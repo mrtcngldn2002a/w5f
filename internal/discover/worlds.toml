@@ -1,0 +1,188 @@
+# Obscure / Archived Worlds — small and old fiction wikis (confic, Backrooms
+# offshoots). Addresses checked live on 2026-09-29; status: live, archived
+# (read from the Wayback Machine), dead. tier: 1 main, 2 good, 3 obscure —
+# Deep Random weights worlds by tier (3 : 2 : 1).
+# Not found at a verifiable address and left out: New Dawn Initiative,
+# Anomalous Reaction Corps, Entity Archive, Perennial Realms, Story Laboratory,
+# Mystery Authorization, CTA Database, Librorum Infinitum, The Emptyrooms,
+# Confic Wiki, Darkrooms (darkrooms.wikidot.com is an unrelated wiki),
+# Liminal Wanderings (only an empty template).
+
+[[world]]
+name = "RPC Authority"
+url = "https://rpc-authority.wikidot.com/"
+family = "confic"
+status = "live"
+tier = 1
+note = "Recovered Phenomena Collection."
+
+[[world]]
+name = "Wayward Society"
+url = "https://wayward.wikidot.com/"
+family = "confic"
+status = "live"
+tier = 1
+
+[[world]]
+name = "Liminal Archives"
+url = "https://liminal-archives.wikidot.com/"
+family = "backrooms"
+status = "live"
+tier = 1
+
+[[world]]
+name = "SCP International (English translations)"
+url = "https://scp-int.wikidot.com/"
+family = "confic"
+status = "live"
+tier = 1
+
+[[world]]
+name = "The Holders"
+url = "https://the-holders.wikidot.com/"
+family = "confic"
+status = "live"
+tier = 1
+note = "The 538 Objects and those who hold them."
+
+[[world]]
+name = "Containment Fiction Archive"
+url = "https://confic-archive.wikidot.com/"
+family = "confic"
+status = "live"
+tier = 1
+note = "Copies of containment-fiction wikis that closed."
+
+[[world]]
+name = "Slender Man Arkive"
+url = "https://slendermanarkive.wikidot.com/"
+family = "fiction"
+status = "live"
+tier = 1
+note = "The Slender Man mythos: blogs and stories, collected."
+
+[[world]]
+name = "The SCP Commune"
+url = "https://scpcommune.wikidot.com/"
+family = "confic"
+status = "live"
+tier = 2
+
+[[world]]
+name = "The Chaos Insurgency"
+url = "https://chaos-insurgency.wikidot.com/"
+family = "confic"
+status = "live"
+tier = 2
+
+[[world]]
+name = "The Antisphere"
+url = "https://antisphere.wikidot.com/"
+family = "confic"
+status = "live"
+tier = 2
+
+[[world]]
+name = "Psychotronics Division"
+url = "https://psychotronicsdivision.wikidot.com/"
+family = "confic"
+status = "live"
+tier = 2
+
+[[world]]
+name = "The Backrooms: Pantheon"
+url = "https://backrooms-pantheon.wikidot.com/"
+family = "backrooms"
+status = "live"
+tier = 2
+
+[[world]]
+name = "Backrooms Apeir"
+url = "https://backrooms-apeir.wikidot.com/"
+family = "backrooms"
+status = "live"
+tier = 2
+
+[[world]]
+name = "Timeless Places"
+url = "https://timeless-places.wikidot.com/"
+family = "backrooms"
+status = "live"
+tier = 2
+
+[[world]]
+name = "F.A.S.A"
+url = "https://fasa.wikidot.com/"
+family = "confic"
+status = "live"
+tier = 3
+
+[[world]]
+name = "Calgary's Gideon Keys"
+url = "https://gideonkeys.wikidot.com/"
+family = "confic"
+status = "live"
+tier = 3
+
+[[world]]
+name = "Void Observation Group"
+url = "https://voidobservationgroup.wikidot.com/"
+family = "confic"
+status = "live"
+tier = 3
+
+[[world]]
+name = "AO/E/L Database"
+url = "https://aoeldatabase.wikidot.com/"
+family = "confic"
+status = "live"
+tier = 3
+
+[[world]]
+name = "The Liminal Files"
+url = "https://the-liminal-files.wikidot.com/"
+family = "backrooms"
+status = "live"
+tier = 3
+
+[[world]]
+name = "The Forgotten Journals"
+url = "https://forgotten-journals.wikidot.com/"
+family = "backrooms"
+status = "live"
+tier = 3
+
+[[world]]
+name = "Spatial Records"
+url = "https://spatial-records.wikidot.com/"
+family = "backrooms"
+status = "live"
+tier = 3
+
+[[world]]
+name = "Forgotten Places"
+url = "https://forgotten-places.wikidot.com/"
+family = "backrooms"
+status = "live"
+tier = 3
+
+[[world]]
+name = "The Middlerooms"
+url = "https://the-middlerooms.wikidot.com/"
+family = "backrooms"
+status = "live"
+tier = 3
+
+[[world]]
+name = "Backrooms Archive Unit"
+url = "https://backroomsarchiveunit.wikidot.com/"
+family = "backrooms"
+status = "live"
+tier = 3
+
+[[world]]
+name = "The Backrooms Classified"
+url = "https://backroomsclassified.wikidot.com/"
+family = "backrooms"
+status = "live"
+tier = 3

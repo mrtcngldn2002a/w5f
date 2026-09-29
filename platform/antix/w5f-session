@@ -1,0 +1,28 @@
+#!/bin/sh
+# W5F // Archive Node — the boot session: W5F, and when it closes a
+# one-key menu. Installed as ~/.local/bin/w5f-session.
+W5F=${W5F:-$HOME/.local/bin/w5f}
+export LANG=${LANG:-en_US.UTF-8}
+
+readkey() {
+	old=$(stty -g 2>/dev/null)
+	stty -icanon -echo min 1 2>/dev/null
+	key=$(dd bs=1 count=1 2>/dev/null)
+	[ -n "$old" ] && stty "$old" 2>/dev/null
+	printf '%s' "$key"
+}
+
+while :; do
+	clear
+	"$W5F"
+	printf '\n  W5F closed.   w  W5F again   s  shell   r  restart   p  power off\n  > '
+	case $(readkey) in
+	s | S)
+		printf '\n  Shell. Type exit to come back.\n\n'
+		"${SHELL:-/bin/sh}" -l
+		;;
+	r | R) sudo -n /sbin/reboot || { echo " (reboot is not allowed: run install.sh again)"; sleep 3; } ;;
+	p | P) sudo -n /sbin/poweroff || { echo " (power off is not allowed: run install.sh again)"; sleep 3; } ;;
+	*) ;;
+	esac
+done

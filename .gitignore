@@ -1,0 +1,12 @@
+# builds
+/bin/
+/dist/
+*.exe
+*.new
+*.prev
+*.swap
+# keys and sessions never belong in the repo
+*.key
+*.pem
+reddit_session*
+ao3_session*

@@ -1,0 +1,13 @@
+#!/bin/sh
+# W5F // Archive Node — X variant (installed as ~/.xinitrc). No window
+# manager: one xterm covering the screen runs the W5F session.
+xrdb -merge "$HOME/.Xresources"
+xset s off -dpms 2>/dev/null
+# Size the terminal to the screen: Terminus 16 is 8x16 pixels per cell.
+dims=$(xdpyinfo 2>/dev/null | awk '/dimensions:/ {print $2}')
+w=${dims%x*}; h=${dims#*x}
+cols=160; rows=50
+if [ -n "$dims" ] && [ "$w" -gt 0 ] 2>/dev/null; then
+	cols=$((w / 8)); rows=$((h / 16))
+fi
+exec xterm -geometry "${cols}x${rows}+0+0" -e "$HOME/.local/bin/w5f-session"

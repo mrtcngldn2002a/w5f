@@ -1,0 +1,700 @@
+# W5F built-in periodicals shelf.
+# Selected together in the v1 conversations (Sept 2026); game-dev sources were
+# removed by the owner. `url` lists candidate feed addresses tried in order;
+# `site` is used for feed autodiscovery when none of them works.
+
+[[shelf]]
+id = "archaeology-tr"
+label = "Archaeology · TR"
+[[shelf]]
+id = "science-tr"
+label = "Science · TR"
+[[shelf]]
+id = "myth-tr"
+label = "Myth & Folklore · TR"
+[[shelf]]
+id = "philosophy-tr"
+label = "Philosophy · TR"
+[[shelf]]
+id = "literature-tr"
+label = "Literature · TR"
+[[shelf]]
+id = "academic-tr"
+label = "Academic · TR (DergiPark)"
+[[shelf]]
+id = "weird"
+label = "Weird & Folklore"
+[[shelf]]
+id = "occult"
+label = "Occult & Esoterica"
+[[shelf]]
+id = "mind"
+label = "Philosophy & Mind"
+[[shelf]]
+id = "ancient"
+label = "Anthropology & Archaeology"
+[[shelf]]
+id = "science"
+label = "Science"
+[[shelf]]
+id = "longreads"
+label = "Long Reads"
+[[shelf]]
+id = "books"
+label = "Books & Criticism"
+[[shelf]]
+id = "specfic"
+label = "Speculative Fiction"
+[[shelf]]
+id = "horror"
+label = "Horror Stories"
+[[shelf]]
+id = "tech"
+label = "Linux & Tech"
+[[shelf]]
+id = "new"
+label = "New Arrivals (books & archives)"
+
+# ---------------------------------------------------------------- Turkish
+[[feed]]
+id = "arkeofili"
+name = "Arkeofili"
+shelf = "archaeology-tr"
+lang = "tr"
+url = ["https://arkeofili.com/feed/"]
+
+[[feed]]
+id = "evrimagaci"
+name = "Evrim Ağacı"
+shelf = "science-tr"
+lang = "tr"
+url = ["https://evrimagaci.org/rss.xml"]
+
+[[feed]]
+id = "sarkac"
+name = "Sarkaç"
+shelf = "science-tr"
+lang = "tr"
+url = ["https://sarkac.org/feed/"]
+
+[[feed]]
+id = "tarihlibilim"
+name = "Tarihli Bilim"
+shelf = "science-tr"
+lang = "tr"
+url = ["https://www.tarihlibilim.com/feed/"]
+
+[[feed]]
+id = "mitoloji"
+name = "Mitoloji.org.tr"
+shelf = "myth-tr"
+lang = "tr"
+url = ["https://mitoloji.org.tr/feed/"]
+
+[[feed]]
+id = "oncul"
+name = "Öncül Analitik Felsefe"
+shelf = "philosophy-tr"
+lang = "tr"
+url = ["https://onculanalitikfelsefe.com/feed/"]
+
+[[feed]]
+id = "cekiclefelsefe"
+disabled = true  # domain now redirects to an unrelated site (checked 2026-09-28)
+name = "Çekiçle Felsefe"
+shelf = "philosophy-tr"
+lang = "tr"
+url = ["https://cekiclefelsefe.com/feed/", "https://www.cekiclefelsefe.com/feed/"]
+
+[[feed]]
+id = "sosyalbilimler"
+name = "Sosyal Bilimler"
+shelf = "philosophy-tr"
+lang = "tr"
+url = ["https://www.sosyalbilimler.org/feed/"]
+
+[[feed]]
+id = "kayiprihtim"
+name = "Kayıp Rıhtım"
+shelf = "literature-tr"
+lang = "tr"
+url = ["https://kayiprihtim.com/feed/"]
+
+[[feed]]
+id = "oykuseckisi"
+name = "Kayıp Rıhtım Öykü Seçkisi"
+shelf = "literature-tr"
+lang = "tr"
+url = ["https://oykuseckisi.com/feed/"]
+
+[[feed]]
+id = "bilimkurgukulubu"
+name = "Bilimkurgu Kulübü"
+shelf = "literature-tr"
+lang = "tr"
+url = ["https://www.bilimkurgukulubu.com/feed/"]
+
+[[feed]]
+id = "edebiyathaber"
+name = "Edebiyat Haber"
+shelf = "literature-tr"
+lang = "tr"
+url = ["https://www.edebiyathaber.net/feed/"]
+
+[[feed]]
+id = "argonotlar"
+name = "Argonotlar"
+shelf = "literature-tr"
+lang = "tr"
+url = ["https://argonotlar.com/feed/"]
+
+[[feed]]
+id = "manifold"
+name = "Manifold"
+shelf = "literature-tr"
+lang = "tr"
+url = ["https://manifold.press/rss", "https://manifold.press/feed"]
+site = "https://manifold.press/"
+
+[[feed]]
+id = "vesaire"
+name = "Vesaire"
+shelf = "literature-tr"
+lang = "tr"
+url = ["https://vesaire.press/feed/"]
+
+[[feed]]
+id = "tubaar"
+name = "TÜBA-AR"
+shelf = "academic-tr"
+lang = "tr"
+url = ["https://dergipark.org.tr/tr/pub/tubaar/rss/lastissue/tr", "https://dergipark.org.tr/tr/pub/tubaar/rss"]
+
+[[feed]]
+id = "folkloredebiyat"
+name = "Folklor/Edebiyat"
+shelf = "academic-tr"
+lang = "tr"
+url = ["https://dergipark.org.tr/tr/pub/fe/rss/lastissue/tr", "https://dergipark.org.tr/tr/pub/fe/rss"]
+
+[[feed]]
+id = "millifolklor"
+name = "Millî Folklor"
+shelf = "academic-tr"
+lang = "tr"
+url = ["https://dergipark.org.tr/tr/pub/millifolklor/rss/lastissue/tr", "https://dergipark.org.tr/tr/pub/millifolklor/rss"]
+
+[[feed]]
+id = "antropoloji"
+name = "Antropoloji (AÜ DTCF)"
+shelf = "academic-tr"
+lang = "tr"
+url = ["https://dergipark.org.tr/tr/pub/antropolojidergisi/rss/lastissue/tr", "https://dergipark.org.tr/tr/pub/antropolojidergisi/rss"]
+
+[[feed]]
+id = "metazihin"
+name = "MetaZihin"
+shelf = "academic-tr"
+lang = "tr"
+url = ["https://dergipark.org.tr/tr/pub/metazihin/rss/lastissue/tr", "https://dergipark.org.tr/tr/pub/metazihin/rss"]
+
+# ---------------------------------------------------------------- Weird & folklore
+[[feed]]
+id = "folkloresociety"
+disabled = true  # site publishes no feed (checked 2026-09-28)
+name = "The Folklore Society"
+shelf = "weird"
+url = ["https://www.folklore-society.com/blog/feed/", "https://www.folklore-society.com/feed/"]
+
+[[feed]]
+id = "folklifetoday"
+disabled = true  # behind bot protection: HTTP 403 for feed readers (checked 2026-09-28)
+name = "Folklife Today (LOC)"
+shelf = "weird"
+url = ["https://blogs.loc.gov/folklife/feed/"]
+
+[[feed]]
+id = "sifolklife"
+disabled = true  # behind bot protection: HTTP 403 for feed readers (checked 2026-09-28)
+name = "Smithsonian Folklife"
+shelf = "weird"
+url = ["https://folklife.si.edu/magazine/rss", "https://folklife.si.edu/rss"]
+site = "https://folklife.si.edu/magazine"
+
+[[feed]]
+id = "atlasobscura"
+name = "Atlas Obscura"
+shelf = "weird"
+url = ["https://www.atlasobscura.com/feeds/latest"]
+site = "https://www.atlasobscura.com/articles"
+
+[[feed]]
+id = "skeptical"
+name = "Skeptical Inquirer"
+shelf = "weird"
+url = ["https://skepticalinquirer.org/feed/"]
+
+[[feed]]
+id = "pdr"
+name = "Public Domain Review"
+shelf = "weird"
+url = ["https://publicdomainreview.org/rss.xml"]
+
+[[feed]]
+id = "llewellyn"
+disabled = true  # journal publishes no feed (checked 2026-09-28)
+name = "Llewellyn Journal"
+shelf = "occult"
+url = ["https://www.llewellyn.com/journal/rss.php", "https://www.llewellyn.com/journal/feed/"]
+site = "https://www.llewellyn.com/journal/"
+
+# ---------------------------------------------------------------- Philosophy & mind
+[[feed]]
+id = "aeon"
+name = "Aeon"
+shelf = "mind"
+url = ["https://aeon.co/feed.rss"]
+
+[[feed]]
+id = "psyche"
+name = "Psyche"
+shelf = "mind"
+url = ["https://psyche.co/feed.rss"]
+
+[[feed]]
+id = "brainsblog"
+name = "The Brains Blog"
+shelf = "mind"
+url = ["https://philosophyofbrains.com/feed/"]
+
+[[feed]]
+id = "dailynous"
+name = "Daily Nous"
+shelf = "mind"
+url = ["https://dailynous.com/feed/"]
+
+[[feed]]
+id = "iai"
+name = "IAI News"
+shelf = "mind"
+url = ["https://iai.tv/rss", "https://iai.tv/feed", "https://feeds.feedburner.com/PhilosophyForOurTimes"]
+site = "https://iai.tv/articles/philosophy"
+
+[[feed]]
+id = "ndpr"
+name = "Notre Dame Philosophical Reviews"
+shelf = "mind"
+url = ["https://feeds2.feedburner.com/PhilosophicalReviews/News"]
+site = "https://ndpr.nd.edu/"
+
+[[feed]]
+id = "hopwag"
+name = "History of Philosophy without any gaps"
+shelf = "mind"
+url = ["https://historyofphilosophy.net/rss.xml"]
+site = "https://historyofphilosophy.net/"
+
+[[feed]]
+id = "philosophynow"
+name = "Philosophy Now"
+shelf = "mind"
+url = ["https://philosophynow.org/rss", "https://philosophynow.org/rss.xml"]
+
+# ---------------------------------------------------------------- Ancient world
+[[feed]]
+id = "archaeologymag"
+name = "Archaeology Magazine"
+shelf = "ancient"
+url = ["https://archaeology.org/feed/"]
+
+[[feed]]
+id = "anthronews"
+name = "Anthropology News"
+shelf = "ancient"
+url = ["https://www.anthropology-news.org/feed/"]
+
+[[feed]]
+id = "anetoday"
+name = "The Ancient Near East Today (ASOR)"
+shelf = "ancient"
+url = ["https://www.asor.org/anetoday/feed/"]
+site = "https://www.asor.org/anetoday/"
+
+[[feed]]
+id = "awol"
+name = "AWOL — The Ancient World Online"
+shelf = "ancient"
+url = ["https://ancientworldonline.blogspot.com/feeds/posts/default?alt=rss"]
+
+[[feed]]
+id = "currentarchaeology"
+disabled = true  # behind bot protection: HTTP 403 for feed readers (checked 2026-09-28)
+name = "Current Archaeology"
+shelf = "ancient"
+url = ["https://archaeology.co.uk/feed/", "https://www.archaeology.co.uk/feed/"]
+
+[[feed]]
+id = "medievalists"
+name = "Medievalists.net"
+shelf = "ancient"
+url = ["https://www.medievalists.net/feed/", "https://medievalists.net/feed/"]
+
+# ---------------------------------------------------------------- Science
+[[feed]]
+id = "quanta"
+name = "Quanta Magazine"
+shelf = "science"
+url = ["https://api.quantamagazine.org/feed/", "https://www.quantamagazine.org/feed/"]
+
+[[feed]]
+id = "nautilus"
+name = "Nautilus"
+shelf = "science"
+url = ["https://nautil.us/feed/"]
+
+[[feed]]
+id = "knowable"
+disabled = true  # behind bot protection: HTTP 403 for feed readers (checked 2026-09-28)
+name = "Knowable Magazine"
+shelf = "science"
+url = ["https://knowablemagazine.org/rss"]
+
+[[feed]]
+id = "sciencenews"
+name = "Science News"
+shelf = "science"
+url = ["https://www.sciencenews.org/feed"]
+
+[[feed]]
+id = "smithsonianscience"
+name = "Smithsonian — Science & Nature"
+shelf = "science"
+url = ["https://www.smithsonianmag.com/rss/science-nature/"]
+
+[[feed]]
+id = "jpl"
+name = "NASA JPL"
+shelf = "science"
+url = ["https://www.jpl.nasa.gov/feeds/news/"]
+
+# ---------------------------------------------------------------- Long reads
+[[feed]]
+id = "jstordaily"
+name = "JSTOR Daily"
+shelf = "longreads"
+url = ["https://daily.jstor.org/feed/"]
+
+[[feed]]
+id = "longreads"
+name = "Longreads"
+shelf = "longreads"
+url = ["https://longreads.com/feed/"]
+
+[[feed]]
+id = "marginalian"
+name = "The Marginalian"
+shelf = "longreads"
+url = ["https://www.themarginalian.org/feed/"]
+
+[[feed]]
+id = "smithsonianhistory"
+name = "Smithsonian — History"
+shelf = "longreads"
+url = ["https://www.smithsonianmag.com/rss/history/"]
+
+# ---------------------------------------------------------------- Books
+[[feed]]
+id = "lithub"
+name = "Literary Hub"
+shelf = "books"
+url = ["https://lithub.com/feed/"]
+
+[[feed]]
+id = "publicbooks"
+name = "Public Books"
+shelf = "books"
+url = ["https://www.publicbooks.org/feed/"]
+
+[[feed]]
+id = "shreviews"
+name = "Strange Horizons — Reviews"
+shelf = "books"
+url = ["https://strangehorizons.com/wordpress/non-fiction/reviews/feed/"]
+
+# ---------------------------------------------------------------- Speculative fiction
+[[feed]]
+id = "shfiction"
+name = "Strange Horizons — Fiction"
+shelf = "specfic"
+url = ["https://strangehorizons.com/wordpress/fiction/feed/"]
+
+[[feed]]
+id = "sharticles"
+name = "Strange Horizons — Articles"
+shelf = "specfic"
+url = ["https://strangehorizons.com/wordpress/non-fiction/articles/feed/"]
+
+[[feed]]
+id = "nightmare"
+name = "Nightmare Magazine"
+shelf = "specfic"
+url = ["https://www.nightmare-magazine.com/feed/", "https://www.nightmare-magazine.com/rss-2"]
+
+[[feed]]
+id = "thedark"
+name = "The Dark"
+shelf = "specfic"
+url = ["https://www.thedarkmagazine.com/feed/"]
+
+[[feed]]
+id = "clarkesworld"
+name = "Clarkesworld"
+shelf = "specfic"
+url = ["https://clarkesworldmagazine.com/feed/"]
+
+[[feed]]
+id = "lightspeed"
+name = "Lightspeed"
+shelf = "specfic"
+url = ["https://www.lightspeedmagazine.com/feed/", "https://www.lightspeedmagazine.com/rss-2"]
+
+[[feed]]
+id = "uncanny"
+name = "Uncanny Magazine"
+shelf = "specfic"
+url = ["https://www.uncannymagazine.com/feed/"]
+
+[[feed]]
+id = "bcs"
+name = "Beneath Ceaseless Skies"
+shelf = "specfic"
+url = ["https://www.beneath-ceaseless-skies.com/feed/"]
+
+[[feed]]
+id = "apex"
+disabled = true  # magazine moved to apexbookcompany.com, no feed (checked 2026-09-28)
+name = "Apex Magazine"
+shelf = "specfic"
+url = ["https://apex-magazine.com/feed/", "https://www.apex-magazine.com/feed/"]
+
+[[feed]]
+id = "reactor"
+name = "Reactor"
+shelf = "specfic"
+url = ["https://reactormag.com/feed/"]
+
+[[feed]]
+id = "escapepod"
+name = "Escape Pod"
+shelf = "specfic"
+url = ["https://escapepod.org/feed/", "https://escapepod.org/feed/atom/"]
+
+# ---------------------------------------------------------------- Horror stories
+[[feed]]
+id = "creepypasta"
+name = "Creepypasta.com"
+shelf = "horror"
+url = ["https://www.creepypasta.com/feed/"]
+
+[[feed]]
+id = "creepypastastories"
+name = "Creepypasta Stories"
+shelf = "horror"
+url = ["https://www.creepypastastories.com/feed/"]
+
+[[feed]]
+id = "hungryshedgerow"
+name = "Hungry's Hedgerow"
+shelf = "horror"
+url = ["https://hungryshedgerow.net/feed/"]
+
+[[feed]]
+id = "oldstyletales"
+name = "Oldstyle Tales"
+shelf = "horror"
+url = ["https://www.oldstyletales.com/blog-feed.xml"]
+
+[[feed]]
+id = "shortstoryme"
+name = "Short-Story.Me — Horror"
+shelf = "horror"
+url = ["https://short-story.me/stories/horror-stories?format=feed&type=rss"]
+
+# ---------------------------------------------------------------- Linux & tech
+[[feed]]
+id = "lwn"
+name = "LWN.net"
+shelf = "tech"
+url = ["https://lwn.net/headlines/rss"]
+
+[[feed]]
+id = "arstechnica"
+name = "Ars Technica"
+shelf = "tech"
+url = ["https://feeds.arstechnica.com/arstechnica/index"]
+
+[[feed]]
+id = "hackaday"
+name = "Hackaday"
+shelf = "tech"
+url = ["https://hackaday.com/blog/feed/"]
+
+[[feed]]
+id = "lobsters"
+name = "Lobsters"
+shelf = "tech"
+url = ["https://lobste.rs/rss"]
+
+[[feed]]
+id = "hackernews"
+name = "Hacker News"
+shelf = "tech"
+url = ["https://hnrss.org/frontpage"]
+
+[[feed]]
+id = "planetdebian"
+name = "Planet Debian"
+shelf = "tech"
+url = ["https://planet.debian.org/rss20.xml"]
+
+# ---------------------------------------------------------------- New arrivals
+[[feed]]
+id = "gutenberg"
+name = "Project Gutenberg — today"
+shelf = "new"
+url = ["https://www.gutenberg.org/cache/epub/feeds/today.rss"]
+
+[[feed]]
+id = "standardebooks"
+name = "Standard Ebooks — new releases"
+shelf = "new"
+url = ["https://standardebooks.org/feeds/rss/new-releases"]
+
+[[feed]]
+id = "iablog"
+name = "Internet Archive Blogs"
+shelf = "new"
+url = ["https://blog.archive.org/feed/"]
+
+# ---------------------------------------------------------------- Added 2026-09-28
+# Replacements for the disabled feeds, each checked live (feed parses, recent
+# posts, no bot wall). The occult shelf favours scholarship, publishers and
+# long-running practitioners over sensational sites.
+
+[[feed]]
+id = "correspondences"
+name = "Correspondences (journal)"
+shelf = "occult"
+url = ["https://correspondencesjournal.com/feed/"]
+
+[[feed]]
+id = "threehands"
+name = "Three Hands Press"
+shelf = "occult"
+url = ["https://www.threehandspress.com/feed/"]
+
+[[feed]]
+id = "ecosophia"
+name = "Ecosophia (John Michael Greer)"
+shelf = "occult"
+url = ["https://www.ecosophia.net/feed/"]
+
+[[feed]]
+id = "goldendawn"
+name = "Hermetic Order of the Golden Dawn"
+shelf = "occult"
+url = ["https://www.hermeticgoldendawn.org/feed/"]
+
+[[feed]]
+id = "wildhunt"
+name = "The Wild Hunt"
+shelf = "occult"
+url = ["https://wildhunt.org/feed"]
+
+[[feed]]
+id = "hermeticacademy"
+name = "Hermetic Academy"
+shelf = "occult"
+url = ["https://hermeticacademy.com/feed/"]
+
+[[feed]]
+id = "oupreligion"
+name = "OUPblog — Religion"
+shelf = "occult"
+url = ["https://blog.oup.com/category/religion/feed/"]
+
+[[feed]]
+id = "iaesoteric"
+name = "Internet Archive — new esoteric texts"
+shelf = "occult"
+url = ["https://archive.org/advancedsearch.php?q=subject%3A%28hermeticism+OR+gnosticism+OR+alchemy+OR+kabbalah+OR+grimoire+OR+%22western+esotericism%22+OR+theosophy%29+AND+mediatype%3Atexts&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=description&sort%5B%5D=addeddate+desc&rows=15&output=rss"]
+
+[[feed]]
+id = "afs"
+name = "American Folklore Society"
+shelf = "weird"
+url = ["https://americanfolkloresociety.org/feed/"]
+
+[[feed]]
+id = "colavito"
+name = "Jason Colavito"
+shelf = "weird"
+url = ["https://www.jasoncolavito.com/blog/feed"]
+
+[[feed]]
+id = "folkhorror"
+name = "Folk Horror Revival"
+shelf = "weird"
+url = ["https://folkhorrorrevival.com/feed/"]
+
+[[feed]]
+id = "undark"
+name = "Undark"
+shelf = "science"
+url = ["https://undark.org/feed/"]
+
+[[feed]]
+id = "worldhistory"
+name = "World History Encyclopedia"
+shelf = "ancient"
+url = ["https://www.worldhistory.org/rss/"]
+
+[[feed]]
+id = "diabolicalplots"
+name = "Diabolical Plots"
+shelf = "specfic"
+url = ["https://www.diabolicalplots.com/feed/"]
+
+[[feed]]
+id = "cosmichorror"
+name = "Cosmic Horror Monthly"
+shelf = "horror"
+url = ["https://cosmichorrormonthly.com/feed/"]
+
+[[feed]]
+id = "felsefegentr"
+name = "Felsefe.gen.tr"
+shelf = "philosophy-tr"
+lang = "tr"
+url = ["https://www.felsefe.gen.tr/feed/"]
+
+[[feed]]
+id = "dusunbil"
+name = "Düşünbil"
+shelf = "philosophy-tr"
+lang = "tr"
+url = ["https://www.dusunbil.com/feed/"]
+
+[[feed]]
+id = "bilimvegelecek"
+name = "Bilim ve Gelecek"
+shelf = "science-tr"
+lang = "tr"
+url = ["https://bilimvegelecek.com.tr/index.php/feed/"]
+
+[[feed]]
+id = "acikbilim"
+name = "Açık Bilim"
+shelf = "science-tr"
+lang = "tr"
+url = ["https://www.acikbilim.com/feed"]

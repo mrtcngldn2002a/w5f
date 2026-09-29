@@ -1,0 +1,284 @@
+package discover
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
+	"w5f/internal/doc"
+	"w5f/internal/personal"
+	"w5f/internal/store"
+)
+
+// Packet is one day's issue of the Daily Packet.
+type Packet struct {
+	Date    string  `json:"date"` // 2026-09-29
+	Number  int     `json:"number"`
+	Entries []Entry `json:"entries"`
+}
+
+// Entry is one item of an issue.
+type Entry struct {
+	Kind   string `json:"kind"` // periodical, weird, esoteric, public, archive, queue
+	Title  string `json:"title"`
+	Target string `json:"target"`
+	Source string `json:"source"` // feed id, family detail
+}
+
+// packetDraws are the random parts of an issue (replaced in tests).
+var packetDraws = map[string]func(context.Context, Env) (Draw, error){
+	"weird": func(ctx context.Context, env Env) (Draw, error) { return weird{}.Draw(ctx, env) },
+	"esoteric": func(ctx context.Context, env Env) (Draw, error) {
+		if pick([]bool{true, false}) {
+			return esoteric{}.Draw(ctx, env)
+		}
+		return folklore{}.Draw(ctx, env)
+	},
+	"public":  publicDomainDraw,
+	"archive": func(ctx context.Context, env Env) (Draw, error) { return textfiles{}.Draw(ctx, env) },
+}
+
+var packetKinds = []string{"weird", "esoteric", "public", "archive"}
+
+var roman = []string{"I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"}
+
+func today() string { return time.Now().Format("2006-01-02") }
+
+func loadPacket(db *store.DB, date string) (Packet, bool) {
+	var p Packet
+	if json.Unmarshal([]byte(db.Get("packet:"+date)), &p) != nil || p.Date == "" {
+		return p, false
+	}
+	return p, true
+}
+
+// todayPacket returns today's issue, building it on first use.
+func todayPacket(env Env) (Packet, error) {
+	if p, ok := loadPacket(env.DB, today()); ok {
+		return p, nil
+	}
+	n, _ := strconv.Atoi(env.DB.Get("packet:count"))
+	p := buildPacket(context.Background(), env, today(), n+1)
+	if err := savePacket(env.DB, p); err != nil {
+		return p, err
+	}
+	return p, env.DB.Set("packet:count", strconv.Itoa(n+1))
+}
+
+func savePacket(db *store.DB, p Packet) error {
+	b, err := json.Marshal(p)
+	if err != nil {
+		return err
+	}
+	return db.Set("packet:"+p.Date, string(b))
+}
+
+// buildPacket assembles an issue: three unread periodicals from three
+// feeds, one each of weird, esoteric-or-folklore, public domain and archive,
+// and the first open item of the reading queue. A missing part is skipped.
+func buildPacket(ctx context.Context, env Env, date string, number int) Packet {
+	p := Packet{Date: date, Number: number}
+	if items, err := env.DB.Items(store.Query{Unread: true, Limit: 200}); err == nil {
+		seen := map[string]bool{}
+		for _, it := range items {
+			if seen[it.FeedID] || len(seen) == 3 {
+				continue
+			}
+			seen[it.FeedID] = true
+			p.Entries = append(p.Entries, Entry{Kind: "periodical", Title: it.Title, Target: fmt.Sprintf("w5f:item/%d", it.ID), Source: it.FeedID})
+		}
+	}
+	for _, k := range packetKinds {
+		d, err := packetDraws[k](ctx, env)
+		if err != nil {
+			continue
+		}
+		title, source := d.Why, d.Why
+		if i := strings.Index(d.Why, " · "); i >= 0 {
+			title, source = d.Why[i+len(" · "):], d.Why[:i]
+		}
+		p.Entries = append(p.Entries, Entry{Kind: k, Title: title, Target: d.Target, Source: source})
+	}
+	if q, err := personal.LoadQueue(); err == nil {
+		for _, e := range q.Entries() {
+			if !e.Done {
+				p.Entries = append(p.Entries, Entry{Kind: "queue", Title: e.Title, Target: e.URL, Source: "reading queue"})
+				break
+			}
+		}
+	}
+	return p
+}
+
+var kindLabel = map[string]string{"periodical": "Periodicals", "weird": "Weird Worlds", "esoteric": "Esoterica & folklore",
+	"public": "Public domain", "archive": "Old internet", "queue": "From your queue"}
+
+func packetHref(date string, rest string) string {
+	if rest == "" {
+		return "w5f:packet/" + date
+	}
+	return "w5f:packet/" + date + "/" + rest
+}
+
+func coverDoc(p Packet) *doc.Document {
+	d := &doc.Document{Title: "The W5F Daily Packet", URL: packetHref(p.Date, ""), Origin: "local", Lang: "en"}
+	d.Meta = []doc.KV{{Key: "·", Value: fmt.Sprintf("No. %d · %s · %d items", p.Number, p.Date, len(p.Entries))}}
+	link := func(href, text string) int {
+		d.Links = append(d.Links, doc.Link{Href: href, Text: text})
+		return len(d.Links)
+	}
+	var items [][]doc.Block
+	for i, e := range p.Entries {
+		in := doc.Inline{{Text: roman[i] + ".  ", Style: doc.Bold}, {Text: e.Title, Link: link(packetHref(p.Date, strconv.Itoa(i+1)), e.Title)},
+			{Text: "  · " + kindLabel[e.Kind] + " · " + e.Source, Style: doc.Italic}}
+		items = append(items, []doc.Block{doc.Paragraph{Text: in}})
+	}
+	if len(items) == 0 {
+		d.Blocks = append(d.Blocks, doc.Paragraph{Text: doc.Inline{{Text: "Nothing could be gathered today (offline?). Try reshuffle later.", Style: doc.Italic}}})
+	} else {
+		d.Blocks = append(d.Blocks, doc.List{Items: items})
+	}
+	actions := doc.Inline{}
+	if len(p.Entries) > 0 {
+		actions = append(actions, doc.Span{Text: "▶ start reading", Style: doc.Bold, Link: link(packetHref(p.Date, "1"), "start")}, doc.Span{Text: "   "})
+	}
+	if p.Date == today() {
+		actions = append(actions, doc.Span{Text: "reshuffle", Link: link(packetHref(p.Date, "reshuffle"), "reshuffle")}, doc.Span{Text: "   "})
+	}
+	actions = append(actions, doc.Span{Text: "save this issue", Link: link(packetHref(p.Date, "save"), "save")})
+	d.Blocks = append(d.Blocks, doc.Rule{}, doc.Paragraph{Text: actions})
+	if p.Date == today() {
+		d.Next = packetHref(p.Date, "1")
+	}
+	return d
+}
+
+// entryDoc opens item n of an issue with the packet's navigation.
+func entryDoc(ctx context.Context, env Env, p Packet, n int) (*doc.Document, error) {
+	if n < 1 || n > len(p.Entries) {
+		return coverDoc(p), nil
+	}
+	e := p.Entries[n-1]
+	d, err := env.Load(ctx, e.Target)
+	if err != nil {
+		d = &doc.Document{Title: e.Title, Blocks: []doc.Block{doc.Notice{Kind: "warn", Text: err.Error()}}}
+	}
+	link := func(href, text string) int {
+		d.Links = append(d.Links, doc.Link{Href: href, Text: text})
+		return len(d.Links)
+	}
+	line := doc.Inline{{Text: fmt.Sprintf("Daily Packet No. %d · %s of %s · %s", p.Number, roman[n-1], roman[len(p.Entries)-1], kindLabel[e.Kind]), Style: doc.Italic}}
+	if n > 1 {
+		d.Prev = packetHref(p.Date, strconv.Itoa(n-1))
+		line = append(line, doc.Span{Text: " · "}, doc.Span{Text: "‹ previous", Link: link(d.Prev, "previous")})
+	}
+	line = append(line, doc.Span{Text: " · "}, doc.Span{Text: "cover", Link: link(packetHref(p.Date, ""), "cover")})
+	if n < len(p.Entries) {
+		d.Next = packetHref(p.Date, strconv.Itoa(n+1))
+		line = append(line, doc.Span{Text: " · "}, doc.Span{Text: "next ›", Link: link(d.Next, "next")})
+	} else {
+		d.Next = ""
+	}
+	d.Blocks = append([]doc.Block{doc.Paragraph{Text: line}}, d.Blocks...)
+	return d, nil
+}
+
+// saveIssue writes the whole issue as one Markdown file in the notes folder.
+func saveIssue(ctx context.Context, env Env, p Packet) (*doc.Document, error) {
+	var b strings.Builder
+	fmt.Fprintf(&b, "---\ntitle: \"The W5F Daily Packet No. %d\"\ndate: %s\ntags: [w5f, packet]\n---\n# The W5F Daily Packet No. %d — %s\n\n", p.Number, p.Date, p.Number, p.Date)
+	for i, e := range p.Entries {
+		fmt.Fprintf(&b, "## %s. %s\n\n*%s · %s* — <%s>\n\n", roman[i], e.Title, kindLabel[e.Kind], e.Source, e.Target)
+		if d, err := env.Load(ctx, e.Target); err == nil {
+			b.WriteString(personal.ToMarkdown(d))
+			b.WriteString("\n\n")
+		}
+	}
+	dir := filepath.Join(personal.Dir(), "Saved")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, err
+	}
+	path := filepath.Join(dir, personal.FileName(fmt.Sprintf("Daily Packet No. %d (%s)", p.Number, p.Date))+".md")
+	if err := os.WriteFile(path, []byte(b.String()), 0o644); err != nil {
+		return nil, err
+	}
+	d := coverDoc(p)
+	d.Blocks = append([]doc.Block{doc.Notice{Kind: "info", Text: "Saved: " + path}}, d.Blocks...)
+	return d, nil
+}
+
+// packetRoute serves w5f:packet and w5f:packet/<date>[/<n>|/reshuffle|/save].
+func packetRoute(ctx context.Context, target string, env Env) (*doc.Document, error) {
+	if target == "w5f:packet" {
+		p, err := todayPacket(env)
+		if err != nil {
+			return nil, err
+		}
+		return coverDoc(p), nil
+	}
+	parts := strings.Split(strings.TrimPrefix(target, "w5f:packet/"), "/")
+	p, ok := loadPacket(env.DB, parts[0])
+	if !ok {
+		if parts[0] != today() {
+			return nil, errors.New("no Daily Packet for " + parts[0])
+		}
+		var err error
+		if p, err = todayPacket(env); err != nil {
+			return nil, err
+		}
+	}
+	if len(parts) == 1 {
+		return coverDoc(p), nil
+	}
+	switch parts[1] {
+	case "reshuffle":
+		if p.Date != today() {
+			return coverDoc(p), nil
+		}
+		p = buildPacket(ctx, env, p.Date, p.Number)
+		if err := savePacket(env.DB, p); err != nil {
+			return nil, err
+		}
+		return coverDoc(p), nil
+	case "save":
+		return saveIssue(ctx, env, p)
+	}
+	n, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return nil, errors.New("bad packet address")
+	}
+	return entryDoc(ctx, env, p, n)
+}
+
+// publicDomainDraw: a recent Public Domain Review article, else a random
+// Project Gutenberg book.
+func publicDomainDraw(ctx context.Context, env Env) (Draw, error) {
+	if link, title, err := rssPick(ctx, env.Fetcher, "https://publicdomainreview.org/rss.xml"); err == nil {
+		return Draw{Target: link, Why: "public domain/Public Domain Review · " + title}, nil
+	}
+	gq, base, err := get(ctx, env.Fetcher, "https://www.gutenberg.org/ebooks/search/?sort_order=random")
+	if err != nil {
+		return Draw{}, err
+	}
+	a := gq.Find("li.booklink a.link").First()
+	href, _ := a.Attr("href")
+	if href == "" {
+		return Draw{}, errors.New("Gutenberg: no random book")
+	}
+	target, _ := base.Parse(href)
+	return Draw{Target: target.String(), Why: "public domain/Project Gutenberg · " + strings.Join(strings.Fields(a.Find(".title").Text()), " ")}, nil
+}
+
+// Welcome is the welcome screen's line about today's packet ("" before it exists).
+func Welcome(db *store.DB) string {
+	if p, ok := loadPacket(db, today()); ok {
+		return fmt.Sprintf("Daily Packet No. %d — %d items", p.Number, len(p.Entries))
+	}
+	return "today's Daily Packet — press p"
+}

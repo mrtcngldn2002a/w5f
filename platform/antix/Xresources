@@ -1,0 +1,30 @@
+! W5F // Archive Node — xterm for the X variant (installed as ~/.Xresources)
+XTerm*font: -*-terminus-medium-r-normal-*-16-*-*-*-*-*-iso10646-1
+XTerm*utf8: 1
+XTerm*locale: true
+XTerm*termName: xterm-256color
+XTerm*internalBorder: 0
+XTerm*scrollBar: false
+XTerm*saveLines: 0
+XTerm*metaSendsEscape: true
+XTerm*allowWindowOps: false
+! Amber P3, from internal/theme (a Go test keeps these lines in step).
+XTerm*foreground: #ffb000
+XTerm*background: #120c02
+XTerm*cursorColor: #ffd27a
+XTerm*color0: #120c02
+XTerm*color1: #ff6a00
+XTerm*color2: #9c6b00
+XTerm*color3: #ffb000
+XTerm*color4: #4a3300
+XTerm*color5: #ffd27a
+XTerm*color6: #9c6b00
+XTerm*color7: #ffb000
+XTerm*color8: #4a3300
+XTerm*color9: #ff6a00
+XTerm*color10: #ffd27a
+XTerm*color11: #ffd27a
+XTerm*color12: #9c6b00
+XTerm*color13: #ffd27a
+XTerm*color14: #ffd27a
+XTerm*color15: #ffd27a
