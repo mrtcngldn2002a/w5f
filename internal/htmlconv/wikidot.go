@@ -80,13 +80,43 @@ func Wikidot(r io.Reader, pageURL string) (*doc.Document, error) {
 		}
 	}
 
+	// The site's top menu first, so its links come before the page's.
+	menu := siteMenu(c, root)
 	content := find(root, byID("page-content"))
 	if content == nil {
 		content = root
 	}
 	d.Blocks = c.blocks(content)
+	if menu != nil {
+		d.Blocks = append([]doc.Block{*menu}, d.Blocks...)
+	}
 	d.Renumber()
 	return d, nil
+}
+
+// siteMenu keeps the wiki's top menu as one closed section. Hub pages rely on
+// it: Wanderers' Library's "Browse the Library" opens Wing One, and Wing Two,
+// Wing Three and the halls are only reachable from this menu.
+func siteMenu(c *converter, root *html.Node) *doc.Collapsible {
+	bar := find(root, byClass("top-bar"))
+	if bar == nil {
+		return nil
+	}
+	links := 0
+	walk(bar, func(n *html.Node) bool {
+		if n.Type == html.ElementNode && n.DataAtom == atom.A && !strings.HasPrefix(attr(n, "href"), "javascript:") {
+			links++
+		}
+		return true
+	})
+	if links < 3 {
+		return nil
+	}
+	blocks := c.blocks(bar)
+	if len(blocks) == 0 {
+		return nil
+	}
+	return &doc.Collapsible{Show: "Site menu", Hide: "Site menu", Blocks: blocks}
 }
 
 // wikidotSpecial maps known Wikidot widgets onto first-class blocks.

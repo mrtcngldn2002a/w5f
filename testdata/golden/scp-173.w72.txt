@@ -3,6 +3,8 @@ rating +11082 · tags autonomous ectoentropic euclid featured horror
 hostile murder-monster mystery observational scp sculpture the-sculpture
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+[+] Site menu
+
 Item #: SCP-173
 
 Object Class: Euclid

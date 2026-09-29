@@ -67,8 +67,8 @@ func TestWikidotSCP173(t *testing.T) {
 			t.Errorf("widget text leaked: %q", junk)
 		}
 	}
-	if d.Collapsibles != 1 {
-		t.Errorf("collapsibles = %d, want 1", d.Collapsibles)
+	if d.Collapsibles != 2 { // the site menu and Licensing / Citation
+		t.Errorf("collapsibles = %d, want 2", d.Collapsibles)
 	}
 	var rating string
 	for _, kv := range d.Meta {
@@ -108,7 +108,7 @@ func TestCollapsibleStartsClosedWithCleanLabels(t *testing.T) {
 	if col.Show != "Licensing / Citation" || col.Hide != "Hide Licensing / Citation" {
 		t.Errorf("labels = %q / %q", col.Show, col.Hide)
 	}
-	if col.ID != 1 || len(col.Blocks) == 0 {
+	if col.ID != 2 || len(col.Blocks) == 0 { // 1 is the site menu
 		t.Errorf("id=%d blocks=%d", col.ID, len(col.Blocks))
 	}
 }
@@ -136,8 +136,8 @@ func TestWanderersTale(t *testing.T) {
 	if !strings.Contains(text, "Olympus Mons") || !strings.Contains(text, "Its name is Regret.") {
 		t.Error("tale body missing")
 	}
-	// "More From This Author" stays; the Translations box is deliberately dropped.
-	if d.Collapsibles != 1 || strings.Contains(text, "Translations") {
+	// The site menu and "More From This Author" stay; the Translations box is deliberately dropped.
+	if d.Collapsibles != 2 || strings.Contains(text, "Translations") {
 		t.Errorf("collapsibles = %d\n%s", d.Collapsibles, text)
 	}
 }
@@ -182,5 +182,33 @@ func TestRedactionAndInlineStyles(t *testing.T) {
 	}
 	if !strings.Contains(p.Text.PlainText(), "████") {
 		t.Error("block redaction characters must be preserved")
+	}
+}
+
+// The site's top menu (Wing Two, Hall One, collections…) is kept as one
+// closed "Site menu" section at the top: hubs like Wing One link nowhere else.
+func TestWikidotSiteMenu(t *testing.T) {
+	d := loadFixture(t, "wl-six-etchings.html", "https://wanderers-library.wikidot.com/six-etchings-in-the-basalt-of-olympus-mons")
+	menu, ok := d.Blocks[0].(doc.Collapsible)
+	if !ok || menu.Show != "Site menu" || menu.Open {
+		t.Fatalf("first block: %#v", d.Blocks[0])
+	}
+	text := allText(menu.Blocks)
+	for _, want := range []string{"Browse", "Wing Two", "Hall One"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("site menu lacks %q:\n%s", want, text)
+		}
+	}
+	found := false
+	for _, l := range d.Links {
+		found = found || l.Href == "https://wanderers-library.wikidot.com/wing-two"
+	}
+	if !found {
+		t.Error("Wing Two is not a link")
+	}
+	// A page without a top bar gets no menu.
+	plain, _ := Wikidot(strings.NewReader(`<div id="page-content"><p>text</p></div>`), "https://x.wikidot.com/p")
+	if _, isMenu := plain.Blocks[0].(doc.Collapsible); isMenu {
+		t.Error("no top bar, no menu")
 	}
 }

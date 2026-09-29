@@ -6,6 +6,8 @@ observational scp sculpture
 the-sculpture
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+[+] Site menu
+
 Item #: SCP-173
 
 Object Class: Euclid

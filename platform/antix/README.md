@@ -20,15 +20,18 @@ sh install.sh kmscon    # or: sh install.sh x
 
 It asks for sudo for the system parts:
 - the Terminus fonts;
-- the tty1 line in `/etc/inittab` (backed up first);
+- tty1: antiX 26 (s6-rc) in `/etc/s6-rc/config/tty1.conf`, older antiX in `/etc/inittab`, backed up first;
+- the display manager (slimski on antiX 26) is taken off the boot list and brought back by `--undo`;
+- a fontconfig exception for Terminus, because antiX turns bitmap fonts off;
 - `/etc/sudoers.d/w5f-power`, which allows only `poweroff` and `reboot`, for the menu.
 
 W5F itself goes to `~/.local/bin`, so `w5f update` needs no root.
 
-If a display manager (slim, lightdm…) starts at boot, the script says how to
-turn it off.
-
 Undo everything with `sh install.sh --undo`.
+
+Restart right after installing or undoing. On antiX 26 the script reloads the
+s6-rc service list, and that can leave `turnstiled` stuck. New logins, SSH
+included, then hang until the restart (seen on 2026-09-29).
 
 ## The session
 

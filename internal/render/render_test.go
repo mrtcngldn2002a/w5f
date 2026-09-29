@@ -60,7 +60,7 @@ func fixture(t *testing.T, name, u string) *doc.Document {
 func TestGoldenSCP173(t *testing.T) {
 	d := fixture(t, "scp-173.html", "https://scp-wiki.wikidot.com/scp-173")
 	golden(t, "scp-173.w72.txt", text(Render(d, Options{Width: 72})))
-	golden(t, "scp-173.w40.open.txt", text(Render(d, Options{Width: 40, Open: map[int]bool{1: true}})))
+	golden(t, "scp-173.w40.open.txt", text(Render(d, Options{Width: 40, Open: map[int]bool{2: true}})))
 }
 
 func TestGoldenWanderers(t *testing.T) {
