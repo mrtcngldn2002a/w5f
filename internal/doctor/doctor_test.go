@@ -65,8 +65,11 @@ func TestProblemsAreReported(t *testing.T) {
 	notDir := filepath.Join(t.TempDir(), "file")
 	os.WriteFile(notDir, nil, 0o644)
 	e.CacheDir = notDir
+	e.ComicsDir = t.TempDir()
+	e.SuwayomiJar = "/x/Suwayomi-Server-v2.jar"
+	e.JavaPath = func() (string, error) { return "", errors.New("not found") }
 	rs := Check(e)
-	want := map[string]Status{"config": Fail, "database": Fail, "locale": Fail, "terminal": Warn, "font": Warn,
+	want := map[string]Status{"suwayomi": Warn, "viewer": Warn, "comics folder": OK, "config": Fail, "database": Fail, "locale": Fail, "terminal": Warn, "font": Warn,
 		"dictionary": Warn, "update": Warn, "cache folder": Fail, "notes folder": OK}
 	for name, s := range want {
 		if r := find(rs, name); r.Status != s {

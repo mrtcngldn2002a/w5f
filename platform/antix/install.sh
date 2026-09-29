@@ -21,6 +21,13 @@ ME=$(id -un)
 BIN="$HOME/.local/bin"
 SUDOERS=/etc/sudoers.d/w5f-power
 FONTCONF=/etc/fonts/conf.d/60-w5f-terminus.conf
+NOGLX=/etc/X11/xorg.conf.d/90-w5f-no-glx.conf
+# antiX 26: /etc/user_session.d/s6-rc-user-session.sh ends with
+# "... && rm -rf ... || sleep 5 && pkill -9 waitpid", which always kills
+# turnstile's waitpid: the user manager restarts every few seconds and new
+# logins (SSH too) hang. A same-named, non-executable file in the user's own
+# session folder makes turnstile skip it for this user (seen 2026-09-30).
+USERSESS="$HOME/.user_session.d/s6-rc-user-session.sh"
 MARK="# w5f-session (install.sh)"
 S6TTY=/etc/s6-rc/config/tty1.conf
 INITTAB=/etc/inittab
@@ -90,9 +97,10 @@ undo() {
 		sudo rm /etc/s6-rc/w5f-disabled-dm
 		sudo s6-db-reload
 	fi
-	sudo rm -f "$SUDOERS"
+	sudo rm -f "$SUDOERS" "$NOGLX"
 	restore /etc/kmscon/kmscon.conf
 	profile_clean
+	if [ -f "$USERSESS" ] && grep -q "^# W5F" "$USERSESS"; then rm -f "$USERSESS"; fi
 	if [ -f "$HOME/.xinitrc.w5f-backup" ]; then mv "$HOME/.xinitrc.w5f-backup" "$HOME/.xinitrc"; fi
 	echo "Done. Restart to get the normal login back. (W5F itself stays in $BIN; fonts stay installed.)"
 }
@@ -117,6 +125,16 @@ install_common() {
 		sudo tee "$FONTCONF" >/dev/null
 	sudo fc-cache -f >/dev/null
 	echo "Terminus for fontconfig: $(fc-list | grep -ic terminus) files"
+
+	if [ -f /etc/user_session.d/s6-rc-user-session.sh ] && [ ! -e "$USERSESS" ]; then
+		say "Turnstile fix: skip antiX's s6-rc user session script for $ME"
+		mkdir -p "$HOME/.user_session.d"
+		{
+			echo "# W5F: skips /etc/user_session.d/s6-rc-user-session.sh for this user; its exit trap"
+			echo "# always kills turnstile's waitpid and hangs logins. Delete this file to bring it back."
+		} >"$USERSESS"
+		chmod 644 "$USERSESS"
+	fi
 
 	say "Power menu: allow only poweroff and reboot without a password"
 	tmp=$(mktemp)
@@ -146,6 +164,9 @@ x)
 	say "X and xterm"
 	sudo apt-get install -y xserver-xorg-core xserver-xorg-video-intel xinit xterm x11-xserver-utils x11-utils
 	install -m 0644 "$HERE/Xresources" "$HOME/.Xresources"
+	# xterm needs no OpenGL: without GLX, Xorg does not load the Mesa driver.
+	sudo mkdir -p /etc/X11/xorg.conf.d
+	sudo install -m 0644 "$HERE/90-w5f-no-glx.conf" "$NOGLX"
 	if [ -f "$HOME/.xinitrc" ] && [ ! -f "$HOME/.xinitrc.w5f-backup" ]; then cp "$HOME/.xinitrc" "$HOME/.xinitrc.w5f-backup"; fi
 	install -m 0755 "$HERE/xinitrc" "$HOME/.xinitrc"
 	profile_clean

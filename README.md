@@ -7,7 +7,7 @@ One Go binary, one document model, one reader: web pages, Wikidot wikis (SCP,
 Wanderers' Library, Backrooms), feeds, books and small-web content are all
 converted into the same internal format and read with the same keys.
 
-> Status: **M7 — platform + update** (signed `w5f update` / `--rollback` from GitHub Releases, `w5f doctor [--live] [--bench]`, antiX boot shell in `platform/antix`, not yet tried on the laptop) · **M6 — discovery** (deep random `x`, Daily Packet `p`, Gemini & Gopher, archived worlds) · **M5 — internet fiction** (Royal Road, XenForo threadmarks, AO3, WordPress serials, Reddit series; follow for new chapters; FanFicFare bridge) · **M4 — personal layer** · **M3 — library** (reads EPUB, MOBI/AZW/AZW3, FB2/.fb2.zip and PDF text with chapters/contents/resume; Gutenberg + Standard Ebooks, local ~/Archive/Books, DJVU/CBZ/CBR → external viewer) · **M2 — periodicals** (71-feed shelf, full text, read/star state, `w5f sync`) on top of **M1 — web + Wikidot.** Readability article extraction, on-disk
+> Status: **M8 — comics** (local CBZ library with progress, Suwayomi as the following engine, own X11 viewer `w5f view`) · **M7 — platform + update** (signed `w5f update` / `--rollback` from GitHub Releases, `w5f doctor [--live] [--bench]`, antiX boot shell in `platform/antix`: X + xterm on the laptop) · **M6 — discovery** (deep random `x`, Daily Packet `p`, Gemini & Gopher, archived worlds) · **M5 — internet fiction** (Royal Road, XenForo threadmarks, AO3, WordPress serials, Reddit series; follow for new chapters; FanFicFare bridge) · **M4 — personal layer** · **M3 — library** (reads EPUB, MOBI/AZW/AZW3, FB2/.fb2.zip and PDF text with chapters/contents/resume; Gutenberg + Standard Ebooks, local ~/Archive/Books, DJVU/CBZ/CBR → external viewer) · **M2 — periodicals** (71-feed shelf, full text, read/star state, `w5f sync`) on top of **M1 — web + Wikidot.** Readability article extraction, on-disk
 > cache (offline reading, `--offline`), Wayback fallback for dead pages,
 > embedded Wikidot blocks inlined, random pages via Crom (SCP, Wanderers'
 > Library, Backrooms).
@@ -106,6 +106,35 @@ W5F target (the T7200 has no SSE4.2, so the amd64 level must stay at v1):
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v1 go build -trimpath -ldflags "-s -w" -o bin/w5f-linux-amd64 ./cmd/w5f
 ```
 
+## Comics
+
+`g → comics` (or the Comics link on the welcome page).
+
+- **Library.** CBZ files and image folders in `~/Archive/Comics` (`W5F_COMICS`), one folder per series.
+  - `ComicInfo.xml` is used when present; natural page order.
+  - Your page is kept.
+  - PDF, CBR and DJVU open in the system viewer.
+- **Following** runs on [Suwayomi-Server](https://github.com/Suwayomi/Suwayomi-Server).
+  - Install: `w5f comics server install` downloads the official release and checks it against the release's checksums. Suwayomi needs Java 21.
+  - W5F starts it when Comics opens and stops it when W5F closes. On the W5F laptop: about 13 s to start, 352 MB while idle.
+  - Settings: headless, local only (`127.0.0.1:4567`); downloads are CBZ into `Comics/Suwayomi`; its Local source is `Comics/Local`.
+  - Pages: followed series, series pages (follow, refresh, download), sources and search, downloads, extensions.
+  - CLI: `w5f comics list|update|server start|stop|status`.
+- **Extensions.** W5F ships and pre-configures no extension repositories. You add a repository by its address and choose what to install; the rights of what a source offers are yours to mind.
+- **Viewer.** `w5f view` is a full-screen X11 window, pure Go with no OpenGL.
+
+  | Key | Action |
+  |---|---|
+  | space / b, arrows | next / previous |
+  | `f` | fit page / width / height |
+  | `d` | two-page spreads |
+  | `r` | right to left |
+  | `g` + number + enter | go to page |
+  | `n` / `p` (also `]` `[`, ğ ü) | next / previous issue |
+  | `q` | back to W5F |
+
+  Progress is saved on every page turn, and to Suwayomi for its chapters. On the laptop: about 250 ms per page turn, 66 MB.
+
 ## Update, releases, doctor
 
 - **Update.** `w5f update` installs the latest release from GitHub Releases:
@@ -143,6 +172,9 @@ Golden files: `go test ./internal/render -update` rewrites
 ```
 cmd/w5f            CLI entry point
 cmd/w5f-release    release tool: key, cross-builds, signed manifest (developer only)
+internal/comics    comics library (CBZ, ComicInfo, progress) and the Comics pages
+internal/comics/suwayomi  Suwayomi-Server client, start/stop, official install
+internal/comics/view      the comics viewer (X11, layout, spreads, RTL)
 internal/update    signed self-update and rollback
 internal/doctor    install checks, live source checks, render bench
 platform/antix     boot shell for the W5F laptop (kmscon or X, Terminus, Amber P3)

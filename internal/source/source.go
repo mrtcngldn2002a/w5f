@@ -11,8 +11,10 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -20,6 +22,8 @@ import (
 	"github.com/BurntSushi/toml"
 
 	"w5f/internal/books"
+	"w5f/internal/comics"
+	"w5f/internal/comics/suwayomi"
 	"w5f/internal/crom"
 	"w5f/internal/discover"
 	"w5f/internal/doc"
@@ -109,6 +113,13 @@ func Load(ctx context.Context, target string, opts Options) (*doc.Document, erro
 			return nil, err
 		}
 		return feeds.Route(ctx, target, env)
+	}
+	if comics.IsTarget(target) {
+		env, err := ComicsEnv()
+		if err != nil {
+			return nil, err
+		}
+		return comics.Route(ctx, target, env)
 	}
 	if fiction.IsTarget(target) {
 		env, err := FictionEnv()
@@ -236,6 +247,8 @@ func Resolve(input string) string {
 		return "w5f:fiction"
 	case lower == "following":
 		return "w5f:following"
+	case lower == "comics" || lower == "manga" || lower == "comic":
+		return "w5f:comics"
 	case lower == "smallweb" || lower == "small web" || lower == "gemini" || lower == "gopher":
 		return "w5f:smallweb"
 	case lower == "worlds" || lower == "archived worlds":
@@ -320,6 +333,56 @@ func FictionEnv() (fiction.Env, error) {
 		Reddit: func(ctx context.Context, u *url.URL) (*doc.Document, error) {
 			return reddit.Load(ctx, Fetcher, u, false)
 		}}, nil
+}
+
+// ComicsServer is the Suwayomi server W5F starts for Comics: its jar and
+// data in <data>/suwayomi, downloads and the Local source inside the Comics
+// folder so the library sees them.
+func ComicsServer() suwayomi.Server {
+	root := comics.Root()
+	return suwayomi.Server{Dir: filepath.Join(store.DataDir(), "suwayomi"),
+		Downloads: filepath.Join(root, "Suwayomi"), Local: filepath.Join(root, "Local")}
+}
+
+// ComicsEnv is what the Comics pages need.
+func ComicsEnv() (comics.Env, error) {
+	db, err := store.Default()
+	if err != nil {
+		return comics.Env{}, fmt.Errorf("opening the local database: %w", err)
+	}
+	return comics.Env{DB: db, Root: comics.Root(), Server: ComicsServer(), View: OpenComic}, nil
+}
+
+// OpenComic starts the comics viewer (w5f view) in its own window; without
+// a display, a local file goes to the system viewer.
+func OpenComic(v comics.ViewRequest) error {
+	args := []string{"view"}
+	switch {
+	case v.ChapterID > 0:
+		args = append(args, "--chapter", strconv.Itoa(v.ChapterID))
+	case v.ComicID > 0:
+		args = append(args, "--comic", strconv.FormatInt(v.ComicID, 10), v.Path)
+	default:
+		args = append(args, v.Path)
+	}
+	if runtime.GOOS == "linux" && os.Getenv("DISPLAY") == "" {
+		if v.Path != "" {
+			return books.OpenExternal(v.Path)
+		}
+		return errors.New("the comics viewer needs X (it runs in the W5F session, not over SSH or on the console)")
+	}
+	if runtime.GOOS != "linux" {
+		if v.Path != "" {
+			return books.OpenExternal(v.Path)
+		}
+		return errors.New("reading Suwayomi chapters needs the W5F viewer, which runs on Linux with X")
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command(exe, args...)
+	return cmd.Start()
 }
 
 // SmallwebEnv is where Gemini's known hosts and the small web cache live.

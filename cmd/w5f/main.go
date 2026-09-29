@@ -14,6 +14,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	xterm "github.com/charmbracelet/x/term"
 
+	"w5f/internal/comics"
 	"w5f/internal/dict"
 	"w5f/internal/doc"
 	"w5f/internal/feeds"
@@ -42,6 +43,8 @@ Usage:
   w5f reddit-login            connect Reddit with your own session cookie
   w5f reddit-logout           remove the stored Reddit session
   w5f ao3-login / ao3-logout  connect AO3 with your own session cookie / remove it
+  w5f view [--comic ID] [file] the comics viewer (X11; opened from Comics pages)
+  w5f comics list|update       comics: local library and followed series (w5f comics for more)
   w5f doctor [--live] [--bench]
                               check this install (--live: sources, --bench: speed)
   w5f update [--check]        install the latest signed release (GitHub Releases)
@@ -68,6 +71,10 @@ func main() {
 			os.Exit(selftest())
 		case "doctor":
 			os.Exit(runDoctor(args[1:]))
+		case "comics":
+			os.Exit(runComics(args[1:]))
+		case "view":
+			os.Exit(runView(args[1:]))
 		case "sync":
 			os.Exit(syncFeeds())
 		case "reindex":
@@ -118,9 +125,11 @@ func main() {
 		}
 	}
 	source.Init(cacheDir(), offline)
+	comics.AutoStart = true // the reader stops it again on exit
 	p := tea.NewProgram(tui.New(target, version))
 	_, err := p.Run()
-	reddit.Shutdown() // stop a Redlib that W5F started
+	reddit.Shutdown()                      // stop a Redlib that W5F started
+	comics.Shutdown(source.ComicsServer()) // and a Suwayomi
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "w5f:", err)
 		os.Exit(1)
@@ -253,6 +262,7 @@ func dump(args []string) int {
 	}
 	d, err := source.Load(context.Background(), source.Resolve(fs.Arg(0)), source.Options{})
 	reddit.Shutdown()
+	comics.Shutdown(source.ComicsServer())
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "w5f:", err)
 		return 1

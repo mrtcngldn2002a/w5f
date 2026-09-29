@@ -29,6 +29,7 @@ func welcomeDoc(version string) *doc.Document {
 			{Href: "w5f:discover/random", Text: "Deep random"},
 			{Href: "w5f:smallweb", Text: "Small Web"},
 			{Href: "w5f:worlds", Text: "Archived worlds"},
+			{Href: "w5f:comics", Text: "Comics"},
 		},
 	}
 	fiction := "serials, forum stories, Reddit series — follow them for new chapters"
@@ -58,6 +59,7 @@ func welcomeDoc(version string) *doc.Document {
 			{doc.Paragraph{Text: doc.Inline{{Text: "Periodicals — ", Style: doc.Bold}, {Text: "your shelves of magazines and blogs", Link: 4}}}},
 			{doc.Paragraph{Text: doc.Inline{{Text: "Library — ", Style: doc.Bold}, {Text: "your books, Project Gutenberg, Standard Ebooks", Link: 5}}}},
 			{doc.Paragraph{Text: doc.Inline{{Text: "Internet Fiction — ", Style: doc.Bold}, {Text: fiction, Link: 9}}}},
+			{doc.Paragraph{Text: doc.Inline{{Text: "Comics — ", Style: doc.Bold}, {Text: "your CBZ library and the series Suwayomi follows", Link: 14}}}},
 			{doc.Paragraph{Text: doc.Inline{{Text: "Discovery — ", Style: doc.Bold}, {Text: packet, Link: 10}, {Text: " · "}, {Text: "deep random (x)", Link: 11},
 				{Text: " · "}, {Text: "Small Web", Link: 12}, {Text: " · "}, {Text: "archived worlds", Link: 13}}}},
 			{doc.Paragraph{Text: doc.Inline{{Text: "SCP Foundation — ", Style: doc.Bold}, {Text: "SCP-173", Link: 1}}}},

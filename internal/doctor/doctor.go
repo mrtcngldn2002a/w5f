@@ -49,6 +49,10 @@ type Env struct {
 	Getenv   func(string) string
 	TermSize func() (w, h int, err error)
 	FontList func() (string, error) // fc-list output (Linux)
+	// Comics (M8)
+	ComicsDir   string
+	SuwayomiJar string                 // "" = not installed
+	JavaPath    func() (string, error) // java on PATH
 }
 
 // Check runs the offline checks.
@@ -88,6 +92,8 @@ func Check(e Env) []Result {
 	if e.GOOS == "linux" {
 		out = append(out, font(e))
 	}
+
+	out = append(out, comicsChecks(e)...)
 
 	switch {
 	case !e.HasKey:
@@ -226,4 +232,32 @@ func Print(w io.Writer, rs []Result) int {
 		fmt.Fprintf(w, "  %-5s %-13s %s\n", r.Status, r.Name, r.Detail)
 	}
 	return fails
+}
+
+// comicsChecks: the comics folder, Suwayomi and Java, and X for the viewer.
+func comicsChecks(e Env) []Result {
+	if e.ComicsDir == "" {
+		return nil
+	}
+	s, detail := dirState(e.ComicsDir)
+	out := []Result{{s, "comics folder", detail}}
+	switch {
+	case e.SuwayomiJar == "":
+		out = append(out, Result{Warn, "suwayomi", "not installed (w5f comics server install); the local comics library works without it"})
+	case e.JavaPath == nil:
+	default:
+		if _, err := e.JavaPath(); err != nil {
+			out = append(out, Result{Warn, "suwayomi", "Java is missing: Suwayomi needs Java 21 (apt install openjdk-21-jre-headless)"})
+		} else {
+			out = append(out, Result{OK, "suwayomi", filepath.Base(e.SuwayomiJar) + " with Java; started when Comics opens"})
+		}
+	}
+	if e.GOOS == "linux" {
+		if e.Getenv("DISPLAY") == "" {
+			out = append(out, Result{Warn, "viewer", "no X display here: the comics viewer runs inside the W5F session"})
+		} else {
+			out = append(out, Result{OK, "viewer", "X display " + e.Getenv("DISPLAY")})
+		}
+	}
+	return out
 }

@@ -13,9 +13,11 @@ require (
 	github.com/bogdanfinn/tls-client v1.11.2
 	github.com/charmbracelet/x/ansi v0.11.8
 	github.com/charmbracelet/x/term v0.2.2
+	github.com/jezek/xgb v1.3.1
 	github.com/ledongthuc/pdf v0.0.0-20260907135840-6c8c28e0e8a0
 	github.com/mattn/go-runewidth v0.0.30
 	github.com/mmcdole/gofeed v1.5.0
+	golang.org/x/image v0.46.0
 	golang.org/x/net v0.59.0
 	golang.org/x/text v0.42.0
 	modernc.org/sqlite v1.59.0
