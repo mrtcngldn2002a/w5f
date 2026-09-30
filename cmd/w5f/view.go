@@ -23,7 +23,8 @@ func runView(args []string) int {
 	fs := flag.NewFlagSet("view", flag.ContinueOnError)
 	comicID := fs.Int64("comic", 0, "a comic of the library (keeps progress)")
 	chapterID := fs.Int("chapter", 0, "a chapter from Suwayomi")
-	bench := fs.Int("bench", 0, "show N pages as fast as possible and report the time per page")
+	bench := fs.Int("bench", 0, "turn N pages and report the time from key to picture")
+	dwell := fs.Duration("dwell", 1500*time.Millisecond, "with --bench: reading time before each turn (0 = back to back)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -42,7 +43,7 @@ func runView(args []string) int {
 	}
 	defer d.Close()
 	if *bench > 0 {
-		return benchView(d, book, *bench)
+		return benchView(d, book, *bench, *dwell)
 	}
 	if _, err := view.New(d, book, neighbor).Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "w5f view:", err)
@@ -181,28 +182,39 @@ func neighborChapter(c *suwayomi.Client, id, dir int) (int, error) {
 	return best, nil
 }
 
-// benchView turns n pages and reports the time per page on this display.
-func benchView(d view.Display, b view.Book, n int) int {
+// benchView turns n pages, waiting dwell before each turn as a reader
+// would, and reports the time from the key to the picture on screen.
+func benchView(d view.Display, b view.Book, n int, dwell time.Duration) int {
+	b.OnPage = nil // a measurement is not reading
 	keys := make(chan view.Key)
 	fd := &benchDisplay{Display: d, keys: keys, shown: make(chan struct{}, 1)}
 	v := view.New(fd, b, nil)
-	done := make(chan time.Duration)
+	type result struct{ avg, worst time.Duration }
+	done := make(chan result)
 	turns := min(n, b.Pages.Len()) - 1
 	go func() {
 		<-fd.shown // the first page
-		start := time.Now()
+		var total, worst time.Duration
 		for i := 0; i < turns; i++ {
+			time.Sleep(dwell)
+			for len(fd.shown) > 0 { // an overlay redraw is not a turn
+				<-fd.shown
+			}
+			start := time.Now()
 			keys <- "space"
 			<-fd.shown
+			took := time.Since(start)
+			total += took
+			worst = max(worst, took)
 		}
-		took := time.Since(start)
 		keys <- "q"
-		done <- took
+		done <- result{total / time.Duration(max(1, turns)), worst}
 	}()
 	v.Run()
-	per := <-done / time.Duration(max(1, turns))
+	r := <-done
 	sz := d.Size()
-	fmt.Printf("%d page turns on a %dx%d screen: %s per turn (budget 300ms)\n", turns, sz.X, sz.Y, per.Round(time.Millisecond))
+	fmt.Printf("%d page turns on a %dx%d screen, %s reading before each: %s average, %s worst (budget 300ms)\n",
+		turns, sz.X, sz.Y, dwell, r.avg.Round(time.Millisecond), r.worst.Round(time.Millisecond))
 	return 0
 }
 

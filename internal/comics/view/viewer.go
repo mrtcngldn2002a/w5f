@@ -1,6 +1,7 @@
 package view
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"image"
@@ -11,7 +12,6 @@ import (
 	_ "image/png"
 	"io"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -83,17 +83,17 @@ func (v *Viewer) load(b Book) {
 
 func (v *Viewer) flash(s string) { v.overlay, v.overlayT = s, time.Now() }
 
-// size is a page's pixel size (decoded on demand).
+// size is a page's pixel size, read from the image header.
 func (v *Viewer) size(i int) image.Point {
 	if s, ok := v.sizes[i]; ok {
 		return s
 	}
-	img, err := v.cache.get(i)
+	sz, err := v.cache.size(i)
 	if err != nil {
-		return image.Pt(1, 1)
+		sz = image.Pt(1, 1)
 	}
-	v.sizes[i] = img.Bounds().Size()
-	return v.sizes[i]
+	v.sizes[i] = sz
+	return sz
 }
 
 func (v *Viewer) view() []int {
@@ -265,7 +265,7 @@ func (v *Viewer) turned() {
 	if v.book.OnPage != nil {
 		v.book.OnPage(vw[len(vw)-1], v.book.Pages.Len())
 	}
-	go v.cache.prefetch(vw[len(vw)-1] + 1)
+	v.prefetch()
 }
 
 var ink = color.RGBA{0xff, 0xb0, 0x00, 0xff} // Amber P3
@@ -288,6 +288,9 @@ func (v *Viewer) draw() error {
 	}
 	for _, p := range placed {
 		img, err := v.cache.scaled(p.Page, p.Size)
+		if err == nil {
+			defer v.prefetch() // the next view gets ready while this one is read
+		}
 		if err != nil {
 			v.text(fmt.Sprintf("page %d cannot be shown: %v", p.Page+1, err), image.Pt(20, sc.Y/2))
 			continue
@@ -308,84 +311,148 @@ func (v *Viewer) text(s string, at image.Point) {
 	(&font.Drawer{Dst: v.frame, Src: image.NewUniform(ink), Face: face, Dot: fixed.P(at.X, at.Y)}).DrawString(s)
 }
 
-// pageCache keeps decoded pages and their scaled copies (a few of each).
+// prefetch gets the next view ready (decoded and scaled) in the background:
+// a big page takes about half a second to decode on the W5F laptop, which
+// the reader spends reading the current one.
+func (v *Viewer) prefetch() {
+	vw := v.view()
+	if len(vw) == 0 {
+		return
+	}
+	next := Spread(vw[len(vw)-1]+1, v.book.Pages.Len(), v.double, v.size)
+	if len(next) == 0 {
+		return
+	}
+	var sizes []image.Point
+	for _, i := range next {
+		sizes = append(sizes, v.size(i))
+	}
+	for _, p := range Layout(next, sizes, v.d.Size(), v.fit, v.book.RTL, 0) {
+		go v.cache.scaled(p.Page, p.Size)
+	}
+}
+
+// pageCache keeps a few pages' bytes and their screen-sized copies; full
+// decoded pages (up to 15 MB each) are dropped as soon as they are scaled.
 type pageCache struct {
-	mu      sync.Mutex
-	pages   comics.Pages
-	decoded map[int]image.Image
-	order   []int
-	scaledM map[string]*image.RGBA
+	mu       sync.Mutex
+	pages    comics.Pages
+	raw      map[int][]byte
+	rawOrder []int
+	sizes    map[int]image.Point
+	scaledM  map[string]*image.RGBA
+	order    []string
+	inflight map[string]chan struct{}
 }
 
 func newPageCache(p comics.Pages) *pageCache {
-	return &pageCache{pages: p, decoded: map[int]image.Image{}, scaledM: map[string]*image.RGBA{}}
+	return &pageCache{pages: p, raw: map[int][]byte{}, sizes: map[int]image.Point{},
+		scaledM: map[string]*image.RGBA{}, inflight: map[string]chan struct{}{}}
 }
 
-const keepDecoded = 2 // the page shown and the one prefetched (a 1600×2400 page is 6–15 MB decoded)
+const (
+	keepRaw    = 3 // compressed pages (about 1 MB each)
+	keepScaled = 3 // screen-sized pages (about 2 MB each): shown, next, previous
+)
 
-func (c *pageCache) get(i int) (image.Image, error) {
+// bytes reads a page once (from the archive or the server).
+func (c *pageCache) bytes(i int) ([]byte, error) {
 	c.mu.Lock()
-	if img, ok := c.decoded[i]; ok {
+	if b, ok := c.raw[i]; ok {
 		c.mu.Unlock()
-		return img, nil
+		return b, nil
 	}
 	c.mu.Unlock()
 	rc, err := c.pages.Open(i)
 	if err != nil {
 		return nil, err
 	}
-	img, _, err := image.Decode(io.LimitReader(rc, 64<<20))
+	b, err := io.ReadAll(io.LimitReader(rc, 64<<20))
 	rc.Close()
 	if err != nil {
-		return nil, fmt.Errorf("%s: %v", c.pages.Name(i), err)
+		return nil, err
 	}
 	c.mu.Lock()
-	c.decoded[i] = img
-	c.order = append(c.order, i)
-	for len(c.order) > keepDecoded {
-		old := c.order[0]
-		c.order = c.order[1:]
-		delete(c.decoded, old)
-		for k := range c.scaledM {
-			if pageOf(k) == old {
-				delete(c.scaledM, k)
-			}
-		}
+	c.raw[i] = b
+	c.rawOrder = append(c.rawOrder, i)
+	for len(c.rawOrder) > keepRaw {
+		delete(c.raw, c.rawOrder[0])
+		c.rawOrder = c.rawOrder[1:]
 	}
 	c.mu.Unlock()
-	return img, nil
+	return b, nil
+}
+
+// size reads a page's size from its header, without decoding it.
+func (c *pageCache) size(i int) (image.Point, error) {
+	c.mu.Lock()
+	if s, ok := c.sizes[i]; ok {
+		c.mu.Unlock()
+		return s, nil
+	}
+	c.mu.Unlock()
+	b, err := c.bytes(i)
+	if err != nil {
+		return image.Point{}, err
+	}
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(b))
+	if err != nil {
+		return image.Point{}, fmt.Errorf("%s: %v", c.pages.Name(i), err)
+	}
+	sz := image.Pt(cfg.Width, cfg.Height)
+	c.mu.Lock()
+	c.sizes[i] = sz
+	c.mu.Unlock()
+	return sz, nil
 }
 
 func key(i int, sz image.Point) string { return fmt.Sprintf("%d:%dx%d", i, sz.X, sz.Y) }
 
-func pageOf(k string) int {
-	page, _, _ := strings.Cut(k, ":")
-	n, _ := strconv.Atoi(page)
-	return n
-}
-
+// scaled returns page i at a screen size, decoding it once; a second caller
+// for the same page waits for the first instead of decoding it again.
 func (c *pageCache) scaled(i int, sz image.Point) (*image.RGBA, error) {
-	c.mu.Lock()
-	if img, ok := c.scaledM[key(i, sz)]; ok {
+	k := key(i, sz)
+	for {
+		c.mu.Lock()
+		if img, ok := c.scaledM[k]; ok {
+			c.mu.Unlock()
+			return img, nil
+		}
+		wait, busy := c.inflight[k]
+		if !busy {
+			c.inflight[k] = make(chan struct{})
+			c.mu.Unlock()
+			break
+		}
 		c.mu.Unlock()
-		return img, nil
+		<-wait
+	}
+	img, err := c.decodeScaled(i, sz)
+	c.mu.Lock()
+	close(c.inflight[k])
+	delete(c.inflight, k)
+	if err == nil {
+		c.scaledM[k] = img
+		c.order = append(c.order, k)
+		for len(c.order) > keepScaled {
+			delete(c.scaledM, c.order[0])
+			c.order = c.order[1:]
+		}
 	}
 	c.mu.Unlock()
-	src, err := c.get(i)
+	return img, err
+}
+
+func (c *pageCache) decodeScaled(i int, sz image.Point) (*image.RGBA, error) {
+	b, err := c.bytes(i)
 	if err != nil {
 		return nil, err
 	}
+	src, _, err := image.Decode(bytes.NewReader(b))
+	if err != nil {
+		return nil, fmt.Errorf("%s: %v", c.pages.Name(i), err)
+	}
 	dst := image.NewRGBA(image.Rectangle{Max: sz})
 	xdraw.ApproxBiLinear.Scale(dst, dst.Bounds(), src, src.Bounds(), xdraw.Src, nil)
-	c.mu.Lock()
-	c.scaledM[key(i, sz)] = dst
-	c.mu.Unlock()
 	return dst, nil
-}
-
-// prefetch decodes the page after the view in the background.
-func (c *pageCache) prefetch(i int) {
-	if i >= 0 && i < c.pages.Len() {
-		_, _ = c.get(i)
-	}
 }
