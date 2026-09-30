@@ -130,6 +130,7 @@ func main() {
 	source.Init(cacheDir(), offline)
 	comics.AutoStart = true  // the reader stops it again on exit
 	source.OpenImages = true // pictures open in the comics viewer
+	registerComicsForms()
 	p := tea.NewProgram(tui.New(target, version))
 	_, err := p.Run()
 	reddit.Shutdown()                      // stop a Redlib that W5F started
