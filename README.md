@@ -24,6 +24,8 @@ w5f r/nosleep            Reddit (connect once: g → reddit-login, paste your ow
 w5f eksisozluk.com       Ekşi Sözlük: gündem, topics with entries and paging
 w5f w5f:feeds            Periodicals: shelves, unread, starred, feed status
 w5f sync                 refresh all feeds (cron/timer friendly)
+w5f feeds import x.opml  add another reader's feeds (folders become shelves; in the reader: g → opml-import <file>)
+w5f feeds export [file]  your shelves as OPML (in the reader: g → opml-export [file], default ~/w5f-periodicals.opml)
 w5f w5f:books            Library: continue reading, your books, catalogs
 w5f "gut lovecraft"      search Project Gutenberg (also: se <words> for Standard Ebooks)
 w5f "libgen dracula"     search Library Genesis (also: lg <words>)

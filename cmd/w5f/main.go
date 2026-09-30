@@ -38,8 +38,9 @@ Usage:
   w5f dump [-w N] [-open all] file|url
                               print the rendered page as plain text
   w5f sync                    refresh all periodicals and followed serials (for timers/cron)
+  w5f feeds import|export     move periodicals in or out as OPML (w5f feeds for more)
   w5f reindex                 rebuild the search index (pages from the cache, feeds, books, notes)
-  w5f dict-install [zip|url]  install the pop-up dictionary (default: Englishâ€“Turkish)
+  w5f dict-install [zip|url]  install the pop-up dictionary (default: English–Turkish)
   w5f reddit-login            connect Reddit with your own session cookie
   w5f reddit-logout           remove the stored Reddit session
   w5f ao3-login / ao3-logout  connect AO3 with your own session cookie / remove it
@@ -77,6 +78,8 @@ func main() {
 			os.Exit(runView(args[1:]))
 		case "sync":
 			os.Exit(syncFeeds())
+		case "feeds":
+			os.Exit(runFeeds(args[1:]))
 		case "reindex":
 			os.Exit(reindex())
 		case "dict-install":
@@ -231,7 +234,7 @@ func reindex() int {
 	}
 	ctx := context.Background()
 	load := func(t string) (*doc.Document, error) { return source.Load(ctx, t, source.Options{}) }
-	fmt.Println("Rebuilding the search indexâ€¦")
+	fmt.Println("Rebuilding the search index…")
 	r, err := index.Rebuild(ctx, db, personal.Dir(), load)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "w5f:", err)

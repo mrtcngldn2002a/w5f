@@ -39,10 +39,10 @@ type Feed struct {
 	ID    string   `toml:"id"`
 	Name  string   `toml:"name"`
 	Shelf string   `toml:"shelf"`
-	Lang  string   `toml:"lang"`
+	Lang  string   `toml:"lang,omitempty"`
 	URL   []string `toml:"url"`
-	Site  string   `toml:"site"`
-	Off   bool     `toml:"disabled"`
+	Site  string   `toml:"site,omitempty"`
+	Off   bool     `toml:"disabled,omitempty"`
 }
 
 // Catalog is the merged built-in + user catalog.

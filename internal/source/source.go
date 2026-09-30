@@ -183,6 +183,21 @@ func Load(ctx context.Context, target string, opts Options) (*doc.Document, erro
 	return d, nil
 }
 
+// userPath turns a typed file name into an absolute path: quotes around it
+// are dropped and ~ is the home folder.
+func userPath(p string) string {
+	p = strings.Trim(strings.TrimSpace(p), `"'`)
+	if p == "~" || strings.HasPrefix(p, "~/") || strings.HasPrefix(p, `~\`) {
+		if h, err := os.UserHomeDir(); err == nil {
+			p = filepath.Join(h, p[1:])
+		}
+	}
+	if abs, err := filepath.Abs(p); err == nil {
+		return abs
+	}
+	return p
+}
+
 // hasNotice reports a page that already says what it is (a picture, say).
 func hasNotice(bs []doc.Block) bool {
 	for _, b := range bs {
@@ -225,6 +240,12 @@ func Resolve(input string) string {
 		return "w5f:catalog/check?" + v.Encode()
 	case lower == "catalogs":
 		return "w5f:catalogs"
+	case strings.HasPrefix(lower, "opml-import ") && len(strings.Fields(s)) > 1:
+		return "w5f:feeds/import?" + url.Values{"f": {userPath(s[len("opml-import "):])}}.Encode()
+	case lower == "opml-export":
+		return "w5f:feeds/export"
+	case strings.HasPrefix(lower, "opml-export "):
+		return "w5f:feeds/export?" + url.Values{"f": {userPath(s[len("opml-export "):])}}.Encode()
 	case strings.HasPrefix(lower, "cat ") && isCatalogID(strings.Fields(s)[1]):
 		fields := strings.SplitN(strings.TrimSpace(s[4:]), " ", 2)
 		if len(fields) == 1 {

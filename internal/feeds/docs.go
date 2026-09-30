@@ -1,10 +1,13 @@
 package feeds
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -68,6 +71,10 @@ func Route(ctx context.Context, target string, env Env) (*doc.Document, error) {
 		return shelvesDoc(env, syncNotice(rep)), nil
 	case path == "feeds/status":
 		return statusDoc(env), nil
+	case path == "feeds/import":
+		return importDoc(env, u.Query().Get("f"))
+	case path == "feeds/export":
+		return exportDoc(env, u.Query().Get("f"))
 	case path == "feeds/unread":
 		return listDoc(env, "All unread", "w5f:feeds/unread", store.Query{Unread: true}, page, ""), nil
 	case path == "feeds/starred":
@@ -149,7 +156,67 @@ func shelvesDoc(env Env, notice *doc.Notice) *doc.Document {
 		items = append(items, []doc.Block{doc.Paragraph{Text: in}})
 	}
 	d.Blocks = append(d.Blocks, doc.Heading{Level: 2, Text: doc.Inline{{Text: "Shelves"}}}, doc.List{Items: items})
+	d.Blocks = append(d.Blocks, doc.Paragraph{Text: doc.Inline{
+		{Text: "OPML: bring feeds from another reader with g → opml-import <file>   ", Style: doc.Italic},
+		{Text: "export these shelves", Link: link(d, "w5f:feeds/export", "export")},
+	}})
 	return d
+}
+
+// DefaultExport is where the shelves are exported without a file name.
+func DefaultExport() string {
+	if h, err := os.UserHomeDir(); err == nil {
+		return filepath.Join(h, "w5f-periodicals.opml")
+	}
+	return "w5f-periodicals.opml"
+}
+
+func importDoc(env Env, file string) (*doc.Document, error) {
+	if file == "" {
+		return nil, errors.New("which file? g → opml-import <file.opml>")
+	}
+	rep, err := Import(env.Catalog, file)
+	if err != nil {
+		return nil, err
+	}
+	var text string
+	switch {
+	case len(rep.Added) == 0:
+		text = fmt.Sprintf("Nothing new: all %d feeds of %s are already on your shelves.", len(rep.Duplicate), filepath.Base(file))
+	default:
+		text = fmt.Sprintf("Added %d feeds to %s", len(rep.Added), rep.File)
+		if len(rep.Shelves) > 0 {
+			var labels []string
+			for _, s := range rep.Shelves {
+				labels = append(labels, s.Label)
+			}
+			text += " on new shelves: " + strings.Join(labels, ", ")
+		}
+		text += "."
+		if len(rep.Duplicate) > 0 {
+			text += fmt.Sprintf(" %d were already here.", len(rep.Duplicate))
+		}
+		text += " Sync to fetch them."
+	}
+	if c, err := LoadCatalog(); err == nil {
+		env.Catalog = c
+	}
+	return shelvesDoc(env, &doc.Notice{Kind: "info", Text: text}), nil
+}
+
+func exportDoc(env Env, file string) (*doc.Document, error) {
+	if file == "" {
+		file = DefaultExport()
+	}
+	var b bytes.Buffer
+	n, err := Export(env.Catalog, env.DB, &b)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.WriteFile(file, b.Bytes(), 0o644); err != nil {
+		return nil, err
+	}
+	return shelvesDoc(env, &doc.Notice{Kind: "info", Text: fmt.Sprintf("Exported %d feeds to %s.", n, file)}), nil
 }
 
 func shelfDoc(env Env, shelf string, page int, note string) (*doc.Document, error) {
