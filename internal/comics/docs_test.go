@@ -130,6 +130,10 @@ func fakeSuwayomi(t *testing.T, calls *[]string) int {
 			fmt.Fprint(w, `{"data":{"enqueueChapterDownloads":{"downloadStatus":{"state":"STARTED"}}}}`)
 		case strings.Contains(q, "fetchExtensions"):
 			fmt.Fprint(w, `{"data":{"fetchExtensions":{"extensions":[{"pkgName":"p.one","name":"One","lang":"en","isInstalled":true,"hasUpdate":true}],"extensionStores":[{"name":"Mine","indexUrl":"https://repo.example/index.min.json"}]}}}`)
+		case strings.Contains(q, "sources {"):
+			fmt.Fprint(w, `{"data":{"sources":{"nodes":[{"id":"0","displayName":"Local source","lang":"localsourcelang"},`+
+				`{"id":"11","displayName":"GlobalComix (EN)","lang":"en"},{"id":"12","displayName":"GlobalComix (JA)","lang":"ja"},`+
+				`{"id":"13","displayName":"GlobalComix (TR)","lang":"tr"},{"id":"14","displayName":"Anywhere","lang":"all"}]}}}`)
 		case strings.Contains(q, "extensions {"):
 			fmt.Fprint(w, `{"data":{"extensions":{"nodes":[{"pkgName":"p.one","name":"One","lang":"en","isInstalled":true,"hasUpdate":true},`+
 				`{"pkgName":"p.ja","name":"Nihon","lang":"ja"},{"pkgName":"p.jai","name":"Kept","lang":"ja","isInstalled":true},`+
@@ -217,5 +221,31 @@ func TestExtensionsFilterByLanguage(t *testing.T) {
 	all, _ := Route(ctx, "w5f:comics/extensions?lang=any", env)
 	if s := text(all); !strings.Contains(s, "Uno") || !strings.Contains(s, "Nihon") {
 		t.Errorf("every language:\n%s", s)
+	}
+}
+
+func TestSourcesFilterByLanguage(t *testing.T) {
+	env, _ := testEnv(t)
+	var calls []string
+	env.Server.Port = fakeSuwayomi(t, &calls)
+	ctx := context.Background()
+	d, err := Route(ctx, "w5f:comics/sources", env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := text(d)
+	for _, want := range []string{"Local source", "GlobalComix (EN)", "Anywhere", "2 more in other languages"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("English sources lack %q:\n%s", want, s)
+		}
+	}
+	if strings.Contains(s, "(JA)") || strings.Contains(s, "(TR)") || !hasLink(d, "w5f:comics/sources?lang=tr") {
+		t.Errorf("other languages hidden, with links to them:\n%s", s)
+	}
+	// The language chosen on Extensions is the one Sources uses too.
+	Route(ctx, "w5f:comics/extensions?lang=ja", env)
+	ja, _ := Route(ctx, "w5f:comics/sources", env)
+	if s := text(ja); !strings.Contains(s, "(JA)") || strings.Contains(s, "(EN)") || !strings.Contains(s, "Local source") {
+		t.Errorf("Japanese sources:\n%s", s)
 	}
 }

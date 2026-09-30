@@ -193,7 +193,7 @@ func Route(ctx context.Context, target string, env Env) (*doc.Document, error) {
 		}
 		return chapterRoute(ctx, env, c, id, at(parts, 2), query.Get("manga"))
 	case "sources":
-		return sourcesDoc(ctx, c)
+		return sourcesDoc(ctx, env, c, query.Get("lang"))
 	case "source":
 		pg, _ := strconv.Atoi(query.Get("page"))
 		return browseDoc(ctx, c, at(parts, 1), strings.ToUpper(query.Get("type")), "", max(pg, 1))
@@ -532,16 +532,30 @@ func chapterRoute(ctx context.Context, env Env, c *suwayomi.Client, id int, acti
 	return nil, errors.New("unknown chapter action")
 }
 
-func sourcesDoc(ctx context.Context, c *suwayomi.Client) (*doc.Document, error) {
-	p := newPage("Sources", "w5f:comics/sources")
+func sourcesDoc(ctx context.Context, env Env, c *suwayomi.Client, lang string) (*doc.Document, error) {
+	lang = chosenLang(env, lang)
+	p := newPage("Sources", "w5f:comics/sources?lang="+url.QueryEscape(lang))
 	srcs, err := c.Sources(ctx)
 	if err != nil {
 		return nil, err
 	}
 	p.para(doc.Inline{dim("Sources come from the extensions you install ("), p.a("w5f:comics/extensions", "Extensions"),
 		dim("). The Local source reads your own files in " + "Comics/Local" + ".")})
-	var items []doc.Inline
+	counts := map[string]int{}
 	for _, s := range srcs {
+		if s.ID != suwayomi.LocalSource {
+			counts[s.Lang]++
+		}
+	}
+	langBar(p, counts, lang, "w5f:comics/sources")
+	var items []doc.Inline
+	hidden := 0
+	for _, s := range srcs {
+		// The Local source (your files) and all-language sources always show.
+		if lang != "any" && s.ID != suwayomi.LocalSource && s.Lang != lang && s.Lang != "all" && s.Lang != "multi" {
+			hidden++
+			continue
+		}
 		in := doc.Inline{{Text: s.DisplayName, Style: doc.Bold}, dim("  "),
 			p.a(fmt.Sprintf("w5f:comics/source/%s?type=POPULAR", s.ID), "popular")}
 		if s.SupportsLatest {
@@ -554,6 +568,9 @@ func sourcesDoc(ctx context.Context, c *suwayomi.Client) (*doc.Document, error) 
 		items = append(items, in)
 	}
 	p.list(items)
+	if hidden > 0 {
+		p.para(doc.Inline{dim(fmt.Sprintf("%d more in other languages — ", hidden)), p.a("w5f:comics/sources?lang=any", "show every language")})
+	}
 	return p.d, nil
 }
 
@@ -640,7 +657,10 @@ var langNames = map[string]string{"en": "English", "all": "all languages", "mult
 	"ko": "Korean", "zh": "Chinese", "zh-Hans": "Chinese (simplified)", "zh-Hant": "Chinese (traditional)", "es": "Spanish",
 	"es-419": "Spanish (Latin America)", "pt": "Portuguese", "pt-BR": "Portuguese (Brazil)", "fr": "French", "de": "German",
 	"it": "Italian", "ru": "Russian", "tr": "Turkish", "id": "Indonesian", "vi": "Vietnamese", "th": "Thai", "ar": "Arabic",
-	"pl": "Polish", "uk": "Ukrainian"}
+	"pl": "Polish", "uk": "Ukrainian", "bg": "Bulgarian", "bn": "Bengali", "cs": "Czech", "da": "Danish", "el": "Greek",
+	"fa": "Persian", "fi": "Finnish", "fil": "Filipino", "he": "Hebrew", "hi": "Hindi", "hu": "Hungarian", "lv": "Latvian",
+	"ms": "Malay", "nl": "Dutch", "no": "Norwegian", "ro": "Romanian", "sk": "Slovak", "sl": "Slovenian", "sq": "Albanian",
+	"sv": "Swedish", "ta": "Tamil", "ur": "Urdu"}
 
 func langName(code string) string {
 	if n, ok := langNames[code]; ok {
@@ -649,7 +669,56 @@ func langName(code string) string {
 	return code
 }
 
-const extLangKey = "comics:extensions-lang"
+const langKey = "comics:lang" // one language choice for Extensions and Sources
+
+// chosenLang records a language picked on a page (lang != ""), or returns
+// the one chosen before; English until something else is picked.
+func chosenLang(env Env, lang string) string {
+	if lang != "" {
+		_ = env.DB.Set(langKey, lang)
+		return lang
+	}
+	if l := env.DB.Get(langKey); l != "" {
+		return l
+	}
+	return "en"
+}
+
+// langBar is the "Language: English (12) · Japanese (3) · every language"
+// line; it is shown only when there is more than one language to choose.
+func langBar(p *page, counts map[string]int, lang, base string) {
+	langs := make([]string, 0, len(counts))
+	for l := range counts {
+		if l != "all" && l != "multi" && l != "" {
+			langs = append(langs, l)
+		}
+	}
+	if len(langs) < 2 && (len(langs) == 0 || langs[0] == lang) {
+		return
+	}
+	sort.Slice(langs, func(i, j int) bool {
+		if (langs[i] == "en") != (langs[j] == "en") {
+			return langs[i] == "en"
+		}
+		return langName(langs[i]) < langName(langs[j])
+	})
+	bar := doc.Inline{dim("Language: ")}
+	for _, l := range append(langs, "any") {
+		label := langName(l)
+		if l == "any" {
+			label = "every language"
+		} else {
+			label += fmt.Sprintf(" (%d)", counts[l])
+		}
+		if l == lang {
+			bar = append(bar, doc.Span{Text: label, Style: doc.Bold})
+		} else {
+			bar = append(bar, p.a(base+"?lang="+url.QueryEscape(l), label))
+		}
+		bar = append(bar, dim("  "))
+	}
+	p.para(bar)
+}
 
 // shownExtension: the chosen language, extensions for every language, and
 // whatever is installed.
@@ -658,11 +727,7 @@ func shownExtension(e suwayomi.Extension, lang string) bool {
 }
 
 func extensionsDoc(ctx context.Context, env Env, c *suwayomi.Client, refresh bool, msg, lang string) (*doc.Document, error) {
-	if lang != "" {
-		_ = env.DB.Set(extLangKey, lang)
-	} else if lang = env.DB.Get(extLangKey); lang == "" {
-		lang = "en" // English unless chosen otherwise
-	}
+	lang = chosenLang(env, lang)
 	p := newPage("Extensions", "w5f:comics/extensions?lang="+url.QueryEscape(lang))
 	exts, stores, err := c.Extensions(ctx, refresh || msg != "")
 	if err != nil {
@@ -689,36 +754,7 @@ func extensionsDoc(ctx context.Context, env Env, c *suwayomi.Client, refresh boo
 	for _, e := range exts {
 		counts[e.Lang]++
 	}
-	if len(counts) > 1 {
-		langs := make([]string, 0, len(counts))
-		for l := range counts {
-			if l != "all" && l != "multi" {
-				langs = append(langs, l)
-			}
-		}
-		sort.Slice(langs, func(i, j int) bool {
-			if (langs[i] == "en") != (langs[j] == "en") {
-				return langs[i] == "en"
-			}
-			return langName(langs[i]) < langName(langs[j])
-		})
-		bar := doc.Inline{dim("Language: ")}
-		for _, l := range append(langs, "any") {
-			label := langName(l)
-			if l == "any" {
-				label = "every language"
-			} else {
-				label += fmt.Sprintf(" (%d)", counts[l])
-			}
-			if l == lang {
-				bar = append(bar, doc.Span{Text: label, Style: doc.Bold})
-			} else {
-				bar = append(bar, p.a("w5f:comics/extensions?lang="+url.QueryEscape(l), label))
-			}
-			bar = append(bar, dim("  "))
-		}
-		p.para(bar)
-	}
+	langBar(p, counts, lang, "w5f:comics/extensions")
 	var items []doc.Inline
 	hidden := 0
 	for _, e := range exts {
