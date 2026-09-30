@@ -131,7 +131,10 @@ func fakeSuwayomi(t *testing.T, calls *[]string) int {
 		case strings.Contains(q, "fetchExtensions"):
 			fmt.Fprint(w, `{"data":{"fetchExtensions":{"extensions":[{"pkgName":"p.one","name":"One","lang":"en","isInstalled":true,"hasUpdate":true}],"extensionStores":[{"name":"Mine","indexUrl":"https://repo.example/index.min.json"}]}}}`)
 		case strings.Contains(q, "extensions {"):
-			fmt.Fprint(w, `{"data":{"extensions":{"nodes":[{"pkgName":"p.one","name":"One","lang":"en","isInstalled":true,"hasUpdate":true}]},"extensionStores":{"nodes":[{"name":"Mine","indexUrl":"https://repo.example/index.min.json"}]}}}`)
+			fmt.Fprint(w, `{"data":{"extensions":{"nodes":[{"pkgName":"p.one","name":"One","lang":"en","isInstalled":true,"hasUpdate":true},`+
+				`{"pkgName":"p.ja","name":"Nihon","lang":"ja"},{"pkgName":"p.jai","name":"Kept","lang":"ja","isInstalled":true},`+
+				`{"pkgName":"p.all","name":"Everywhere","lang":"all"},{"pkgName":"p.es","name":"Uno","lang":"es"}]},`+
+				`"extensionStores":{"nodes":[{"name":"Mine","indexUrl":"https://repo.example/index.min.json"}]}}}`)
 		case strings.Contains(q, "addExtensionStore"), strings.Contains(q, "updateExtension"):
 			fmt.Fprint(w, `{"data":{}}`)
 		default:
@@ -179,5 +182,40 @@ func TestSuwayomiPages(t *testing.T) {
 	}
 	if d, _ := Route(ctx, "w5f:comics/repo/add?url=https://repo.example/index.min.json", env); !strings.Contains(text(d), "Repository list changed") {
 		t.Errorf("add repo:\n%s", text(d))
+	}
+}
+
+func TestExtensionsFilterByLanguage(t *testing.T) {
+	env, _ := testEnv(t)
+	var calls []string
+	env.Server.Port = fakeSuwayomi(t, &calls)
+	ctx := context.Background()
+	d, err := Route(ctx, "w5f:comics/extensions", env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := text(d)
+	for _, want := range []string{"One", "Everywhere", "Kept", "2 more in other languages"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("English view lacks %q:\n%s", want, s)
+		}
+	}
+	if strings.Contains(s, "Nihon") || strings.Contains(s, "Uno") {
+		t.Errorf("other languages are hidden by default:\n%s", s)
+	}
+	if !hasLink(d, "w5f:comics/extensions?lang=ja") || !hasLink(d, "w5f:comics/extensions?lang=any") {
+		t.Errorf("language links: %+v", d.Links)
+	}
+	ja, _ := Route(ctx, "w5f:comics/extensions?lang=ja", env)
+	if s := text(ja); !strings.Contains(s, "Nihon") || strings.Contains(s, "Uno") {
+		t.Errorf("Japanese view:\n%s", s)
+	}
+	again, _ := Route(ctx, "w5f:comics/extensions", env) // the choice is remembered
+	if !strings.Contains(text(again), "Nihon") {
+		t.Error("the chosen language is kept")
+	}
+	all, _ := Route(ctx, "w5f:comics/extensions?lang=any", env)
+	if s := text(all); !strings.Contains(s, "Uno") || !strings.Contains(s, "Nihon") {
+		t.Errorf("every language:\n%s", s)
 	}
 }

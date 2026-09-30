@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -202,14 +203,14 @@ func Route(ctx context.Context, target string, env Env) (*doc.Document, error) {
 	case "downloads":
 		return downloadsDoc(ctx, c)
 	case "extensions":
-		return extensionsDoc(ctx, c, at(parts, 1) == "refresh", "")
+		return extensionsDoc(ctx, env, c, at(parts, 1) == "refresh", "", query.Get("lang"))
 	case "extension":
 		action := at(parts, 2)
 		msg := fmt.Sprintf("%s: %s done.", at(parts, 1), action)
 		if err := c.SetExtension(ctx, at(parts, 1), action); err != nil {
 			msg = err.Error()
 		}
-		return extensionsDoc(ctx, c, false, msg)
+		return extensionsDoc(ctx, env, c, false, msg, "")
 	case "repo":
 		u := query.Get("url")
 		var err error
@@ -223,7 +224,7 @@ func Route(ctx context.Context, target string, env Env) (*doc.Document, error) {
 		if err != nil {
 			msg = err.Error()
 		}
-		return extensionsDoc(ctx, c, err == nil, msg)
+		return extensionsDoc(ctx, env, c, err == nil, msg, "")
 	}
 	return nil, errors.New("unknown comics address: " + target)
 }
@@ -631,11 +632,38 @@ func downloadsDoc(ctx context.Context, c *suwayomi.Client) (*doc.Document, error
 // address.
 func RepoPage() string {
 	return smallweb.WebSearchPage("w5f:comics/repo/add", "url",
-		"Address of the repository's index (it ends in index.min.json). Only add repositories you trust.")
+		"Address of the repository's index (usually ending in index.min.json or repo.json). Only add repositories you trust.")
 }
 
-func extensionsDoc(ctx context.Context, c *suwayomi.Client, refresh bool, msg string) (*doc.Document, error) {
-	p := newPage("Extensions", "w5f:comics/extensions")
+// langNames names the language codes extensions use.
+var langNames = map[string]string{"en": "English", "all": "all languages", "multi": "several languages", "ja": "Japanese",
+	"ko": "Korean", "zh": "Chinese", "zh-Hans": "Chinese (simplified)", "zh-Hant": "Chinese (traditional)", "es": "Spanish",
+	"es-419": "Spanish (Latin America)", "pt": "Portuguese", "pt-BR": "Portuguese (Brazil)", "fr": "French", "de": "German",
+	"it": "Italian", "ru": "Russian", "tr": "Turkish", "id": "Indonesian", "vi": "Vietnamese", "th": "Thai", "ar": "Arabic",
+	"pl": "Polish", "uk": "Ukrainian"}
+
+func langName(code string) string {
+	if n, ok := langNames[code]; ok {
+		return n
+	}
+	return code
+}
+
+const extLangKey = "comics:extensions-lang"
+
+// shownExtension: the chosen language, extensions for every language, and
+// whatever is installed.
+func shownExtension(e suwayomi.Extension, lang string) bool {
+	return lang == "any" || e.IsInstalled || e.Lang == lang || e.Lang == "all" || e.Lang == "multi"
+}
+
+func extensionsDoc(ctx context.Context, env Env, c *suwayomi.Client, refresh bool, msg, lang string) (*doc.Document, error) {
+	if lang != "" {
+		_ = env.DB.Set(extLangKey, lang)
+	} else if lang = env.DB.Get(extLangKey); lang == "" {
+		lang = "en" // English unless chosen otherwise
+	}
+	p := newPage("Extensions", "w5f:comics/extensions?lang="+url.QueryEscape(lang))
 	exts, stores, err := c.Extensions(ctx, refresh || msg != "")
 	if err != nil {
 		return nil, err
@@ -657,8 +685,47 @@ func extensionsDoc(ctx context.Context, c *suwayomi.Client, refresh bool, msg st
 	if len(exts) == 0 {
 		p.note("info", "No extensions listed: add a repository first.")
 	}
-	var items []doc.Inline
+	counts := map[string]int{}
 	for _, e := range exts {
+		counts[e.Lang]++
+	}
+	if len(counts) > 1 {
+		langs := make([]string, 0, len(counts))
+		for l := range counts {
+			if l != "all" && l != "multi" {
+				langs = append(langs, l)
+			}
+		}
+		sort.Slice(langs, func(i, j int) bool {
+			if (langs[i] == "en") != (langs[j] == "en") {
+				return langs[i] == "en"
+			}
+			return langName(langs[i]) < langName(langs[j])
+		})
+		bar := doc.Inline{dim("Language: ")}
+		for _, l := range append(langs, "any") {
+			label := langName(l)
+			if l == "any" {
+				label = "every language"
+			} else {
+				label += fmt.Sprintf(" (%d)", counts[l])
+			}
+			if l == lang {
+				bar = append(bar, doc.Span{Text: label, Style: doc.Bold})
+			} else {
+				bar = append(bar, p.a("w5f:comics/extensions?lang="+url.QueryEscape(l), label))
+			}
+			bar = append(bar, dim("  "))
+		}
+		p.para(bar)
+	}
+	var items []doc.Inline
+	hidden := 0
+	for _, e := range exts {
+		if !shownExtension(e, lang) {
+			hidden++
+			continue
+		}
 		in := doc.Inline{{Text: e.Name, Style: doc.Bold}, dim(fmt.Sprintf("  %s %s  ", e.Lang, e.VersionName))}
 		switch {
 		case e.IsInstalled && e.HasUpdate:
@@ -678,5 +745,8 @@ func extensionsDoc(ctx context.Context, c *suwayomi.Client, refresh bool, msg st
 		items = append(items, in)
 	}
 	p.list(items)
+	if hidden > 0 {
+		p.para(doc.Inline{dim(fmt.Sprintf("%d more in other languages — ", hidden)), p.a("w5f:comics/extensions?lang=any", "show every language")})
+	}
 	return p.d, nil
 }
