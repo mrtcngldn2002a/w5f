@@ -26,7 +26,14 @@ type Env struct {
 }
 
 // CatalogLink is a site catalog shown in the Library.
-type CatalogLink struct{ ID, Name string }
+type CatalogLink struct{ ID, Name, Home string }
+
+// suggestedCatalogs are offered in the Library until they are added: sites
+// whose own pages refuse W5F but whose books are reachable another way.
+var suggestedCatalogs = []struct{ name, home, test string }{
+	{"Biodiversity Heritage Library — old natural history, bestiaries, herbals (its Internet Archive copy)",
+		"https://archive.org/details/biodiversity", "serpents"},
+}
 
 // IsTarget reports whether target belongs to the Library.
 func IsTarget(target string) bool {
@@ -177,10 +184,25 @@ func homeDoc(env Env) (*doc.Document, error) {
 		{doc.Paragraph{Text: doc.Inline{{Text: "Standard Ebooks — newest", Link: link(d, "w5f:books/se", "Standard Ebooks")},
 			{Text: "   search: g → se <words>", Style: doc.Italic}}}},
 	}
+	var added []CatalogLink
 	if env.Catalogs != nil {
-		for _, c := range env.Catalogs() {
+		added = env.Catalogs()
+		for _, c := range added {
 			find = append(find, []doc.Block{doc.Paragraph{Text: doc.Inline{{Text: c.Name, Link: link(d, "w5f:catalog/"+c.ID, c.Name)},
 				{Text: "   search: g → cat " + c.ID + " <words>", Style: doc.Italic}}}})
+		}
+	}
+	for _, s := range suggestedCatalogs {
+		have := false
+		for _, c := range added {
+			if strings.TrimSuffix(c.Home, "/") == s.home {
+				have = true
+			}
+		}
+		if !have {
+			check := "w5f:catalog/check?" + url.Values{"url": {s.home}, "w": {s.test}}.Encode()
+			find = append(find, []doc.Block{doc.Paragraph{Text: doc.Inline{{Text: "+ suggested: ", Style: doc.Italic},
+				{Text: s.name, Link: link(d, check, "add "+s.name)}}}})
 		}
 	}
 	find = append(find, []doc.Block{doc.Paragraph{Text: doc.Inline{{Text: "+ add a site: g → catalog-add <address>", Style: doc.Italic}, {Text: "   "},

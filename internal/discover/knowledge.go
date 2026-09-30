@@ -65,6 +65,7 @@ var knowledgeSources = []knowSource{
 	{"World History Encyclopedia", fromFeed("https://www.worldhistory.org/rss/articles")},
 	{"Internet Classics Archive", fromIndex("https://classics.mit.edu/Browse/index.html", "/", 4)},
 	{"Catholic Encyclopedia (1913)", catholicEncyclopedia},
+	{"Perseus Digital Library", perseusPick},
 }
 
 func init() { families = append(families, knowledge{}) }

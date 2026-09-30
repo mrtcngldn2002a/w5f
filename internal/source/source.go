@@ -912,7 +912,7 @@ func booksEnv(db *store.DB) books.Env {
 		ps, _ := sitecat.LoadAll(sitecat.Path())
 		out := make([]books.CatalogLink, 0, len(ps))
 		for _, p := range ps {
-			out = append(out, books.CatalogLink{ID: p.ID, Name: p.Name})
+			out = append(out, books.CatalogLink{ID: p.ID, Name: p.Name, Home: p.Home})
 		}
 		return out
 	}}

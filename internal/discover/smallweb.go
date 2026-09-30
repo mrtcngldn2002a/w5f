@@ -37,6 +37,9 @@ func (smallwebFamily) Draw(ctx context.Context, env Env) (Draw, error) {
 		func() (Draw, error) {
 			return linkFromPage(ctx, env.Smallweb, pick(gopherLists), "smallweb/Gopher via Floodgap")
 		},
+		func() (Draw, error) { return oohDraw(ctx, env.Fetcher) },
+		func() (Draw, error) { return kagiDraw(ctx, env.Fetcher) },
+		func() (Draw, error) { return oocitiesDraw(ctx, env.Fetcher) },
 	}
 	for _, i := range rand.Perm(len(tries)) {
 		d, err := tries[i]()
@@ -46,6 +49,18 @@ func (smallwebFamily) Draw(ctx context.Context, env Env) (Draw, error) {
 		errs = append(errs, err.Error())
 	}
 	return Draw{}, errors.New(strings.Join(errs, "; "))
+}
+
+// directoryDraws are the small web pickers the Small Web page opens directly
+// (w5f:discover/<name>), each landing on a new page every time.
+var directoryDraws = map[string]struct {
+	label string
+	draw  func(context.Context, *fetch.Fetcher) (Draw, error)
+}{
+	"wiby":      {"Wiby surprise", wibyDraw},
+	"ooh":       {"ooh.directory random blog", oohDraw},
+	"kagi":      {"Kagi Small Web", kagiDraw},
+	"geocities": {"GeoCities archive", oocitiesDraw},
 }
 
 // wibyDraw follows Wiby's surprise page (a meta refresh to a random site).

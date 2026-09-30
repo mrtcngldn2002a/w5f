@@ -39,5 +39,12 @@ func menuDoc() *doc.Document {
 		{"Marginalia — random small sites (explore)", "w5f:smallweb/marginalia-random"},
 		{"Marginalia Search — the non-commercial web", WebSearchPage(marginaliaSearch, "query", "Search the independent, non-commercial web with Marginalia.")},
 	})
+	section("Small web directories (web)", [][2]string{
+		{"ooh.directory — a random blog, its latest post", "w5f:discover/ooh"},
+		{"ooh.directory — blogs by subject", "https://ooh.directory/"},
+		{"Kagi Small Web — a recent post from a personal site", "w5f:discover/kagi"},
+		{"GeoCities archive (OoCities) — a random member page", "w5f:discover/geocities"},
+		{"GeoCities archive — the neighborhoods", "https://www.oocities.org/"},
+	})
 	return d
 }

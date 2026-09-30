@@ -69,7 +69,7 @@ func pick[T any](xs []T) T { return xs[rand.IntN(len(xs))] }
 var reNotContent = regexp.MustCompile(`(?i)/(\w*shop|store|cart|buy|donat\w*|search|help|contact|about|faq|login|privacy|links?|cgi-bin|advert\w*|subscribe)(/|\.|$)`)
 
 var skipExt = map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".gif": true, ".pdf": true, ".zip": true,
-	".mp3": true, ".css": true, ".js": true, ".ico": true, ".svg": true, ".webp": true}
+	".mp3": true, ".css": true, ".js": true, ".ico": true, ".svg": true, ".webp": true, ".tmp": true, ".mid": true, ".wav": true}
 
 // descend walks from an index page down random internal links until a page
 // with real text (at most depth levels), staying in the start page's folder;
@@ -262,6 +262,7 @@ var encyclopedias = []site{
 	{"Wikipedia (EN)", "https://en.wikipedia.org/wiki/Special:Random"},
 	{"Wikipedia (TR)", "https://tr.wikipedia.org/wiki/%C3%96zel:Rastgele"},
 	{"Stanford Encyclopedia of Philosophy", "https://plato.stanford.edu/cgi-bin/encyclopedia/random"},
+	{"Internet Encyclopedia of Philosophy", "https://iep.utm.edu/"},
 }
 
 func (encyclopedic) Name() string { return "encyclopedic" }
@@ -273,6 +274,8 @@ func (encyclopedic) Draw(ctx context.Context, env Env) (Draw, error) {
 		var err error
 		if s.name == "Britannica" {
 			target, title, err = britannicaPick(ctx, env.Fetcher, s.start)
+		} else if s.name == "Internet Encyclopedia of Philosophy" {
+			target, title, err = iepPick(ctx, env.Fetcher)
 		} else {
 			target, err = resolveRandom(ctx, env.Fetcher, s.start)
 		}

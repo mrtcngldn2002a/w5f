@@ -77,4 +77,17 @@ func TestHomeListsSiteCatalogs(t *testing.T) {
 	if !strings.Contains(all, "w5f:catalog/fadedpage-com") || !strings.Contains(all, "w5f:catalogs") {
 		t.Errorf("links: %s", all)
 	}
+	// BHL is suggested (its check page, with a test word) until it is added.
+	if !strings.Contains(all, "w5f:catalog/check?url=https%3A%2F%2Farchive.org%2Fdetails%2Fbiodiversity&w=serpents") {
+		t.Errorf("BHL suggestion missing: %s", all)
+	}
+	env.Catalogs = func() []CatalogLink {
+		return []CatalogLink{{ID: "archive-org", Name: "BHL", Home: "https://archive.org/details/biodiversity/"}}
+	}
+	d, _ = Route(context.Background(), "w5f:books", env)
+	for _, l := range d.Links {
+		if strings.Contains(l.Href, "catalog/check") {
+			t.Errorf("suggested although added: %s", l.Href)
+		}
+	}
 }

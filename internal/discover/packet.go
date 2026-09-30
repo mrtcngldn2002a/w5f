@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -256,12 +257,34 @@ func packetRoute(ctx context.Context, target string, env Env) (*doc.Document, er
 	return entryDoc(ctx, env, p, n)
 }
 
-// publicDomainDraw: a recent Public Domain Review article, else a random
-// Project Gutenberg book.
-func publicDomainDraw(ctx context.Context, env Env) (Draw, error) {
-	if link, title, err := rssPick(ctx, env.Fetcher, "https://publicdomainreview.org/rss.xml"); err == nil {
+// publicDomainDraws are the public-domain sources, tried in random order: a
+// recent Public Domain Review article, a random Project Gutenberg book, or
+// an old curious natural history book of the Biodiversity Heritage Library.
+var publicDomainDraws = []func(context.Context, Env) (Draw, error){
+	func(ctx context.Context, env Env) (Draw, error) {
+		link, title, err := rssPick(ctx, env.Fetcher, "https://publicdomainreview.org/rss.xml")
+		if err != nil {
+			return Draw{}, err
+		}
 		return Draw{Target: link, Why: "public domain/Public Domain Review · " + title}, nil
+	},
+	gutenbergDraw,
+	bhlPick,
+}
+
+func publicDomainDraw(ctx context.Context, env Env) (Draw, error) {
+	var errs []string
+	for _, i := range rand.Perm(len(publicDomainDraws)) {
+		d, err := publicDomainDraws[i](ctx, env)
+		if err == nil {
+			return d, nil
+		}
+		errs = append(errs, err.Error())
 	}
+	return Draw{}, errors.New(strings.Join(errs, "; "))
+}
+
+func gutenbergDraw(ctx context.Context, env Env) (Draw, error) {
 	gq, base, err := get(ctx, env.Fetcher, "https://www.gutenberg.org/ebooks/search/?sort_order=random")
 	if err != nil {
 		return Draw{}, err

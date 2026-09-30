@@ -118,8 +118,9 @@ func Route(ctx context.Context, target string, env Env) (*doc.Document, error) {
 	case target == "w5f:discover/random":
 		_, page, err := Next(ctx, env)
 		return page, err
-	case target == "w5f:discover/wiby":
-		d, err := wibyDraw(ctx, env.Fetcher)
+	case directoryDraws[strings.TrimPrefix(target, "w5f:discover/")].draw != nil:
+		dd := directoryDraws[strings.TrimPrefix(target, "w5f:discover/")]
+		d, err := dd.draw(ctx, env.Fetcher)
 		if err != nil {
 			return nil, err
 		}
@@ -127,7 +128,8 @@ func Route(ctx context.Context, target string, env Env) (*doc.Document, error) {
 		if err != nil {
 			return nil, err
 		}
-		page.Blocks = append([]doc.Block{doc.Notice{Kind: "info", Text: "Wiby surprise · " + strings.TrimPrefix(d.Why, "smallweb/Wiby · ") + " · open it again from Small Web for another"}}, page.Blocks...)
+		_, detail, _ := strings.Cut(d.Why, " · ")
+		page.Blocks = append([]doc.Block{doc.Notice{Kind: "info", Text: dd.label + " · " + detail + " · open it again from Small Web for another"}}, page.Blocks...)
 		return page, nil
 	case target == "w5f:worlds":
 		return worldsDoc()
