@@ -108,6 +108,13 @@ func viewBook(comicID int64, chapterID int, path string) (view.Book, func(int) (
 			return view.Book{}, errors.New("this is the first issue in " + cur.Series)
 		}
 		return b, neighbor, nil
+	case path != "" && comics.IsImage(path):
+		// One picture: its folder, from that picture on.
+		pages, info, start, err := comics.OpenImage(path)
+		if err != nil {
+			return view.Book{}, nil, err
+		}
+		return view.Book{Title: filepath.Base(filepath.Dir(path)), Pages: pages, RTL: info.RTL(), Start: start}, nil, nil
 	case path != "":
 		pages, info, err := comics.Open(path)
 		if err != nil {

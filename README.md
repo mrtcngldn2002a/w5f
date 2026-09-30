@@ -110,10 +110,11 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v1 go build -trimpath -ldflags "-s
 
 `g → comics` (or the Comics link on the welcome page).
 
-- **Library.** CBZ files and image folders in `~/Archive/Comics` (`W5F_COMICS`), one folder per series.
+- **Library.** CBZ, CBR, CB7 and CBT files and image folders in `~/Archive/Comics` (`W5F_COMICS`), one folder per series.
   - `ComicInfo.xml` is used when present; natural page order.
   - Your page is kept.
-  - PDF, CBR and DJVU open in the system viewer.
+  - Pictures (JPG, PNG, WebP, GIF, BMP): a folder with at least one is a comic; loose pictures at the top are "Loose images". `w5f view picture.jpg`, or opening a picture in the reader, shows its folder from that picture on.
+  - PDF and DJVU open in the system viewer.
 - **Following** runs on [Suwayomi-Server](https://github.com/Suwayomi/Suwayomi-Server).
   - Install: `w5f comics server install` downloads the official release and checks it against the release's checksums. Suwayomi needs Java 21.
   - W5F starts it when Comics opens and stops it when W5F closes. On the W5F laptop: about 13 s to start, 352 MB while idle.

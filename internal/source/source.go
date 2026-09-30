@@ -6,9 +6,12 @@ package source
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"mime"
 	"net/url"
 	"os"
 	"os/exec"
@@ -174,10 +177,20 @@ func Load(ctx context.Context, target string, opts Options) (*doc.Document, erro
 	if err != nil {
 		return nil, err
 	}
-	if doc.TextLength(d.Blocks) == 0 && d.Collapsibles == 0 {
+	if doc.TextLength(d.Blocks) == 0 && d.Collapsibles == 0 && !hasNotice(d.Blocks) {
 		d.Blocks = append(d.Blocks, doc.Notice{Kind: "info", Text: "No readable text was found on this page. Press ← to go back."})
 	}
 	return d, nil
+}
+
+// hasNotice reports a page that already says what it is (a picture, say).
+func hasNotice(bs []doc.Block) bool {
+	for _, b := range bs {
+		if _, ok := b.(doc.Notice); ok {
+			return true
+		}
+	}
+	return false
 }
 
 var (
@@ -618,8 +631,60 @@ func refreshTarget(resp *fetch.Response, d *doc.Document) *url.URL {
 	return next
 }
 
+// OpenImages sends pictures (image files and links) to the comics viewer; the
+// interactive reader turns it on, one-shot commands only describe them.
+var OpenImages = false
+
+// imageDoc opens a picture in the viewer (its folder, from that picture on)
+// and says so.
+func imageDoc(path, origin, address string) *doc.Document {
+	d := &doc.Document{Title: filepath.Base(path), URL: address, Origin: origin}
+	msg := "A picture. Open it in the W5F reader, or with: w5f view " + path
+	if OpenImages {
+		if err := OpenComic(comics.ViewRequest{Path: path, Title: filepath.Base(path)}); err != nil {
+			msg = err.Error()
+		} else {
+			msg = "Opened in the viewer (q comes back here). Other pictures in the same folder follow it."
+		}
+	}
+	d.Blocks = []doc.Block{doc.Notice{Kind: "info", Text: msg}}
+	return d
+}
+
+// webImage keeps a picture from the web in its own folder in the cache (the
+// viewer shows the pictures of a folder) and opens it.
+func webImage(resp *fetch.Response) (*doc.Document, error) {
+	sum := sha256.Sum256([]byte(resp.URL.String()))
+	dir := filepath.Join(os.TempDir(), "w5f-images", hex.EncodeToString(sum[:8]))
+	if Fetcher.CacheDir != "" {
+		dir = filepath.Join(Fetcher.CacheDir, "images", hex.EncodeToString(sum[:8]))
+	}
+	name := filepath.Base(resp.URL.Path)
+	if !comics.IsImage(name) {
+		exts, _ := mime.ExtensionsByType(strings.TrimSpace(strings.Split(resp.ContentType, ";")[0]))
+		name = "image.jpg" // Linux may list .jfif or .jpe first: take one the viewer knows
+		for _, e := range exts {
+			if comics.IsImage("image" + e) {
+				name = "image" + e
+				break
+			}
+		}
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, err
+	}
+	path := filepath.Join(dir, name)
+	if err := os.WriteFile(path, resp.Body, 0o644); err != nil {
+		return nil, err
+	}
+	return imageDoc(path, "live", resp.URL.String()), nil
+}
+
 func convertResponse(resp *fetch.Response) (*doc.Document, error) {
 	ct := resp.ContentType
+	if strings.HasPrefix(ct, "image/") {
+		return webImage(resp)
+	}
 	if strings.HasPrefix(ct, "text/plain") {
 		return plainText(string(resp.Body), resp.URL.String(), "live"), nil
 	}
@@ -737,6 +802,10 @@ func resolveEmbeds(ctx context.Context, d *doc.Document, live bool) {
 }
 
 func loadFile(path string) (*doc.Document, error) {
+	if comics.IsImage(path) {
+		abs, _ := filepath.Abs(path)
+		return imageDoc(abs, "file", (&url.URL{Scheme: "file", Path: filepath.ToSlash(abs)}).String()), nil
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err

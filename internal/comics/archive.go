@@ -115,7 +115,22 @@ func (d *dirPages) Open(i int) (io.ReadCloser, error) {
 }
 func (d *dirPages) Close() error { return nil }
 
-// Open reads a CBZ/ZIP file or a folder of images.
+// OpenImage opens the folder of an image file as the pages to read, and
+// says which page the image is.
+func OpenImage(path string) (Pages, Info, int, error) {
+	pages, info, err := Open(filepath.Dir(path))
+	if err != nil {
+		return nil, info, 0, err
+	}
+	for i := 0; i < pages.Len(); i++ {
+		if strings.EqualFold(pages.Name(i), filepath.Base(path)) {
+			return pages, info, i, nil
+		}
+	}
+	return pages, info, 0, nil
+}
+
+// Open reads a comic archive (CBZ, CBR, CB7, CBT) or a folder of images.
 func Open(path string) (Pages, Info, error) {
 	var info Info
 	st, err := os.Stat(path)

@@ -137,3 +137,42 @@ func TestScanLibrary(t *testing.T) {
 		t.Errorf("recent: %+v", recent)
 	}
 }
+
+func TestSingleImagesAndCovers(t *testing.T) {
+	root := t.TempDir()
+	db, err := store.Open(filepath.Join(t.TempDir(), "w.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	img := func(p string) {
+		os.MkdirAll(filepath.Dir(p), 0o755)
+		os.WriteFile(p, pngBytes(t, 7), 0o644)
+	}
+	img(filepath.Join(root, "Zine", "Issue 1", "page.jpg"))                        // one page is enough
+	img(filepath.Join(root, "Saga", "cover.jpg"))                                  // a series folder with a cover…
+	writeCBZ(t, filepath.Join(root, "Saga", "Saga 01.cbz"), []string{"1.jpg"}, "") // …and its issues
+	img(filepath.Join(root, "Only cover", "cover.png"))                            // not a comic
+	img(filepath.Join(root, "poster.jpg"))                                         // loose in the Comics folder
+	img(filepath.Join(root, "flyer.png"))
+
+	if _, err := Scan(db, root); err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]int{}
+	series, _ := db.ComicSeriesList()
+	for _, s := range series {
+		got[s.Name] = s.Issues
+	}
+	if got["Zine"] != 1 || got["Saga"] != 1 || got[LooseImages] != 1 || got["Only cover"] != 0 || len(got) != 3 {
+		t.Errorf("series: %v", got)
+	}
+	loose, _ := db.ComicsInSeries(LooseImages)
+	if len(loose) != 1 || loose[0].Pages != 2 {
+		t.Errorf("loose images: %+v", loose)
+	}
+	pages, _, start, err := OpenImage(filepath.Join(root, "poster.jpg"))
+	if err != nil || pages.Len() != 2 || pages.Name(start) != "poster.jpg" {
+		t.Errorf("open an image: %v start %d", err, start)
+	}
+}

@@ -62,6 +62,9 @@ func Scan(db *store.DB, root string) (int, error) {
 			n++
 		}
 	}
+	if hasImages(root) {
+		add(root, true)
+	}
 	err := filepath.WalkDir(root, func(p string, de os.DirEntry, err error) error {
 		if err != nil {
 			return nil
@@ -88,29 +91,50 @@ func Scan(db *store.DB, root string) (int, error) {
 	return n, db.MarkComicsMissingExcept(seen)
 }
 
-// imageFolder is a folder that holds pages and no further folders.
+// imageFolder is a folder of pages: images, and no further folders or
+// archives (a series folder with a cover.jpg beside its CBZ files is not
+// one). A lone cover image does not make a comic either.
 func imageFolder(dir string) bool {
 	ents, err := os.ReadDir(dir)
 	if err != nil {
 		return false
 	}
-	pages := 0
+	pages, covers := 0, 0
 	for _, e := range ents {
-		if e.IsDir() {
+		if e.IsDir() || IsComicFile(e.Name()) || External(e.Name()) {
 			return false
 		}
 		if IsImage(e.Name()) {
 			pages++
+			if strings.HasPrefix(strings.ToLower(e.Name()), "cover.") {
+				covers++
+			}
 		}
 	}
-	return pages >= 2
+	return pages > covers
 }
 
+// LooseImages is the comic made of images lying directly in the Comics folder.
+const LooseImages = "Loose images"
+
 var reNumber = regexp.MustCompile(`(?i)(?:^|[^a-z0-9])(?:ch(?:apter)?|vol(?:ume)?|v|#|no\.?|issue)?\s*0*(\d+(?:\.\d+)?)(?:[^0-9]*)$`)
+
+func hasImages(dir string) bool {
+	ents, _ := os.ReadDir(dir)
+	for _, e := range ents {
+		if !e.IsDir() && IsImage(e.Name()) {
+			return true
+		}
+	}
+	return false
+}
 
 // describe names a comic: ComicInfo first, else the folder is the series and
 // the last number in the name is the issue.
 func describe(root, p string, isDir bool, info Info) (series string, number float64, title string) {
+	if filepath.Clean(p) == filepath.Clean(root) {
+		return LooseImages, 0, LooseImages
+	}
 	base := filepath.Base(p)
 	if !isDir {
 		base = strings.TrimSuffix(base, filepath.Ext(base))
