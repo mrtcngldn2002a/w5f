@@ -65,14 +65,18 @@ func (s Server) Args() []string {
 	}
 }
 
+// startWait is how long a start may take (about 13 s on the W5F laptop).
+func (s Server) startWait() time.Duration { return 90 * time.Second }
+
 func (s Server) pidFile() string { return filepath.Join(s.Dir, "w5f.pid") }
 
-// Running reports whether a server answers.
+// Running reports whether a server answers (one that asks W5F to sign in
+// answers too: it must not be started a second time).
 func (s Server) Running(ctx context.Context) bool {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	_, err := New(s.Addr()).Version(ctx)
-	return err == nil
+	_, err := s.Client().Version(ctx)
+	return err == nil || errors.Is(err, ErrUnauthorized)
 }
 
 // Start launches the server unless one already answers, and waits until it
@@ -154,6 +158,15 @@ func (s Server) Start(ctx context.Context, wait time.Duration) (bool, error) {
 		}
 	}
 	return true, fmt.Errorf("Suwayomi did not answer within %s; see %s", wait, filepath.Join(s.Dir, "server.log"))
+}
+
+// ours reports a server on W5F's data folder (started by W5F, or left over
+// on its folder), which W5F may stop and start.
+func (s Server) ours() bool {
+	if pid, ok := s.pid(); ok && alive(pid) {
+		return true
+	}
+	return len(s.strays()) > 0
 }
 
 func (s Server) pid() (int, bool) {

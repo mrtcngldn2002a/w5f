@@ -18,20 +18,30 @@ import (
 // ReleaseAPI is where the latest Suwayomi-Server release is looked up.
 var ReleaseAPI = "https://api.github.com/repos/Suwayomi/Suwayomi-Server/releases/latest"
 
+type release struct {
+	Tag    string `json:"tag_name"`
+	Assets []struct {
+		Name string `json:"name"`
+		URL  string `json:"browser_download_url"`
+		Size int64  `json:"size"`
+	} `json:"assets"`
+}
+
+func latestRelease(ctx context.Context) (release, error) {
+	var rel release
+	if err := getJSON(ctx, ReleaseAPI, &rel); err != nil {
+		return rel, fmt.Errorf("finding the latest Suwayomi release: %w", err)
+	}
+	return rel, nil
+}
+
 // Install downloads the latest Suwayomi-Server jar from its official GitHub
 // release into dir, checks it against the release's Checksums.sha256 and
 // removes older jars. It returns the jar's name.
 func Install(ctx context.Context, dir string, progress func(done, total int64)) (string, error) {
-	var rel struct {
-		Tag    string `json:"tag_name"`
-		Assets []struct {
-			Name string `json:"name"`
-			URL  string `json:"browser_download_url"`
-			Size int64  `json:"size"`
-		} `json:"assets"`
-	}
-	if err := getJSON(ctx, ReleaseAPI, &rel); err != nil {
-		return "", fmt.Errorf("finding the latest Suwayomi release: %w", err)
+	rel, err := latestRelease(ctx)
+	if err != nil {
+		return "", err
 	}
 	var jarURL, sumURL, jarName string
 	var size int64

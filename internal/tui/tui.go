@@ -82,7 +82,8 @@ type Model struct {
 	hintBuf   string
 	gotoBuf   string
 	secretBuf string
-	secretAO3 bool // the hidden input is for the AO3 session, not Reddit's
+	secretAO3 bool       // the hidden input is for the AO3 session, not Reddit's
+	form      *formState // a page's form (RegisterForm) instead of a login
 	findBuf   string
 	dict      dictState
 	note      noteState
@@ -748,6 +749,13 @@ func (m Model) follow(href string) (tea.Model, tea.Cmd) {
 			m.status = "W5F addresses are not opened from web pages (use g to go there yourself)"
 			return m, nil
 		}
+		if open, ok := formFor(href); ok {
+			if m.cur != nil && !w5fPage(m.cur) {
+				m.status = "W5F forms open only from W5F pages"
+				return m, nil
+			}
+			return m.openForm(open, href)
+		}
 		// Notes, clippings and saved pages hold text from the web: their
 		// links may navigate, but never run W5F actions.
 		if m.cur != nil && !w5fPage(m.cur) && !navigationW5F(href) {
@@ -922,6 +930,9 @@ func (m Model) gotoKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 // --- hidden input for the Reddit session (g → reddit-login) ---
 
 func (m Model) secretKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if m.form != nil {
+		return m.formKey(k)
+	}
 	switch k.String() {
 	case "esc":
 		m.mode, m.secretBuf = modeRead, ""
@@ -1133,6 +1144,9 @@ func (m Model) bodyLines() []string {
 }
 
 func (m Model) secretLines() []string {
+	if m.form != nil {
+		return m.formLines()
+	}
 	margin := m.margin()
 	st := func(r render.Role) func(string) string {
 		return func(s string) string { return m.theme.Seg(render.Seg{Role: r}, false).Render(s) }

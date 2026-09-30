@@ -56,7 +56,7 @@ func runView(args []string) int {
 func viewBook(comicID int64, chapterID int, path string) (view.Book, func(int) (view.Book, error), error) {
 	switch {
 	case chapterID > 0:
-		c := suwayomi.New(source.ComicsServer().Addr())
+		c := source.ComicsServer().Client()
 		b, err := chapterBook(c, chapterID)
 		if err != nil {
 			return b, nil, err
