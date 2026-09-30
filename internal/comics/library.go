@@ -25,7 +25,7 @@ func Root() string {
 // External reports files the library lists but a system viewer opens.
 func External(name string) bool {
 	switch strings.ToLower(filepath.Ext(name)) {
-	case ".pdf", ".cbr", ".rar", ".cb7", ".djvu":
+	case ".pdf", ".djvu":
 		return true
 	}
 	return false

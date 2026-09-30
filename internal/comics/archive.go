@@ -45,10 +45,11 @@ var imageExt = map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".webp
 // IsImage reports a page file name.
 func IsImage(name string) bool { return imageExt[strings.ToLower(filepath.Ext(name))] }
 
-// IsComicFile reports the files the library reads itself.
+// IsComicFile reports the files the library reads itself: CBZ, CBR, CB7
+// and CBT (and the zip, rar, 7z and tar they are).
 func IsComicFile(name string) bool {
 	switch strings.ToLower(filepath.Ext(name)) {
-	case ".cbz", ".zip":
+	case ".cbz", ".zip", ".cbr", ".rar", ".cb7", ".7z", ".cbt", ".tar":
 		return true
 	}
 	return false
@@ -142,6 +143,14 @@ func Open(path string) (Pages, Info, error) {
 		}
 		sort.Slice(d.names, func(i, j int) bool { return natLess(d.names[i], d.names[j]) })
 		return d, info, nil
+	}
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".cbr", ".rar":
+		return openRar(path)
+	case ".cb7", ".7z":
+		return openSeven(path)
+	case ".cbt", ".tar":
+		return openTar(path)
 	}
 	if !IsComicFile(path) {
 		return nil, info, fmt.Errorf("%s: not a comic W5F reads itself", filepath.Base(path))

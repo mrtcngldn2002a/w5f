@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	_ "golang.org/x/image/bmp"
 	xdraw "golang.org/x/image/draw"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/basicfont"
@@ -319,17 +320,31 @@ func (v *Viewer) prefetch() {
 	if len(vw) == 0 {
 		return
 	}
-	next := Spread(vw[len(vw)-1]+1, v.book.Pages.Len(), v.double, v.size)
-	if len(next) == 0 {
-		return
-	}
-	var sizes []image.Point
-	for _, i := range next {
-		sizes = append(sizes, v.size(i))
-	}
-	for _, p := range Layout(next, sizes, v.d.Size(), v.fit, v.book.RTL, 0) {
-		go v.cache.scaled(p.Page, p.Size)
-	}
+	// Everything, even the next pages' sizes, is worked out in the
+	// background: in a solid archive (CB7, CBR) reading a page's header
+	// means decompressing it, which must not hold up the page on screen.
+	c, n, start := v.cache, v.book.Pages.Len(), vw[len(vw)-1]+1
+	double, screen, fit, rtl := v.double, v.d.Size(), v.fit, v.book.RTL
+	go func() {
+		size := func(i int) image.Point {
+			sz, err := c.size(i)
+			if err != nil {
+				return image.Pt(1, 1)
+			}
+			return sz
+		}
+		next := Spread(start, n, double, size)
+		if len(next) == 0 {
+			return
+		}
+		var sizes []image.Point
+		for _, i := range next {
+			sizes = append(sizes, size(i))
+		}
+		for _, p := range Layout(next, sizes, screen, fit, rtl, 0) {
+			c.scaled(p.Page, p.Size)
+		}
+	}()
 }
 
 // pageCache keeps a few pages' bytes and their screen-sized copies; full

@@ -144,3 +144,21 @@ func TestTwoPageView(t *testing.T) {
 		t.Error("nothing drawn")
 	}
 }
+
+// A 1×1 24-bit BMP written by hand: the viewer itself must register the BMP
+// decoder (this test does not import it).
+func TestBMPPagesDecode(t *testing.T) {
+	bmpFile := []byte{
+		'B', 'M', 58, 0, 0, 0, 0, 0, 0, 0, 54, 0, 0, 0, // file header: size 58, pixels at 54
+		40, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 24, 0, // info header: 1×1, 1 plane, 24 bits
+		0, 0, 0, 0, 4, 0, 0, 0, 0x13, 0x0b, 0, 0, 0x13, 0x0b, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0x00, 0xb0, 0xff, 0, // one amber pixel (BGR) and row padding
+	}
+	img, format, err := image.Decode(bytes.NewReader(bmpFile))
+	if err != nil || format != "bmp" || img.Bounds().Dx() != 1 {
+		t.Fatalf("BMP pages: %q %v", format, err)
+	}
+	if r, g, _, _ := img.At(0, 0).RGBA(); r>>8 != 0xff || g>>8 != 0xb0 {
+		t.Errorf("pixel: %d %d", r>>8, g>>8)
+	}
+}
