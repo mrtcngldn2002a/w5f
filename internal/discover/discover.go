@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"strings"
+	"time"
 
 	"w5f/internal/doc"
 	"w5f/internal/fetch"
@@ -109,12 +110,18 @@ func Next(ctx context.Context, env Env) (Draw, *doc.Document, error) {
 // IsTarget reports discovery addresses.
 func IsTarget(t string) bool {
 	return strings.HasPrefix(t, "w5f:discover/") || t == "w5f:packet" || strings.HasPrefix(t, "w5f:packet/") ||
-		t == "w5f:worlds" || strings.HasPrefix(t, "w5f:worlds/")
+		t == "w5f:worlds" || strings.HasPrefix(t, "w5f:worlds/") || t == "w5f:almanac" || strings.HasPrefix(t, "w5f:almanac/")
 }
 
 // Route builds the page of a discovery address.
 func Route(ctx context.Context, target string, env Env) (*doc.Document, error) {
 	switch {
+	case target == "w5f:discover/tarot", target == "w5f:discover/iching":
+		return oracleRoute(ctx, env, strings.TrimPrefix(target, "w5f:discover/"))
+	case target == "w5f:almanac":
+		return almanacDoc(ctx, env, time.Now().Format("01-02"))
+	case strings.HasPrefix(target, "w5f:almanac/"):
+		return almanacDoc(ctx, env, strings.TrimPrefix(target, "w5f:almanac/"))
 	case target == "w5f:discover/random":
 		_, page, err := Next(ctx, env)
 		return page, err

@@ -240,6 +240,12 @@ func Resolve(input string) string {
 		return "w5f:catalog/check?" + v.Encode()
 	case lower == "catalogs":
 		return "w5f:catalogs"
+	case lower == "tarot":
+		return "w5f:discover/tarot"
+	case lower == "iching", lower == "i ching", lower == "i-ching":
+		return "w5f:discover/iching"
+	case lower == "almanac", lower == "on this day":
+		return "w5f:almanac"
 	case strings.HasPrefix(lower, "opml-import ") && len(strings.Fields(s)) > 1:
 		return "w5f:feeds/import?" + url.Values{"f": {userPath(s[len("opml-import "):])}}.Encode()
 	case lower == "opml-export":

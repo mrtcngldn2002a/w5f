@@ -22,6 +22,9 @@ type Packet struct {
 	Date    string  `json:"date"` // 2026-09-29
 	Number  int     `json:"number"`
 	Entries []Entry `json:"entries"`
+	// The cover's columns (from v0.9.2; older issues have none).
+	Almanac *Almanac `json:"almanac,omitempty"`
+	Oracle  *Oracle  `json:"oracle,omitempty"`
 }
 
 // Entry is one item of an issue.
@@ -62,6 +65,11 @@ func loadPacket(db *store.DB, date string) (Packet, bool) {
 // todayPacket returns today's issue, building it on first use.
 func todayPacket(env Env) (Packet, error) {
 	if p, ok := loadPacket(env.DB, today()); ok {
+		// An issue made before the almanac and the oracle existed gets them.
+		if p.Almanac == nil && p.Oracle == nil {
+			addColumns(context.Background(), env, &p)
+			_ = savePacket(env.DB, p)
+		}
 		return p, nil
 	}
 	n, _ := strconv.Atoi(env.DB.Get("packet:count"))
@@ -85,6 +93,13 @@ func savePacket(db *store.DB, p Packet) error {
 // and the first open item of the reading queue. A missing part is skipped.
 func buildPacket(ctx context.Context, env Env, date string, number int) Packet {
 	p := Packet{Date: date, Number: number}
+	// The cover's columns are gathered alongside the entries.
+	columns := make(chan Packet, 1)
+	go func() {
+		c := Packet{Date: date}
+		addColumns(ctx, env, &c)
+		columns <- c
+	}()
 	if items, err := env.DB.Items(store.Query{Unread: true, Limit: 200}); err == nil {
 		seen := map[string]bool{}
 		for _, it := range items {
@@ -114,7 +129,66 @@ func buildPacket(ctx context.Context, env Env, date string, number int) Packet {
 			}
 		}
 	}
+	c := <-columns
+	p.Almanac, p.Oracle = c.Almanac, c.Oracle
 	return p
+}
+
+// addColumns sets the cover's columns: the day's almanac and the oracle
+// (tarot and I Ching on alternate days). Either may fail and be left out.
+func addColumns(ctx context.Context, env Env, p *Packet) {
+	if env.Fetcher == nil {
+		return
+	}
+	oracle := make(chan *Oracle, 1)
+	go func() {
+		o, _ := drawOracle(ctx, env.Fetcher, oracleKind(p.Date))
+		oracle <- o
+	}()
+	if t, err := time.Parse("2006-01-02", p.Date); err == nil {
+		if a, err := buildAlmanac(ctx, env.Fetcher, t.Month(), t.Day()); err == nil {
+			p.Almanac = a
+		}
+	}
+	p.Oracle = <-oracle
+}
+
+// columnBlocks are the cover's almanac and oracle columns.
+func columnBlocks(p Packet, link func(href, text string) int) []doc.Block {
+	var bs []doc.Block
+	if a := p.Almanac; a != nil {
+		date := p.Date
+		if t, err := time.Parse("2006-01-02", p.Date); err == nil {
+			date = t.Format("2 January")
+		}
+		bs = append(bs, doc.Heading{Level: 2, Text: doc.Inline{{Text: "On this day · " + date}}})
+		if len(a.Headlines) > 0 || a.Born != "" {
+			in := doc.Inline{{Text: "The Book of Days (1864)", Style: doc.Bold, Link: link(AlmanacHref(a.Day), "The Book of Days")}}
+			if len(a.Headlines) > 0 {
+				in = append(in, doc.Span{Text: ": " + strings.Join(a.Headlines, " · ")})
+			}
+			bs = append(bs, doc.Paragraph{Text: in})
+			if a.Born != "" {
+				bs = append(bs, doc.Paragraph{Text: doc.Inline{{Text: "Born: " + a.Born, Style: doc.Italic}}})
+			}
+		}
+		var items [][]doc.Block
+		for _, e := range a.Events {
+			in := doc.Inline{{Text: strconv.Itoa(e.Year), Style: doc.Bold}, {Text: " — "}, {Text: e.Text, Link: link(e.Target, e.Text)}}
+			if e.Lang != "en" {
+				in = append(in, doc.Span{Text: "  (" + e.Lang + ")", Style: doc.Italic})
+			}
+			items = append(items, []doc.Block{doc.Paragraph{Text: in}})
+		}
+		if len(items) > 0 {
+			bs = append(bs, doc.List{Items: items})
+		}
+	}
+	if p.Oracle != nil {
+		bs = append(bs, doc.Heading{Level: 2, Text: doc.Inline{{Text: "The oracle"}}})
+		bs = append(bs, oracleBlocks(p.Oracle, link)...)
+	}
+	return bs
 }
 
 var kindLabel = map[string]string{"periodical": "Periodicals", "weird": "Weird Worlds", "esoteric": "Esoterica & folklore",
@@ -145,6 +219,7 @@ func coverDoc(p Packet) *doc.Document {
 	} else {
 		d.Blocks = append(d.Blocks, doc.List{Items: items})
 	}
+	d.Blocks = append(d.Blocks, columnBlocks(p, link)...)
 	actions := doc.Inline{}
 	if len(p.Entries) > 0 {
 		actions = append(actions, doc.Span{Text: "▶ start reading", Style: doc.Bold, Link: link(packetHref(p.Date, "1"), "start")}, doc.Span{Text: "   "})
@@ -194,6 +269,23 @@ func entryDoc(ctx context.Context, env Env, p Packet, n int) (*doc.Document, err
 func saveIssue(ctx context.Context, env Env, p Packet) (*doc.Document, error) {
 	var b strings.Builder
 	fmt.Fprintf(&b, "---\ntitle: \"The W5F Daily Packet No. %d\"\ndate: %s\ntags: [w5f, packet]\n---\n# The W5F Daily Packet No. %d — %s\n\n", p.Number, p.Date, p.Number, p.Date)
+	if a := p.Almanac; a != nil {
+		b.WriteString("## On this day\n\n")
+		if len(a.Headlines) > 0 {
+			fmt.Fprintf(&b, "*The Book of Days (1864):* %s\n\n", strings.Join(a.Headlines, " · "))
+		}
+		for _, e := range a.Events {
+			fmt.Fprintf(&b, "- **%d** — [%s](%s)\n", e.Year, e.Text, e.Target)
+		}
+		b.WriteString("\n")
+	}
+	if o := p.Oracle; o != nil {
+		b.WriteString("## The oracle\n\n")
+		if len(o.Lines) == 6 {
+			fmt.Fprintf(&b, "```\n%s\n```\n\n", hexagramLines(o.Lines))
+		}
+		fmt.Fprintf(&b, "[%s](%s) — %s\n\n", o.Title, o.Target, o.Detail)
+	}
 	for i, e := range p.Entries {
 		fmt.Fprintf(&b, "## %s. %s\n\n*%s · %s* — <%s>\n\n", roman[i], e.Title, kindLabel[e.Kind], e.Source, e.Target)
 		if d, err := env.Load(ctx, e.Target); err == nil {
