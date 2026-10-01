@@ -42,6 +42,10 @@ func text(d *doc.Document) string {
 				for _, it := range x.Items {
 					walk(it)
 				}
+			case doc.Columns:
+				for _, c := range x.Cols {
+					walk(c)
+				}
 			}
 		}
 	}

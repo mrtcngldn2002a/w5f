@@ -160,13 +160,16 @@ func bookHref(b store.Book) string {
 	return fmt.Sprintf("w5f:book/%d", b.ID)
 }
 
+// homeDoc is The Stacks: what is being read beside where to find more,
+// then every book.
 func homeDoc(env Env) (*doc.Document, error) {
 	n, scanErr := Scan(env.DB)
-	d := &doc.Document{Title: "Library", URL: "w5f:books", Origin: "local", Lang: "en"}
+	d := &doc.Document{Title: "The Stacks", URL: "w5f:books", Origin: "local", Lang: "en"}
 	d.Meta = []doc.KV{{Key: "books", Value: strconv.Itoa(n)}}
 	if scanErr != nil {
 		d.Blocks = append(d.Blocks, doc.Notice{Kind: "warn", Text: "Library folder: " + scanErr.Error()})
 	}
+	left := []doc.Block{doc.Heading{Level: 2, Text: doc.Inline{{Text: "Continue reading"}}}}
 	if recent, _ := env.DB.Books("recent", 5); len(recent) > 0 {
 		var items [][]doc.Block
 		for _, b := range recent {
@@ -174,7 +177,9 @@ func homeDoc(env Env) (*doc.Document, error) {
 				{Text: b.Title, Style: doc.Bold, Link: link(d, bookHref(b), b.Title)},
 				{Text: "  " + progress(b), Style: doc.Italic}}}})
 		}
-		d.Blocks = append(d.Blocks, doc.Heading{Level: 2, Text: doc.Inline{{Text: "Continue reading"}}}, doc.List{Items: items})
+		left = append(left, doc.List{Items: items})
+	} else {
+		left = append(left, doc.Paragraph{Text: doc.Inline{{Text: "No book opened yet.", Style: doc.Italic}}})
 	}
 	find := [][]doc.Block{
 		{doc.Paragraph{Text: doc.Inline{{Text: "Library Genesis", Link: link(d, "w5f:books/libgen", "Library Genesis")},
@@ -207,7 +212,7 @@ func homeDoc(env Env) (*doc.Document, error) {
 	}
 	find = append(find, []doc.Block{doc.Paragraph{Text: doc.Inline{{Text: "+ add a site: g → catalog-add <address>", Style: doc.Italic}, {Text: "   "},
 		{Text: "manage catalogs", Link: link(d, "w5f:catalogs", "manage")}}}})
-	d.Blocks = append(d.Blocks, doc.Heading{Level: 2, Text: doc.Inline{{Text: "Find books"}}}, doc.List{Items: find})
+	d.Blocks = append(d.Blocks, doc.Columns{Cols: [][]doc.Block{left, {doc.Heading{Level: 2, Text: doc.Inline{{Text: "Find books"}}}, doc.List{Items: find}}}}, doc.Rule{})
 	all, _ := env.DB.Books("author", 0)
 	if len(all) == 0 {
 		d.Blocks = append(d.Blocks, doc.Heading{Level: 2, Text: doc.Inline{{Text: "Your books"}}},

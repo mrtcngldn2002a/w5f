@@ -10,7 +10,6 @@ import (
 
 	"w5f/internal/discover"
 	"w5f/internal/doc"
-	"w5f/internal/smallweb"
 )
 
 // IsTarget reports the table's addresses.
@@ -40,6 +39,17 @@ func Route(ctx context.Context, target string, env Env) (*doc.Document, error) {
 		return env.roll(q.Get("d"))
 	case strings.HasPrefix(path, "solo/ask/"):
 		return env.ask(ctx, strings.TrimPrefix(path, "solo/ask/"), q.Get("q"))
+	case strings.HasPrefix(path, "solo/add/"):
+		return env.add(strings.TrimPrefix(path, "solo/add/"), q.Get("q"))
+	case strings.HasPrefix(path, "solo/pick/"):
+		return env.pick(strings.TrimPrefix(path, "solo/pick/"))
+	case strings.HasPrefix(path, "solo/character/"), strings.HasPrefix(path, "solo/thread/"), strings.HasPrefix(path, "solo/counter/"):
+		list, action, _ := strings.Cut(strings.TrimPrefix(path, "solo/"), "/")
+		i, err := strconv.Atoi(q.Get("i"))
+		if err != nil {
+			return nil, errors.New("which entry? (i=)")
+		}
+		return env.change(list, action, i, q.Get("n"))
 	case strings.HasPrefix(path, "solo/spark/"):
 		s, err := env.Draw(ctx, strings.TrimPrefix(path, "solo/spark/"))
 		if err != nil {
@@ -143,43 +153,6 @@ func sparkBlocks(d *doc.Document, s Spark, label string) []doc.Block {
 		bs = append(bs, doc.Pre{Text: discover.HexagramText(s.Lines)})
 	}
 	return append(bs, doc.Paragraph{Text: doc.Inline{{Text: "from " + s.Source, Style: doc.Italic}}})
-}
-
-// table is the table's page: the oracle, the dice, the sparks and the log.
-func (env Env) table() *doc.Document {
-	d := &doc.Document{Title: "Solo RPG table", URL: "w5f:solo", Origin: "local", Lang: "en"}
-	link := func(href, text string) doc.Span {
-		d.Links = append(d.Links, doc.Link{Href: href, Text: text})
-		return doc.Span{Text: text, Link: len(d.Links)}
-	}
-	gap := doc.Span{Text: "   "}
-	d.Blocks = append(d.Blocks, doc.Rule{}, doc.Heading{Level: 2, Text: doc.Inline{{Text: "Ask the oracle"}}})
-	odds := doc.Inline{}
-	for _, o := range Odds {
-		prompt := fmt.Sprintf("Ask the oracle (%s, %d in 100): your yes/no question. Rolling your own d100? End with = and the number, like: Is the door locked? = 57", o.Label, o.Chance)
-		odds = append(odds, link(smallweb.WebSearchPage(askPrefix+o.Key, "q", prompt), o.Label), gap)
-	}
-	d.Blocks = append(d.Blocks, doc.Paragraph{Text: odds},
-		doc.Paragraph{Text: doc.Inline{{Text: "A d100 at or under the chance is yes; matching digits (11, 22 … 100) make it extreme, or a twist.", Style: doc.Italic}}})
-	d.Blocks = append(d.Blocks, doc.Heading{Level: 2, Text: doc.Inline{{Text: "Dice"}}})
-	dice := doc.Inline{}
-	for _, x := range []string{"d4", "d6", "d8", "d10", "d12", "d20", "d100", "2d6", "3d6", "2d20kh1", "2d20kl1"} {
-		dice = append(dice, link(rollAddr+"?"+url.Values{"d": {x}}.Encode(), x), gap)
-	}
-	dice = append(dice, link(smallweb.WebSearchPage(rollAddr, "d", "Dice, like 2d6+1, d100, 4d6kh3 (keep the 3 highest). Your own dice? Add = and the total (2d6 = 9) or each die (2d6 = 3 6)."), "any dice…"))
-	d.Blocks = append(d.Blocks, doc.Paragraph{Text: dice})
-	d.Blocks = append(d.Blocks, doc.Heading{Level: 2, Text: doc.Inline{{Text: "Sparks"}}})
-	sparks := doc.Inline{}
-	for _, k := range SparkKinds {
-		sparks = append(sparks, link(sparkPrefix+k.Key, k.Label), gap)
-	}
-	d.Blocks = append(d.Blocks, doc.Paragraph{Text: sparks})
-	if recent := env.Recent(12); len(recent) > 0 {
-		d.Blocks = append(d.Blocks, doc.Heading{Level: 2, Text: doc.Inline{{Text: "Log"}}}, logList(recent),
-			doc.Paragraph{Text: doc.Inline{link("w5f:solo/log", "the whole log")}})
-	}
-	d.Blocks = append(d.Blocks, doc.Paragraph{Text: doc.Inline{{Text: "From the prompt: g → roll 2d6+1, g → ask likely Is it guarded?, g → spark words. The odds follow Ironsworn's (Shawn Tomkin, CC BY 4.0).", Style: doc.Italic}}})
-	return d
 }
 
 func logList(es []Entry) doc.Block {

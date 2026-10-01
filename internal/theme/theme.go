@@ -33,6 +33,9 @@ var (
 	// NightRed is low light: reds only, for reading in the dark.
 	NightRed    = Palette{"night", hex("#0A0302"), hex("#F2735C"), hex("#C05844"), hex("#FF8A6E"), hex("#3A1410"), hex("#FFB000")}
 	NightChrome = Palette{"night", hex("#140504"), hex("#F2735C"), hex("#C85E49"), hex("#FF8A6E"), hex("#3A1410"), hex("#FFB000")}
+	// GreenP1 is the P1 phosphor of the old terminals, page and chrome
+	// alike.
+	GreenP1 = Palette{"green", hex("#020A04"), hex("#33FF66"), hex("#1F9C3E"), hex("#B6FFC9"), hex("#0F4A1E"), hex("#E6FF33")}
 )
 
 func hex(s string) color.Color { return lipgloss.Color(s) }
@@ -49,14 +52,17 @@ type Theme struct {
 	FocusFG, FocusBG color.Color
 }
 
-// The themes (chosen with the owner, 2026-10-01): amber, and three more.
+// The themes (chosen with the owner, 2026-10-01): amber, three more, and
+// green.
 var (
 	Amber = Theme{"amber", "Amber — amber chrome over a dark paper page", AmberP3, PaperInk, PaperInk.BG, AmberP3.FG}
 	Day   = Theme{"day", "Day paper — dark ink on cream, for daylight and yellowed screens", DayChrome, DayPaper, DayPaper.BG, DayChrome.FG}
 	Cold  = Theme{"cold", "Cold archive — grey-blue, quiet, a red accent", ColdArchive, ColdArchive, ColdArchive.BG, ColdArchive.FG}
 	Night = Theme{"night", "Night red — reds only, for reading in the dark", NightChrome, NightRed, NightRed.BG, hex("#FF7A5C")}
+	// Green was asked for after the first four (2026-10-01): full phosphor.
+	Green = Theme{"green", "Green phosphor — the P1 green of the old terminals", GreenP1, GreenP1, GreenP1.BG, GreenP1.FG}
 
-	Themes = []Theme{Amber, Day, Cold, Night}
+	Themes = []Theme{Amber, Day, Cold, Night, Green}
 )
 
 // Default is the decided default: Amber.

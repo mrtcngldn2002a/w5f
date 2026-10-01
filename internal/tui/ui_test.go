@@ -8,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"w5f/internal/doc"
 	"w5f/internal/store"
 	"w5f/internal/theme"
 )
@@ -152,5 +153,77 @@ func TestBottomBarFollowsTheRoom(t *testing.T) {
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 60, Height: 20})
 	if b := bar(next.(Model)); !strings.HasSuffix(strings.TrimSpace(b), "? help · q quit") || ansi.StringWidth(b) > 60 {
 		t.Errorf("narrow: %q", b)
+	}
+}
+
+// The desk can be cleared, one page or all at once (asking first); what is
+// set aside comes back when it is opened again. Clearing the history is
+// never a link a note or a saved page can follow.
+func TestDeskCanBeCleared(t *testing.T) {
+	db, _ := store.Default()
+	a, b := "https://example.org/desk-a", "https://example.org/desk-b"
+	for _, u := range []string{a, b} {
+		db.Visit(u, "Desk "+u[len(u)-1:], "web", "")
+		db.SavePos(u, 0.5)
+	}
+	text := func(target string) string { return fmt.Sprint(deskDoc(target).Blocks) }
+	if s := text("w5f:desk"); !strings.Contains(s, "Desk a") || !strings.Contains(s, "Desk b") || !strings.Contains(s, "set aside") {
+		t.Fatalf("desk: %s", s)
+	}
+	if s := fmt.Sprint(welcomeDoc("test").Blocks); !strings.Contains(s, "clear the desk…") {
+		t.Error("the Reading Room has no way to the desk")
+	}
+	s := text("w5f:desk/aside?u=" + a)
+	if !strings.Contains(s, "Set aside") || strings.Contains(s, "Desk a") || !strings.Contains(s, "Desk b") {
+		t.Errorf("one set aside: %s", s)
+	}
+	d := deskDoc("w5f:desk/clear")
+	if d.Title != "Clear the desk?" || !strings.Contains(fmt.Sprint(d.Blocks), "Yes, clear the desk") || !strings.Contains(text("w5f:desk"), "Desk b") {
+		t.Errorf("asking cleared the desk: %s", fmt.Sprint(d.Blocks))
+	}
+	if s := text("w5f:desk/clear?sure=yes"); !strings.Contains(s, "The desk is clear") || strings.Contains(s, "Desk b") {
+		t.Errorf("cleared: %s", s)
+	}
+	db.Visit(a, "Desk a", "web", "")
+	if s := text("w5f:desk"); !strings.Contains(s, "Desk a") {
+		t.Errorf("opened again, not back on the desk: %s", s)
+	}
+	if navigationW5F("w5f:history/clear?sure=yes") || navigationW5F("w5f:history/clear") || !navigationW5F("w5f:history") {
+		t.Error("clearing the history must not be followed from a file page")
+	}
+}
+
+func TestClearDeskStartsOnNo(t *testing.T) {
+	db, _ := store.Default()
+	db.Visit("https://example.org/desk-c", "Desk c", "web", "")
+	db.SavePos("https://example.org/desk-c", 0.5)
+	if d := deskDoc("w5f:desk/clear"); len(d.Links) != 2 || d.Links[0].Href != "w5f:desk" {
+		t.Errorf("first link: %+v", d.Links)
+	}
+}
+
+// A change on the Gaming Table redraws it in place: no new page to go back
+// through, the selection where it was (+ pressed again and again).
+func TestTableRedrawKeepsSelection(t *testing.T) {
+	table := func(n int) *doc.Document {
+		d := &doc.Document{Title: "The Gaming Table", URL: "w5f:solo"}
+		var in doc.Inline
+		for i := 1; i <= 6; i++ {
+			d.Links = append(d.Links, doc.Link{Href: fmt.Sprintf("w5f:solo/counter/up?i=%d", i), Text: "+"})
+			in = append(in, doc.Span{Text: fmt.Sprintf("+%d", n), Link: i}, doc.Span{Text: " "})
+		}
+		d.Blocks = []doc.Block{doc.Paragraph{Text: in}}
+		return d
+	}
+	m := open(sized(New("", "test")), "w5f:solo", table(0))
+	m.cur.focus = 4
+	back := len(m.back)
+	if !soloEdit("w5f:solo/counter/up?i=4&n=Doom") || soloEdit("w5f:solo/roll?d=d6") {
+		t.Error("soloEdit")
+	}
+	next, _ := m.Update(loadedMsg{target: "w5f:solo/counter/up?i=4&n=Doom", doc: table(1), replace: true})
+	m = next.(Model)
+	if m.cur.focus != 4 || len(m.back) != back || m.cur.target != "w5f:solo" {
+		t.Errorf("focus %d, back %d (was %d), target %q", m.cur.focus, len(m.back), back, m.cur.target)
 	}
 }

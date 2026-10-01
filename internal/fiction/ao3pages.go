@@ -51,7 +51,7 @@ func ao3Nav(d *doc.Document) doc.Block {
 		{"Fandoms", ao3Root + "/media"},
 		{"Works search", ao3Root + "/works/search"},
 		{"My AO3", "w5f:fiction/ao3/me"},
-		{"Internet Fiction", "w5f:fiction"},
+		{"The Serial Hall", "w5f:fiction"},
 	} {
 		if i > 0 {
 			in = append(in, plain(" · ", doc.Italic))

@@ -30,12 +30,14 @@ func TestOPMLCommands(t *testing.T) {
 	}
 	for in, want := range map[string]string{"solo": "w5f:solo", "roll 2d6+1": "w5f:solo/roll?d=2d6%2B1", "roll 2d6 = 3 5": "w5f:solo/roll?d=2d6+%3D+3+5",
 		"ask likely Is it guarded?": "w5f:solo/ask/likely?q=Is+it+guarded%3F", "ask almost certain The door holds": "w5f:solo/ask/certain?q=The+door+holds",
-		"ask 50/50 Rain?": "w5f:solo/ask/even?q=Rain%3F", "spark tarot": "w5f:solo/spark/tarot", "spark": "w5f:solo/spark/words"} {
+		"ask 50/50 Rain?": "w5f:solo/ask/even?q=Rain%3F", "spark tarot": "w5f:solo/spark/tarot", "spark": "w5f:solo/spark/words",
+		"npc Agia: a liar": "w5f:solo/add/character?q=Agia%3A+a+liar", "thread Find the key": "w5f:solo/add/thread?q=Find+the+key",
+		"counter Health 5/5": "w5f:solo/add/counter?q=Health+5%2F5", "pick npc": "w5f:solo/pick/character", "pick thread": "w5f:solo/pick/thread"} {
 		if got := Resolve(in); got != want {
 			t.Errorf("%s → %s, want %s", in, got, want)
 		}
 	}
-	for _, web := range []string{"roll call", "ask me anything", "spark plugs"} {
+	for _, web := range []string{"roll call", "ask me anything", "spark plugs", "counter strike"} {
 		if strings.HasPrefix(Resolve(web), "w5f:solo") {
 			t.Errorf("%q should stay a web search", web)
 		}

@@ -275,6 +275,17 @@ func Resolve(input string) string {
 		return "w5f:solo/spark/words"
 	case strings.HasPrefix(lower, "spark ") && isSpark(strings.TrimSpace(lower[len("spark "):])):
 		return "w5f:solo/spark/" + strings.TrimSpace(lower[len("spark "):])
+	case strings.HasPrefix(lower, "npc "), strings.HasPrefix(lower, "thread "), strings.HasPrefix(lower, "counter ") && isCounter(s[len("counter "):]):
+		// The table's lists: g → npc Name — a note, g → thread …, g → counter
+		// Health 5/5 (with a number, so "counter strike" stays a search).
+		word, rest, _ := strings.Cut(s, " ")
+		list := map[string]string{"npc": "character", "thread": "thread", "counter": "counter"}[strings.ToLower(word)]
+		return "w5f:solo/add/" + list + "?" + url.Values{"q": {strings.TrimSpace(rest)}}.Encode()
+	case lower == "pick npc", lower == "pick character", lower == "pick thread":
+		if strings.HasSuffix(lower, "thread") {
+			return "w5f:solo/pick/thread"
+		}
+		return "w5f:solo/pick/character"
 	case lower == "usenet", lower == "news":
 		return "w5f:usenet"
 	case strings.HasPrefix(lower, "usenet ") && len(strings.Fields(s)) > 1:

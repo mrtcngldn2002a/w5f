@@ -276,6 +276,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.replace && m.cur != nil {
 			np.offset = m.cur.offset
 			np.open = m.cur.open
+			np.focus = m.cur.focus // + on a counter, pressed again and again
 		} else if m.cur != nil {
 			m.back = append(m.back, m.cur)
 			m.forward = nil
@@ -287,6 +288,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.mode = modeRead
 		}
 		m.relayout()
+		if np.layout != nil && np.focus > len(np.layout.Focus) {
+			np.focus = len(np.layout.Focus)
+		}
 		if !msg.replace {
 			resume := np.doc.Resume
 			if resume == 0 {
@@ -538,7 +542,7 @@ func (m Model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if id, ok := itemRef(p.doc); ok {
 			if db, err := store.Default(); err == nil {
 				if on, err := db.ToggleStar(id); err == nil {
-					m.status = map[bool]string{true: "★ starred", false: "star removed"}[on]
+					m.status = map[bool]string{true: "* starred", false: "star removed"}[on]
 				}
 			}
 		} else {
@@ -822,6 +826,10 @@ func (m Model) follow(href string) (tea.Model, tea.Cmd) {
 		if t := catalogLoading(href); t != "" {
 			m.loading = t
 		}
+		// The Gaming Table's own changes redraw it in place.
+		if m.cur != nil && m.cur.doc.URL == "w5f:solo" && soloEdit(href) {
+			return m, load(href, true)
+		}
 		return m, load(href, false)
 	case "file":
 		path := u.Path
@@ -844,11 +852,17 @@ func itemRef(d *doc.Document) (int64, bool) {
 	return id, err == nil
 }
 
-// refreshLocal reloads Periodicals list pages after navigating back to them,
-// so read/star markers are current. Local pages are cheap to rebuild.
+// refreshLocal reloads Periodicals list pages (and the Reading Room and the
+// desk) after navigating back to them, so read/star markers are current. Local pages are cheap to rebuild.
 func (m *Model) refreshLocal() tea.Cmd {
 	if m.cur != nil && m.cur.target == "w5f:books" {
 		return load(m.cur.target, true)
+	}
+	if m.cur != nil && (m.cur.target == "w5f:welcome" || m.cur.target == "w5f:desk") {
+		// The desk may have been cleared since.
+		t := m.cur.target
+		d := m.localDoc(t)
+		return func() tea.Msg { return loadedMsg{target: t, doc: d, replace: true} }
 	}
 	if m.cur == nil || !strings.HasPrefix(m.cur.target, "w5f:feeds") || strings.Contains(m.cur.target, "sync") ||
 		strings.Contains(m.cur.target, "/read/") {
@@ -1324,7 +1338,7 @@ func (m Model) helpLines() []string {
 		{"1 … 9, 0", "the rooms of the library: 1 Reading Room (home) · 2 Periodical Gallery (periodicals) · 3 The Stacks (books) · 4 The Serial Hall (internet fiction) · 5 The Picture Vault (comics) · 6 The Gaming Table (solo RPG) · 7 The Newsroom (Usenet) · 8 Curiosity Cabinet (discovery) · 9 The Lectern (queue) · 0 The Scriptorium (notes)"},
 		{"H · L", "The Register (your history) · Ultan's Ledger (your reading, counted)"},
 		{`\`, "hide / show the side menu (wide windows)"},
-		{"g → theme", "choose a theme: amber, day, cold, night (g → theme day puts one on)"},
+		{"g → theme", "choose a theme: amber, day, cold, night, green (g → theme day puts one on)"},
 		{"g → reddit-login chromium", "take your Reddit (or ao3-login chromium: AO3) session from Chromium, where you signed in"},
 		{"/", "search everything you have read (feeds, wikis, web pages, books, notes)"},
 		{"a / A", "add this page / the selected link to the reading queue (g → queue)"},
@@ -1406,4 +1420,14 @@ func (m Model) bottomBar() string {
 		return m.theme.Bar().Foreground(m.theme.Chrome.Warn).Render(text)
 	}
 	return m.theme.BarDim().Render(text)
+}
+
+// soloEdit reports the Gaming Table's changes to its own lists.
+func soloEdit(href string) bool {
+	for _, p := range []string{"w5f:solo/character/", "w5f:solo/thread/", "w5f:solo/counter/", "w5f:solo/pick/"} {
+		if strings.HasPrefix(href, p) {
+			return true
+		}
+	}
+	return false
 }

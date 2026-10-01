@@ -40,7 +40,7 @@ func historyPos(target string, d *doc.Document) float64 {
 // notes and saved pages); actions such as queue/remove or downloads are not.
 func navigationW5F(href string) bool {
 	for _, p := range []string{"w5f:book/", "w5f:item/", "w5f:find?", "w5f:history"} {
-		if strings.HasPrefix(href, p) {
+		if strings.HasPrefix(href, p) && !strings.HasPrefix(href, "w5f:history/clear") {
 			return true
 		}
 	}

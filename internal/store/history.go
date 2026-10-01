@@ -148,10 +148,21 @@ func (db *DB) History(limit, offset int) ([]Visit, error) {
 	  ORDER BY last DESC, rowid DESC LIMIT ? OFFSET ?`, limit, offset)
 }
 
-// Unfinished lists pages left part-way (books are tracked by the library).
+// Unfinished lists pages left part-way (books are tracked by the library),
+// leaving out those set aside since; limit ≤ 0 lists all.
 func (db *DB) Unfinished(limit int) ([]Visit, error) {
-	return db.visits(`SELECT target,title,kind,catalog,first,last,opens,pos FROM history
-	  WHERE pos > 0.05 AND pos < 0.95 AND kind <> 'book' ORDER BY last DESC, rowid DESC LIMIT ?`, limit)
+	vs, err := db.visits(`SELECT target,title,kind,catalog,first,last,opens,pos FROM history
+	  WHERE pos > 0.05 AND pos < 0.95 AND kind <> 'book' ORDER BY last DESC, rowid DESC`)
+	var out []Visit
+	for _, v := range vs {
+		if !db.Aside(v.Target, v.Last) {
+			out = append(out, v)
+		}
+		if limit > 0 && len(out) == limit {
+			break
+		}
+	}
+	return out, err
 }
 
 func (db *DB) visits(q string, args ...any) ([]Visit, error) {

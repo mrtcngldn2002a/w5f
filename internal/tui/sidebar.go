@@ -31,7 +31,7 @@ type room struct {
 
 // The rooms of Ultan's library (named with the owner, 2026-10-01).
 var rooms = []room{
-	{"1", "The Reading Room", "w5f:welcome", nil},
+	{"1", "The Reading Room", "w5f:welcome", []string{"w5f:desk"}},
 	{"2", "Periodical Gallery", "w5f:feeds", []string{"w5f:feed", "w5f:item/"}},
 	{"3", "The Stacks", "w5f:books", []string{"w5f:book/", "w5f:catalog"}},
 	{"4", "The Serial Hall", "w5f:fiction", []string{"w5f:serial/", "w5f:following"}},
@@ -234,6 +234,9 @@ func (m Model) localDoc(target string) *doc.Document {
 	case "w5f:cabinet":
 		return cabinetDoc()
 	}
+	if target == "w5f:desk" || strings.HasPrefix(target, "w5f:desk/") {
+		return deskDoc(target)
+	}
 	return nil
 }
 
@@ -321,7 +324,7 @@ func (m Model) roomHints() []hint {
 		case "5":
 			return []hint{{"→", "open"}, {"B", "in Chromium"}, {"g → comics", "this vault"}}
 		case "6":
-			return []hint{{"g → roll", "2d6+1"}, {"g → ask", "likely <question>"}, {"g → spark", "words · tarot · iching · reading"}}
+			return []hint{{"g → roll", "2d6+1"}, {"g → ask", "likely <question>"}, {"g → spark", "words · tarot"}, {"g → npc / thread / counter", "keep"}, {"g → pick", "npc · thread"}}
 		case "7":
 			return []hint{{"→", "open"}, {"g → usenet", "<word> finds groups"}}
 		case "8":

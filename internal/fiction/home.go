@@ -36,11 +36,14 @@ var presets = []Preset{
 
 func openHref(u string) string { return "w5f:serial/open?" + url.Values{"u": {u}}.Encode() }
 
-// homeDoc is the Internet Fiction page.
+// homeDoc is The Serial Hall: what is followed and the web serials on the
+// left, the weird worlds, horror, forums and fanfiction on the right.
 func homeDoc(env Env) (*doc.Document, error) {
-	d := &doc.Document{Title: "Internet Fiction", URL: "w5f:fiction", Origin: "local", Lang: "en"}
+	d := &doc.Document{Title: "The Serial Hall", URL: "w5f:fiction", Origin: "local", Lang: "en"}
+	var left, right []doc.Block
+	col := &left
 	section := func(title string, items [][]doc.Block) {
-		d.Blocks = append(d.Blocks, doc.Heading{Level: 2, Text: doc.Inline{{Text: title}}}, doc.List{Items: items})
+		*col = append(*col, doc.Heading{Level: 2, Text: doc.Inline{{Text: title}}}, doc.List{Items: items})
 	}
 	item := func(text, href, hint string) []doc.Block {
 		in := doc.Inline{{Text: text, Link: link(d, href, text)}}
@@ -56,17 +59,41 @@ func homeDoc(env Env) (*doc.Document, error) {
 	if newTotal > 0 {
 		head = fmt.Sprintf("Following (%d new)", newTotal)
 	}
-	d.Blocks = append(d.Blocks, doc.Heading{Level: 2, Text: doc.Inline{{Text: head}}})
+	left = append(left, doc.Heading{Level: 2, Text: doc.Inline{{Text: head}}})
 	if len(followed) == 0 {
-		d.Blocks = append(d.Blocks, para(plain("Open a serial or a Reddit series and press F to follow it.", doc.Italic)))
+		left = append(left, para(plain("Open a serial or a Reddit series and press F to follow it.", doc.Italic)))
 	} else {
 		if len(followed) > 6 {
 			followed = followed[:6]
 		}
-		d.Blocks = append(d.Blocks, followedList(d, followed))
+		left = append(left, followedList(d, followed))
 	}
-	d.Blocks = append(d.Blocks, para(doc.Span{Text: "all followed serials", Link: link(d, "w5f:following", "following")},
+	left = append(left, para(doc.Span{Text: "all followed serials", Link: link(d, "w5f:following", "following")},
 		plain("   ", 0), doc.Span{Text: "check now", Link: link(d, "w5f:following/check", "check now")}))
+	if all, _ := env.DB.Serials(false); len(all) > 0 {
+		var items [][]doc.Block
+		for i, s := range all {
+			if i == 8 {
+				break
+			}
+			items = append(items, item(s.Title, serialHref(s.ID, ""), siteName(s.Kind, s.URL)))
+		}
+		section("Your serials", items)
+	}
+
+	// The web serials stay left, under what is read; the rest go right.
+	serials := [][]doc.Block{
+		item("Royal Road — best rated", "w5f:fiction/rr/best", "search: g → rr <words>"),
+		item("Royal Road — latest updates", "w5f:fiction/rr/latest", ""),
+	}
+	for _, p := range presets {
+		serials = append(serials, item(p.Title+" — "+p.Author, openHref(p.URL), ""))
+	}
+	serials = append(serials, item("r/redditserials", "https://www.reddit.com/r/redditserials/", ""),
+		item("r/HFY", "https://www.reddit.com/r/HFY/top/?t=all", ""),
+		item("any serial by address", "w5f:fiction", "g → serial <address of its contents or first chapter>"))
+	section("Web Serials", serials)
+	col = &right
 
 	section("Weird Worlds", [][]doc.Block{
 		item("SCP Foundation", "https://scp-wiki.wikidot.com/", ""),
@@ -88,18 +115,6 @@ func homeDoc(env Env) (*doc.Document, error) {
 	}
 	horror = append(horror, item("Creepypasta.com", "https://www.creepypasta.com/", ""))
 	section("Horror", horror)
-
-	serials := [][]doc.Block{
-		item("Royal Road — best rated", "w5f:fiction/rr/best", "search: g → rr <words>"),
-		item("Royal Road — latest updates", "w5f:fiction/rr/latest", ""),
-	}
-	for _, p := range presets {
-		serials = append(serials, item(p.Title+" — "+p.Author, openHref(p.URL), ""))
-	}
-	serials = append(serials, item("r/redditserials", "https://www.reddit.com/r/redditserials/", ""),
-		item("r/HFY", "https://www.reddit.com/r/HFY/top/?t=all", ""),
-		item("any serial by address", "w5f:fiction", "g → serial <address of its contents or first chapter>"))
-	section("Web Serials", serials)
 
 	forums := [][]doc.Block{
 		item("SpaceBattles — Creative Writing", "https://forums.spacebattles.com/forums/creative-writing.18/", "threads with threadmarks open as serials"),
@@ -125,16 +140,6 @@ func homeDoc(env Env) (*doc.Document, error) {
 		fan = append([][]doc.Block{{doc.Notice{Kind: "info", Text: fmt.Sprintf("%d AO3 books added to the Library from your Downloads folder.", imported)}}}, fan...)
 	}
 	section("Fanfiction", fan)
-
-	if all, _ := env.DB.Serials(false); len(all) > 0 {
-		var items [][]doc.Block
-		for i, s := range all {
-			if i == 8 {
-				break
-			}
-			items = append(items, item(s.Title, serialHref(s.ID, ""), siteName(s.Kind, s.URL)))
-		}
-		section("Your serials", items)
-	}
+	d.Blocks = append(d.Blocks, doc.Columns{Cols: [][]doc.Block{left, right}})
 	return d, nil
 }

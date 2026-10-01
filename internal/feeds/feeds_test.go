@@ -86,7 +86,7 @@ func TestShelvesAndItemDocs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.Title != "Periodicals" || len(d.Links) < 5 {
+	if d.Title != "The Periodical Gallery" || len(d.Links) < 5 || d.Links[5].Href != "w5f:item/1" { // the newest unread at hand
 		t.Fatalf("shelves doc: %+v", d)
 	}
 	items, _ := e.DB.Items(store.Query{})

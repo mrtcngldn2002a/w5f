@@ -29,7 +29,8 @@ func welcomeDoc(version string) *doc.Document {
 
 	left := []doc.Block{doc.Heading{Level: 2, Text: doc.Inline{{Text: "On the desk"}}}}
 	if items := deskItems(db, link); len(items) > 0 {
-		left = append(left, doc.List{Items: items})
+		left = append(left, doc.List{Items: items},
+			doc.Paragraph{Text: doc.Inline{{Text: "clear the desk…", Style: doc.Italic, Link: link("w5f:desk", "the desk")}}})
 	} else {
 		left = append(left, doc.Paragraph{Text: doc.Inline{{Text: "Nothing lies open on the desk.", Style: doc.Italic}}})
 	}
@@ -84,35 +85,9 @@ func welcomeDoc(version string) *doc.Document {
 
 // deskItems are the pages and books left half-read, newest first.
 func deskItems(db *store.DB, link func(href, text string) int) [][]doc.Block {
-	if db == nil {
-		return nil
-	}
 	var items [][]doc.Block
-	add := func(href, title, sub string) {
-		items = append(items, []doc.Block{doc.Paragraph{Text: doc.Inline{{Text: title, Link: link(href, title)}, {Text: "  " + sub, Style: doc.Italic}}}})
-	}
-	vs, _ := db.Unfinished(5)
-	for _, v := range vs {
-		sub := fmt.Sprintf("%d%%", int(v.Pos*100+0.5))
-		if v.Catalog != "" {
-			sub += " · " + v.Catalog
-		}
-		add(v.Target, v.Title, sub)
-	}
-	bs, _ := db.Books("recent", 3)
-	for _, b := range bs {
-		if b.Chapters > 0 && (b.Chapter < b.Chapters-1 || b.Pos < 0.95) {
-			add(fmt.Sprintf("w5f:book/%d", b.ID), b.Title, fmt.Sprintf("chapter %d of %d", b.Chapter+1, b.Chapters))
-		}
-	}
-	ss, _ := db.Serials(false)
-	for i, s := range ss {
-		if i == 3 || s.Opened.IsZero() {
-			break
-		}
-		if s.Chapter < s.Chapters-1 || s.Pos < 0.95 {
-			add(fmt.Sprintf("w5f:serial/%d/continue", s.ID), s.Title, fmt.Sprintf("chapter %d of %d", s.Chapter+1, s.Chapters))
-		}
+	for _, e := range deskEntries(db, 5) {
+		items = append(items, []doc.Block{doc.Paragraph{Text: doc.Inline{{Text: e.title, Link: link(e.target, e.title)}, {Text: "  " + e.sub, Style: doc.Italic}}}})
 	}
 	return items
 }

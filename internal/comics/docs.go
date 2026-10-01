@@ -297,12 +297,21 @@ func viewed(env Env, v ViewRequest, back string) (*doc.Document, error) {
 }
 
 // home: continue reading, the local library, and Suwayomi's side.
+// home is The Picture Vault: what is being read and the local shelf on the
+// left, the Suwayomi server on the right.
 func home(ctx context.Context, env Env) (*doc.Document, error) {
-	p := newPage("Comics", "w5f:comics")
+	p := newPage("The Picture Vault", "w5f:comics")
 	n, scanErr := Scan(env.DB, env.Root)
 	p.d.Meta = []doc.KV{{Key: "local", Value: strconv.Itoa(n)}}
 	if scanErr != nil {
 		p.note("warn", "Comics folder: "+scanErr.Error())
+	}
+	// Each column is drawn on the page in turn, then lifted off it.
+	start := len(p.d.Blocks)
+	lift := func() []doc.Block {
+		bs := append([]doc.Block(nil), p.d.Blocks[start:]...)
+		p.d.Blocks = p.d.Blocks[:start]
+		return bs
 	}
 	if recent, _ := env.DB.RecentComics(5); len(recent) > 0 {
 		p.heading("Continue")
@@ -312,6 +321,22 @@ func home(ctx context.Context, env Env) (*doc.Document, error) {
 		}
 		p.list(items)
 	}
+	p.heading("Library")
+	series, _ := env.DB.ComicSeriesList()
+	if len(series) == 0 {
+		p.para(doc.Inline{dim("Put CBZ files or image folders in " + env.Root + " (one folder per series).")})
+	} else {
+		var items []doc.Inline
+		for i, s := range series {
+			if i == 12 {
+				items = append(items, doc.Inline{p.a("w5f:comics/library", fmt.Sprintf("… all %d series", len(series)))})
+				break
+			}
+			items = append(items, seriesItem(p, s))
+		}
+		p.list(items)
+	}
+	left := lift()
 
 	p.heading("Following (Suwayomi)")
 	switch {
@@ -339,22 +364,8 @@ func home(ctx context.Context, env Env) (*doc.Document, error) {
 		}
 		p.para(doc.Inline{dim("Suwayomi is starting (about 15 seconds). "), p.a("w5f:comics/following", "Open the followed series"), dim(" — it waits until the server answers.")})
 	}
-
-	p.heading("Library")
-	series, _ := env.DB.ComicSeriesList()
-	if len(series) == 0 {
-		p.para(doc.Inline{dim("Put CBZ files or image folders in " + env.Root + " (one folder per series).")})
-	} else {
-		var items []doc.Inline
-		for i, s := range series {
-			if i == 12 {
-				items = append(items, doc.Inline{p.a("w5f:comics/library", fmt.Sprintf("… all %d series", len(series)))})
-				break
-			}
-			items = append(items, seriesItem(p, s))
-		}
-		p.list(items)
-	}
+	right := lift()
+	p.d.Blocks = append(p.d.Blocks, doc.Columns{Cols: [][]doc.Block{left, right}})
 	return p.d, nil
 }
 
@@ -523,7 +534,7 @@ func mangaRoute(ctx context.Context, c *suwayomi.Client, id int, action string) 
 	if m.InLibrary {
 		follow = p.a(fmt.Sprintf("w5f:comics/manga/%d/unfollow", id), "unfollow")
 	} else {
-		follow = p.a(fmt.Sprintf("w5f:comics/manga/%d/follow", id), "★ follow")
+		follow = p.a(fmt.Sprintf("w5f:comics/manga/%d/follow", id), "* follow")
 	}
 	actions := doc.Inline{follow, dim("   "), p.a(fmt.Sprintf("w5f:comics/manga/%d/refresh", id), "↻ refresh")}
 	actions = append(actions, webviewLink(p, m.RealURL, fmt.Sprintf("w5f:comics/manga/%d", id))...)
@@ -688,7 +699,7 @@ func browseDoc(ctx context.Context, c *suwayomi.Client, source, kind, query stri
 	for _, m := range mangas {
 		in := doc.Inline{p.a(fmt.Sprintf("w5f:comics/manga/%d", m.ID), m.Title)}
 		if m.InLibrary {
-			in = append(in, dim("  ★ following"))
+			in = append(in, dim("  * following"))
 		}
 		items = append(items, in)
 	}

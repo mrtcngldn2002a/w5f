@@ -184,3 +184,83 @@ func TestReadingSparkWithNothingRead(t *testing.T) {
 		t.Errorf("empty: %v", err)
 	}
 }
+
+func TestTableLists(t *testing.T) {
+	for in, want := range map[string]Character{
+		"Severian — a torturer, exiled": {"Severian", "a torturer, exiled"},
+		"Dorcas - drowned once":         {"Dorcas", "drowned once"},
+		"Agia: a liar":                  {"Agia", "a liar"},
+		"Jonas":                         {"Jonas", ""},
+	} {
+		if c, err := ParseCharacter(in); err != nil || c != want {
+			t.Errorf("%q → %+v %v", in, c, err)
+		}
+	}
+	for in, want := range map[string]Counter{
+		"Health 5/5": {"Health", 5, 5}, "Doom clock 0 / 6": {"Doom clock", 0, 6}, "Supply 3": {"Supply", 3, 0},
+		"Momentum -2": {"Momentum", -2, 0}, "Wounds": {"Wounds", 0, 0}, "Hope 9/4": {"Hope", 4, 4},
+	} {
+		if c, err := ParseCounter(in); err != nil || c != want {
+			t.Errorf("%q → %+v %v", in, c, err)
+		}
+	}
+	if _, err := ParseCounter("Doom 0/500"); err == nil {
+		t.Error("a maximum of 500")
+	}
+	if IsCounter("strike") || !IsCounter("Health 5/5") || !IsCounter("Supply 3") {
+		t.Error("IsCounter")
+	}
+	if b := (Counter{"Clock", 2, 6}).Bar(); b != "[##....] 2/6" {
+		t.Errorf("bar: %q", b)
+	}
+
+	env, _ := testEnv(t)
+	ctx := context.Background()
+	for _, u := range []string{
+		"w5f:solo/add/character?q=Severian+%E2%80%94+a+torturer",
+		"w5f:solo/add/thread?q=Find+who+burned+the+archive",
+		"w5f:solo/add/counter?q=Doom+5%2F6",
+	} {
+		if _, err := Route(ctx, u, env); err != nil {
+			t.Fatalf("%s: %v", u, err)
+		}
+	}
+	d, _ := Route(ctx, "w5f:solo", env)
+	tx := flat(d)
+	for _, want := range []string{"Severian — a torturer  x", "Find who burned the archive  close x", "Doom  [#####.] 5/6  - +  x", "add…   pick one"} {
+		if !strings.Contains(tx, want) {
+			t.Errorf("table lacks %q:\n%s", want, tx)
+		}
+	}
+	// A clock stops at its maximum, and at 0.
+	for range 3 {
+		d, _ = Route(ctx, "w5f:solo/counter/up?i=0&n=Doom", env)
+	}
+	if !strings.Contains(flat(d), "! Doom [######] 6/6") {
+		t.Errorf("up past the maximum:\n%s", flat(d))
+	}
+	// A stale page (the entry at 0 is no longer Doom) changes nothing.
+	if _, err := Route(ctx, "w5f:solo/counter/remove?i=0&n=Health", env); err == nil || !strings.Contains(err.Error(), "changed") {
+		t.Errorf("stale: %v", err)
+	}
+	d, _ = Route(ctx, "w5f:solo/pick/thread", env)
+	if !strings.Contains(flat(d), "! Picked (thread): Find who burned the archive") {
+		t.Errorf("pick:\n%s", flat(d))
+	}
+	d, _ = Route(ctx, "w5f:solo/thread/close?i=0&n=Find+who+burned+the+archive", env)
+	if !strings.Contains(flat(d), "No thread left open.") {
+		t.Errorf("closed:\n%s", flat(d))
+	}
+	if _, err := Route(ctx, "w5f:solo/pick/thread", env); err == nil {
+		t.Error("a closed thread was picked")
+	}
+	log := env.Recent(10)
+	if len(log) != 3 || log[0].Kind != "thread" || log[0].Input != "closed" || log[1].Kind != "pick" || log[2].Input != "opened" {
+		t.Errorf("log: %+v", log)
+	}
+	// Kept for next time.
+	tb, _ := env.LoadTable()
+	if len(tb.Characters) != 1 || len(tb.Threads) != 1 || !tb.Threads[0].Closed || tb.Counters[0].Value != 6 {
+		t.Errorf("kept: %+v", tb)
+	}
+}

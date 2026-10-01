@@ -66,3 +66,35 @@ func TestNotesAndHistoryPages(t *testing.T) {
 		t.Errorf("history page:\n%s", flat(d))
 	}
 }
+
+func TestClearHistoryAsksFirst(t *testing.T) {
+	useDir(t)
+	db, _ := store.Open(filepath.Join(t.TempDir(), "t.db"))
+	defer db.Close()
+	db.Visit("https://a.example/x", "X", "web", "")
+	d, _ := Route("w5f:history", db)
+	if !strings.Contains(flat(d), "clear the history…") {
+		t.Errorf("history page offers no clearing:\n%s", flat(d))
+	}
+	d, err := Route("w5f:history/clear", db)
+	if err != nil || !strings.Contains(flat(d), "1 page will leave the history") || !strings.Contains(flat(d), "No, keep it · Yes, clear the history") {
+		t.Fatalf("asking: %v\n%s", err, flat(d))
+	}
+	if vs, _ := db.History(0, 0); len(vs) != 1 {
+		t.Fatal("asking cleared the history")
+	}
+	d, err = Route("w5f:history/clear?sure=yes", db)
+	if err != nil || d.URL != "w5f:history" || !strings.Contains(flat(d), "[N] The history is cleared. The old log is kept as") || !strings.Contains(flat(d), "Nothing read yet.") {
+		t.Errorf("cleared: %v %q\n%s", err, d.URL, flat(d))
+	}
+}
+
+// The question's first link (where the selection starts) keeps the history.
+func TestClearHistoryStartsOnNo(t *testing.T) {
+	db, _ := store.Open(filepath.Join(t.TempDir(), "t.db"))
+	defer db.Close()
+	db.Visit("https://a.example/x", "X", "web", "")
+	if d, _ := Route("w5f:history/clear", db); len(d.Links) != 2 || d.Links[0].Href != "w5f:history" {
+		t.Errorf("first link: %+v", d.Links)
+	}
+}

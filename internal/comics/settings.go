@@ -469,7 +469,7 @@ func updateCheck(ctx context.Context, env Env) (*doc.Document, error) {
 		p.para(doc.Inline{{Text: "Installed: " + firstOf(cur, "none") + " · newest: " + l.Tag}})
 		p.para(doc.Inline{p.a("w5f:comics/server/update", "update to "+l.Tag), dim("  (the official release, checked against its checksums; a server W5F started is stopped and started again)")})
 	}
-	p.para(doc.Inline{p.a("w5f:comics/settings", "← settings"), dim(" · "), p.a("w5f:comics", "Comics")})
+	p.para(doc.Inline{p.a("w5f:comics/settings", "← settings"), dim(" · "), p.a("w5f:comics", "The Picture Vault")})
 	return p.d, nil
 }
 

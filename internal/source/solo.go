@@ -40,3 +40,6 @@ func isSpark(kind string) bool {
 	}
 	return false
 }
+
+// isCounter reports "Health 5/5" or "Supply 3": a name and a number.
+func isCounter(s string) bool { return solo.IsCounter(s) }

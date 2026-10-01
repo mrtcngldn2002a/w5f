@@ -45,7 +45,7 @@ func init() {
 		default:
 			d.Blocks = []doc.Block{para(plain(fmt.Sprintf("%d AO3 books added to the Library from %s.", n, downloadsDir(env)), 0))}
 		}
-		d.Blocks = append(d.Blocks, para(doc.Span{Text: "open the Library", Link: link(d, "w5f:books", "Library")}))
+		d.Blocks = append(d.Blocks, para(doc.Span{Text: "open The Stacks", Link: link(d, "w5f:books", "The Stacks")}))
 		return d, nil
 	}
 }

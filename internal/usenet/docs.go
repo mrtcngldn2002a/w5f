@@ -167,7 +167,7 @@ func notice(d *doc.Document, text string) {
 }
 
 func homeDoc(env Env, cfg Config, note string) (*doc.Document, error) {
-	d := newDoc("Usenet", "w5f:usenet")
+	d := newDoc("The Newsroom", "w5f:usenet")
 	d.Meta = []doc.KV{{Key: "server", Value: strings.TrimSuffix(cfg.Server, ":119")}}
 	notice(d, note)
 	d.Blocks = append(d.Blocks, doc.Paragraph{Text: doc.Inline{{Text: "The text newsgroups, read only. Find more groups: g → usenet <word>. New posts are counted since you last read a group.", Style: doc.Italic}}})
@@ -459,7 +459,7 @@ func killDoc(ctx context.Context, env Env, cfg Config, q url.Values) (*doc.Docum
 	}
 	d, err := Route(ctx, back, env)
 	if err != nil {
-		d = newDoc("Usenet", "w5f:usenet")
+		d = newDoc("The Newsroom", "w5f:usenet")
 	}
 	d.Blocks = append([]doc.Block{doc.Notice{Kind: "info", Text: note + " Edit the list in " + env.ConfigPath + "."}}, d.Blocks...)
 	return d, nil

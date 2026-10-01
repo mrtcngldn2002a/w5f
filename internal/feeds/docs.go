@@ -112,8 +112,10 @@ func link(d *doc.Document, href, text string) int {
 	return len(d.Links)
 }
 
+// shelvesDoc is the Periodical Gallery: the shelves on the left, what is at
+// hand and the newest unread on the right.
 func shelvesDoc(env Env, notice *doc.Notice) *doc.Document {
-	d := &doc.Document{Title: "Periodicals", URL: "w5f:feeds", Origin: "local", Lang: "en"}
+	d := &doc.Document{Title: "The Periodical Gallery", URL: "w5f:feeds", Origin: "local", Lang: "en"}
 	counts, _ := env.DB.Counts()
 	totalUnread := 0
 	for _, c := range counts {
@@ -127,13 +129,9 @@ func shelvesDoc(env Env, notice *doc.Notice) *doc.Document {
 	if notice != nil {
 		d.Blocks = append(d.Blocks, *notice)
 	}
-	d.Blocks = append(d.Blocks, doc.Paragraph{Text: doc.Inline{
-		{Text: "↻ sync now", Link: link(d, "w5f:feeds/sync", "sync")}, {Text: "   "},
-		{Text: fmt.Sprintf("all unread (%d)", totalUnread), Link: link(d, "w5f:feeds/unread", "unread")}, {Text: "   "},
-		{Text: fmt.Sprintf("★ starred (%d)", env.DB.StarredCount()), Link: link(d, "w5f:feeds/starred", "starred")}, {Text: "   "},
-		{Text: "feed status", Link: link(d, "w5f:feeds/status", "status")},
-	}})
-	var items [][]doc.Block
+	heading := func(s string) doc.Block { return doc.Heading{Level: 2, Text: doc.Inline{{Text: s}}} }
+
+	var shelves [][]doc.Block
 	for _, s := range env.Catalog.Shelves {
 		ids := env.Catalog.FeedsOn(s.ID)
 		if len(ids) == 0 {
@@ -153,10 +151,34 @@ func shelvesDoc(env Env, notice *doc.Notice) *doc.Document {
 			noun = "feed"
 		}
 		in = append(in, doc.Span{Text: fmt.Sprintf("  · %d %s · %d items", len(ids), noun, total), Style: doc.Italic})
-		items = append(items, []doc.Block{doc.Paragraph{Text: in}})
+		shelves = append(shelves, []doc.Block{doc.Paragraph{Text: in}})
 	}
-	d.Blocks = append(d.Blocks, doc.Heading{Level: 2, Text: doc.Inline{{Text: "Shelves"}}}, doc.List{Items: items})
-	d.Blocks = append(d.Blocks, doc.Paragraph{Text: doc.Inline{
+	left := []doc.Block{heading("Shelves")}
+	if len(shelves) > 0 {
+		left = append(left, doc.List{Items: shelves})
+	} else {
+		left = append(left, doc.Paragraph{Text: doc.Inline{{Text: "No shelves yet.", Style: doc.Italic}}})
+	}
+
+	right := []doc.Block{heading("At hand"), doc.List{Items: [][]doc.Block{
+		{doc.Paragraph{Text: doc.Inline{{Text: "↻ sync now", Link: link(d, "w5f:feeds/sync", "sync")}, {Text: "  last " + last, Style: doc.Italic}}}},
+		{doc.Paragraph{Text: doc.Inline{{Text: fmt.Sprintf("all unread (%d)", totalUnread), Link: link(d, "w5f:feeds/unread", "unread")}}}},
+		{doc.Paragraph{Text: doc.Inline{{Text: fmt.Sprintf("* starred (%d)", env.DB.StarredCount()), Link: link(d, "w5f:feeds/starred", "starred")}}}},
+		{doc.Paragraph{Text: doc.Inline{{Text: "feed status", Link: link(d, "w5f:feeds/status", "status")}}}},
+	}}}
+	if newest, err := env.DB.Items(store.Query{Unread: true, Limit: 6}); err == nil && len(newest) > 0 {
+		var items [][]doc.Block
+		for _, it := range newest {
+			title := it.Title
+			if title == "" {
+				title = "(untitled)"
+			}
+			items = append(items, []doc.Block{doc.Paragraph{Text: doc.Inline{
+				{Text: title, Link: link(d, fmt.Sprintf("w5f:item/%d", it.ID), title)}, {Text: "  " + feedName(env, it.FeedID), Style: doc.Italic}}}})
+		}
+		right = append(right, heading("Newest unread"), doc.List{Items: items})
+	}
+	d.Blocks = append(d.Blocks, doc.Columns{Cols: [][]doc.Block{left, right}}, doc.Rule{}, doc.Paragraph{Text: doc.Inline{
 		{Text: "OPML: bring feeds from another reader with g → opml-import <file>   ", Style: doc.Italic},
 		{Text: "export these shelves", Link: link(d, "w5f:feeds/export", "export")},
 	}})
@@ -279,7 +301,7 @@ func listDoc(env Env, title, base string, q store.Query, page int, note string) 
 			mark = "● "
 		}
 		if it.Starred {
-			mark = "★ "
+			mark = "* "
 		}
 		title := it.Title
 		if title == "" {
@@ -340,7 +362,7 @@ func itemDoc(ctx context.Context, id int64, env Env) (*doc.Document, error) {
 		meta = append(meta, it.Author)
 	}
 	if it.Starred {
-		meta = append(meta, "★ starred")
+		meta = append(meta, "* starred")
 	}
 	d.Meta = append(d.Meta, doc.KV{Key: "·", Value: strings.Join(meta, " · ")})
 

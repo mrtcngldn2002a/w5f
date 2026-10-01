@@ -20,7 +20,7 @@ import (
 // IsTarget reports whether target is one of the personal pages.
 func IsTarget(t string) bool {
 	return t == "w5f:queue" || strings.HasPrefix(t, "w5f:queue/") || t == "w5f:notes" ||
-		t == "w5f:history" || strings.HasPrefix(t, "w5f:history?")
+		t == "w5f:history" || strings.HasPrefix(t, "w5f:history?") || t == "w5f:history/clear" || strings.HasPrefix(t, "w5f:history/clear?")
 }
 
 func link(d *doc.Document, href, text string) int {
@@ -29,7 +29,8 @@ func link(d *doc.Document, href, text string) int {
 }
 
 // Route builds the queue, notes and history pages and applies queue
-// actions (w5f:queue/done|undone|move|remove?u=…).
+// actions (w5f:queue/done|undone|move|remove?u=…) and the clearing of the
+// history (w5f:history/clear asks first; ?sure=yes clears).
 func Route(target string, db *store.DB) (*doc.Document, error) {
 	u, err := url.Parse(target)
 	if err != nil {
@@ -42,6 +43,23 @@ func Route(target string, db *store.DB) (*doc.Document, error) {
 	case p == "history":
 		page, _ := strconv.Atoi(q.Get("page"))
 		return historyDoc(db, max(page, 1))
+	case p == "history/clear":
+		if q.Get("sure") != "yes" {
+			return clearHistoryDoc(db)
+		}
+		kept, err := db.ClearHistory(time.Now())
+		if err != nil {
+			return nil, err
+		}
+		d, err := historyDoc(db, 1)
+		if err == nil {
+			note := "The history is cleared."
+			if kept != "" {
+				note += " The old log is kept as " + kept + "."
+			}
+			d.Blocks = append([]doc.Block{doc.Notice{Kind: "info", Text: note}}, d.Blocks...)
+		}
+		return d, err
 	case p == "queue":
 		return queueDoc("")
 	case strings.HasPrefix(p, "queue/"):
@@ -79,11 +97,12 @@ func queueDoc(note string) (*doc.Document, error) {
 	if err != nil {
 		return nil, err
 	}
-	d := &doc.Document{Title: "Reading queue", URL: "w5f:queue", Origin: "local", Lang: "en"}
+	d := &doc.Document{Title: "The Lectern", URL: "w5f:queue", Origin: "local", Lang: "en"}
 	if note != "" {
 		d.Blocks = append(d.Blocks, doc.Notice{Kind: "info", Text: note})
 	}
 	es := qq.Entries()
+	var cols [][]doc.Block
 	for _, sec := range []string{ThisWeek, Someday} {
 		var items [][]doc.Block
 		for _, e := range es {
@@ -91,13 +110,15 @@ func queueDoc(note string) (*doc.Document, error) {
 				items = append(items, entryBlocks(d, e))
 			}
 		}
-		d.Blocks = append(d.Blocks, doc.Heading{Level: 2, Text: doc.Inline{{Text: sec}}})
+		col := []doc.Block{doc.Heading{Level: 2, Text: doc.Inline{{Text: sec}}}}
 		if len(items) == 0 {
-			d.Blocks = append(d.Blocks, doc.Paragraph{Text: doc.Inline{{Text: "empty", Style: doc.Italic}}})
+			col = append(col, doc.Paragraph{Text: doc.Inline{{Text: "empty", Style: doc.Italic}}})
 		} else {
-			d.Blocks = append(d.Blocks, doc.List{Items: items})
+			col = append(col, doc.List{Items: items})
 		}
+		cols = append(cols, col)
 	}
+	d.Blocks = append(d.Blocks, doc.Columns{Cols: cols})
 	var done [][]doc.Block
 	for _, e := range es {
 		if e.Done {
@@ -164,16 +185,17 @@ func recent(dir string, n int) []fileInfo {
 }
 
 func notesDoc() (*doc.Document, error) {
-	d := &doc.Document{Title: "Notes & clippings", URL: "w5f:notes", Origin: "local", Lang: "en"}
+	d := &doc.Document{Title: "The Scriptorium", URL: "w5f:notes", Origin: "local", Lang: "en"}
+	var parts [][]doc.Block
 	for _, sec := range []struct{ dir, title, empty string }{
 		{"Notes", "Notes", "No notes yet — press n on any page."},
 		{"Clippings", "Clippings", "No clippings yet — press y on any page."},
 		{"Saved", "Saved pages", "No saved pages yet — press s on any page."},
 	} {
-		d.Blocks = append(d.Blocks, doc.Heading{Level: 2, Text: doc.Inline{{Text: sec.title}}})
+		part := []doc.Block{doc.Heading{Level: 2, Text: doc.Inline{{Text: sec.title}}}}
 		files := recent(filepath.Join(Dir(), sec.dir), 20)
 		if len(files) == 0 {
-			d.Blocks = append(d.Blocks, doc.Paragraph{Text: doc.Inline{{Text: sec.empty, Style: doc.Italic}}})
+			parts = append(parts, append(part, doc.Paragraph{Text: doc.Inline{{Text: sec.empty, Style: doc.Italic}}}))
 			continue
 		}
 		var items [][]doc.Block
@@ -182,8 +204,11 @@ func notesDoc() (*doc.Document, error) {
 			items = append(items, []doc.Block{doc.Paragraph{Text: doc.Inline{{Text: rel, Link: link(d, FileURL(f.path), rel)},
 				{Text: "  " + f.mod.Format("2006-01-02 15:04"), Style: doc.Italic}}}})
 		}
-		d.Blocks = append(d.Blocks, doc.List{Items: items})
+		parts = append(parts, append(part, doc.List{Items: items}))
 	}
+	// Notes beside clippings; the saved pages below, full width.
+	d.Blocks = append(d.Blocks, doc.Columns{Cols: parts[:2]})
+	d.Blocks = append(d.Blocks, parts[2]...)
 	if _, err := os.Stat(Dir()); err == nil {
 		d.Blocks = append(d.Blocks, doc.Rule{}, doc.Paragraph{Text: doc.Inline{{Text: "Folder: " + Dir(), Style: doc.Italic}}})
 	}
@@ -196,7 +221,7 @@ func historyDoc(db *store.DB, page int) (*doc.Document, error) {
 	if err != nil {
 		return nil, err
 	}
-	d := &doc.Document{Title: "History", URL: "w5f:history", Origin: "local", Lang: "en"}
+	d := &doc.Document{Title: "The Register", URL: "w5f:history", Origin: "local", Lang: "en"}
 	if len(vs) == 0 {
 		d.Blocks = append(d.Blocks, doc.Paragraph{Text: doc.Inline{{Text: "Nothing read yet.", Style: doc.Italic}}})
 		return d, nil
@@ -204,6 +229,9 @@ func historyDoc(db *store.DB, page int) (*doc.Document, error) {
 	more := len(vs) > per
 	if more {
 		vs = vs[:per]
+	}
+	if page == 1 {
+		d.Blocks = append(d.Blocks, doc.Paragraph{Text: doc.Inline{{Text: "clear the history…", Style: doc.Italic, Link: link(d, "w5f:history/clear", "clear the history")}}})
 	}
 	var items [][]doc.Block
 	for _, v := range vs {
@@ -223,6 +251,30 @@ func historyDoc(db *store.DB, page int) (*doc.Document, error) {
 	d.Blocks = append(d.Blocks, doc.List{Items: items})
 	if more {
 		d.Blocks = append(d.Blocks, doc.Paragraph{Text: doc.Inline{{Text: "→ older", Link: link(d, fmt.Sprintf("w5f:history?page=%d", page+1), "older")}}})
+	}
+	return d, nil
+}
+
+// clearHistoryDoc asks before the history is cleared, saying what goes and
+// what stays.
+func clearHistoryDoc(db *store.DB) (*doc.Document, error) {
+	vs, err := db.History(0, 0)
+	if err != nil {
+		return nil, err
+	}
+	d := &doc.Document{Title: "Clear the history?", URL: "w5f:history/clear", Origin: "local", Lang: "en"}
+	if len(vs) == 0 {
+		d.Blocks = []doc.Block{doc.Paragraph{Text: doc.Inline{{Text: "The history is already empty. "}, {Text: "back to the history", Link: link(d, "w5f:history", "history")}}}}
+		return d, nil
+	}
+	pages := "pages"
+	if len(vs) == 1 {
+		pages = "page"
+	}
+	d.Blocks = []doc.Block{
+		doc.Paragraph{Text: doc.Inline{{Text: fmt.Sprintf("%d %s will leave the history, the desk forgets where they were left, and Ultan's ledger starts again from nothing.", len(vs), pages)}}},
+		doc.Paragraph{Text: doc.Inline{{Text: "Kept: the log of every visit, under a dated name next to the database; the progress of books and serials; the queue, notes and clippings; the search index.", Style: doc.Italic}}},
+		doc.Paragraph{Text: doc.Inline{{Text: "No, keep it", Link: link(d, "w5f:history", "keep")}, {Text: " · "}, {Text: "Yes, clear the history", Style: doc.Bold, Link: link(d, "w5f:history/clear?sure=yes", "clear")}}}, // "No" first: the selection starts there
 	}
 	return d, nil
 }
