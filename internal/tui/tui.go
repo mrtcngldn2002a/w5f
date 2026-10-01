@@ -16,6 +16,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"w5f/internal/books"
+	"w5f/internal/browser"
 	"w5f/internal/catalog"
 	"w5f/internal/crom"
 	"w5f/internal/dict"
@@ -455,6 +456,20 @@ func (m Model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		m.loading = p.target
 		return m, load(p.target, true)
+	case "B":
+		// This page (or the selected link) in Chromium.
+		target := p.target
+		if f := m.focused(); f != nil && f.Kind == render.FocusLink && strings.HasPrefix(p.doc.Links[f.Link-1].Href, "http") {
+			target = p.doc.Links[f.Link-1].Href
+		} else if !strings.HasPrefix(target, "http") {
+			target = p.doc.URL
+		}
+		if err := browser.Open(target); err != nil {
+			m.status = "error: " + err.Error()
+		} else {
+			m.status = "Opened in Chromium: " + target
+		}
+		return m, nil
 	case "o":
 		if f := m.focused(); f != nil && f.Kind == render.FocusLink {
 			m.status = p.doc.Links[f.Link-1].Href
@@ -883,6 +898,14 @@ func (m Model) gotoKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				m.status = "AO3 session removed from this computer."
 			}
 			return m, nil
+		case "reddit-login chromium", "ao3-login chromium":
+			site := strings.TrimSuffix(strings.Fields(strings.ToLower(m.gotoBuf))[0], "-login")
+			if msg, err := source.ImportSession(site); err != nil {
+				m.status = "error: " + err.Error()
+			} else {
+				m.status = msg
+			}
+			return m, nil
 		case "dict-install", "dict install":
 			m.loading = "installing the English–Turkish dictionary (16 MB download)"
 			return m, installDict(dict.DefaultURL)
@@ -891,6 +914,24 @@ func (m Model) gotoKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				m.status = "error: " + err.Error()
 			} else {
 				m.status = "Reddit session removed from this computer."
+			}
+			return m, nil
+		}
+		if low := strings.ToLower(strings.TrimSpace(m.gotoBuf)); low == "chromium" || strings.HasPrefix(low, "chromium ") {
+			// g → chromium [address]: a page in Chromium (no address: this one).
+			addr := strings.TrimSpace(strings.TrimSpace(m.gotoBuf)[len("chromium"):])
+			if addr == "" && m.cur != nil {
+				addr = m.cur.target
+				if !strings.HasPrefix(addr, "http") && m.cur.doc != nil {
+					addr = m.cur.doc.URL
+				}
+			} else if addr != "" && !strings.Contains(addr, "://") {
+				addr = "https://" + addr
+			}
+			if err := browser.Open(addr); err != nil {
+				m.status = "error: " + err.Error()
+			} else {
+				m.status = "Opened in Chromium: " + addr
 			}
 			return m, nil
 		}
@@ -1170,6 +1211,7 @@ func (m Model) secretLines() []string {
 		"",
 		margin + dim(fmt.Sprintf("%d characters · esc cancels · ctrl+u clears", len([]rune(m.secretBuf)))),
 		margin + dim("Stored only on this computer: "+path),
+		margin + dim("Signed in to "+m.secretSite()+" in Chromium? esc, then g → "+strings.ToLower(m.secretSite())+"-login chromium"),
 	}
 }
 
@@ -1207,6 +1249,8 @@ func (m Model) helpLines() []string {
 		{"x / p", "deep random (eight families of sources) · today's Daily Packet"},
 		{"enter / g → ? text", "answer a page that asks for input (g → smallweb, g → worlds)"},
 		{"+ / -", "expand / fold all sections"}, {"o", "show link address"}, {"ctrl+r", "reload"},
+		{"B", "open this page (or the selected link) in Chromium · g → chromium <address>"},
+		{"g → reddit-login chromium", "take your Reddit (or ao3-login chromium: AO3) session from Chromium, where you signed in"},
 		{"/", "search everything you have read (feeds, wikis, web pages, books, notes)"},
 		{"a / A", "add this page / the selected link to the reading queue (g → queue)"},
 		{"n", "write a note about this page"}, {"y", "clip paragraphs (↑↓ choose, shift+↑↓ extend, enter save)"},

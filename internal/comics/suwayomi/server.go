@@ -58,7 +58,9 @@ func (s Server) Args() []string {
 		c + "rootDir=" + filepath.Join(s.Dir, "data"),
 		c + "ip=127.0.0.1", c + "port=" + strconv.Itoa(s.port()),
 		c + "webUIEnabled=false", c + "initialOpenInBrowserEnabled=false", c + "systemTrayEnabled=false",
-		c + "kcefEnabled=false", c + "downloadAsCbz=true",
+		// The WebView (KCEF) is the owner's to turn on or off (2026-10-01):
+		// it is Suwayomi's own setting, kept in its server.conf.
+		c + "downloadAsCbz=true",
 		c + "downloadsPath=" + s.Downloads, c + "localSourcePath=" + s.Local,
 		c + "updateMangas=false", c + "maxSourcesInParallel=2",
 		"-jar", s.Jar(),

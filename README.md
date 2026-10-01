@@ -21,6 +21,8 @@ w5f scp-173              shorthand for the SCP Wiki page
 w5f w5f:random/scp       random SCP (also: tale, wl, backrooms)
 w5f --offline <target>   read from the cache only
 w5f r/nosleep            Reddit (connect once: g → reddit-login, paste your own session cookie; read via old.reddit)
+                         or sign in to Reddit in Chromium and g → reddit-login chromium (AO3: ao3-login chromium)
+B / g → chromium <url>   open this page (or the selected link, or an address) in Chromium
 w5f eksisozluk.com       Ekşi Sözlük: gündem, topics with entries and paging
 w5f w5f:feeds            Periodicals: shelves, unread, starred, feed status
 w5f sync                 refresh all feeds (cron/timer friendly)
@@ -122,6 +124,7 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v1 go build -trimpath -ldflags "-s
   - Install: `w5f comics server install` downloads the official release and checks it against the release's checksums. Suwayomi needs Java 21.
   - W5F starts it when Comics opens and stops it when W5F closes. On the W5F laptop: about 13 s to start, 352 MB while idle.
   - Settings: headless, local only (`127.0.0.1:4567`); downloads are CBZ into `Comics/Suwayomi`; its Local source is `Comics/Local`.
+  - WebView (KCEF) is Suwayomi's own setting (Server settings → Webview; on by default). The first start with it on downloads a Chromium build of 244 MB (529 MB on disk); on the W5F laptop it adds about 170 MB of memory while the server runs. Some extensions use it to get past their sites' bot checks — that is Suwayomi's feature and your choice; W5F itself never does.
   - Pages: followed series, series pages (follow, refresh, download), sources and search, downloads, extensions.
   - CLI: `w5f comics list|update|server start|stop|restart|status|update`, `w5f comics settings [group]`, `w5f comics set <setting> <value>`, `w5f comics login`.
 - **Server settings** (`Comics → Server settings`): Suwayomi's own settings, grouped as its launcher's tabs (SOCKS proxy, Downloader, Conversions, Library updates, Authentication, Backup, Cloudflare, OPDS, KOReader, Sync, Database, Misc, …).

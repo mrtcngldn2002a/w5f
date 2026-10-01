@@ -27,6 +27,9 @@ var ao3Hosts = map[string]bool{"archiveofourown.org": true, "www.archiveofourown
 // ao3Cookies are the cookie names kept from a paste.
 var ao3Cookies = []string{"_otwarchive_session", "remember_user_token"}
 
+// AO3CookieNames are AO3's login cookies, in the order they are kept.
+func AO3CookieNames() []string { return append([]string{}, ao3Cookies...) }
+
 // AO3SessionPath is where the cookie is kept.
 func AO3SessionPath() string {
 	dir, err := os.UserConfigDir()

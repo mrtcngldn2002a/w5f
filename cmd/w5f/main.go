@@ -41,9 +41,11 @@ Usage:
   w5f feeds import|export     move periodicals in or out as OPML (w5f feeds for more)
   w5f reindex                 rebuild the search index (pages from the cache, feeds, books, notes)
   w5f dict-install [zip|url]  install the pop-up dictionary (default: English–Turkish)
-  w5f reddit-login            connect Reddit with your own session cookie
+  w5f reddit-login [chromium] connect Reddit with your own session cookie
+                              (chromium: take it from Chromium, where you signed in)
   w5f reddit-logout           remove the stored Reddit session
-  w5f ao3-login / ao3-logout  connect AO3 with your own session cookie / remove it
+  w5f ao3-login [chromium] / ao3-logout
+                              connect AO3 the same way / remove it
   w5f view [--comic ID] [file] the comics viewer (X11; opened from Comics pages)
   w5f comics list|update       comics: local library and followed series (w5f comics for more)
   w5f doctor [--live] [--bench]
@@ -95,9 +97,19 @@ func main() {
 			}
 			fmt.Println("Installed:", title)
 			return
-		case "reddit-login":
-			os.Exit(redditLogin())
-		case "ao3-login":
+		case "reddit-login", "ao3-login":
+			if len(args) > 1 && args[1] == "chromium" {
+				msg, err := source.ImportSession(strings.TrimSuffix(args[0], "-login"))
+				if err != nil {
+					fmt.Fprintln(os.Stderr, "w5f:", err)
+					os.Exit(1)
+				}
+				fmt.Println(msg)
+				return
+			}
+			if args[0] == "reddit-login" {
+				os.Exit(redditLogin())
+			}
 			os.Exit(ao3Login())
 		case "ao3-logout":
 			if err := fiction.DeleteAO3Session(); err != nil {

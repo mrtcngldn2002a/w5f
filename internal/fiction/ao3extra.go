@@ -219,6 +219,8 @@ func ao3MeDoc(ctx context.Context, env Env) (*doc.Document, error) {
 			para(plain("Connect your own AO3 account to see your bookmarks, subscriptions and history, and works only logged-in users can read.", 0)),
 			para(plain("In a browser where you are logged in to AO3, copy the value of the _otwarchive_session cookie (developer tools → Storage/Application → Cookies → archiveofourown.org). In W5F press g, type ", 0),
 				plain("ao3-login", doc.Code), plain(", paste it (it stays hidden) and press enter. It is stored only on this computer and sent only to archiveofourown.org.", 0)),
+			para(plain("On the W5F laptop it is simpler: g → ", 0), plain("chromium archiveofourown.org/users/login", doc.Code),
+				plain(", log in there, then g → ", 0), plain("ao3-login chromium", doc.Code), plain(" takes the session from Chromium.", 0)),
 		}
 		return d, nil
 	}
