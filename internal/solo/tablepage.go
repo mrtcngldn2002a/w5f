@@ -118,7 +118,7 @@ func (env Env) table() *doc.Document {
 	d.Blocks = append(d.Blocks, doc.Columns{Cols: [][]doc.Block{left, right}})
 	if recent := env.Recent(12); len(recent) > 0 {
 		d.Blocks = append(d.Blocks, doc.Rule{}, heading("Log"), logList(recent),
-			doc.Paragraph{Text: doc.Inline{link("w5f:solo/log", "the whole log")}})
+			doc.Paragraph{Text: doc.Inline{link("w5f:solo/log", "the whole log"), gap, link("w5f:solo/log/clear", "clear the log…")}})
 	}
 	d.Blocks = append(d.Blocks, doc.Rule{}, italic("From the prompt: g → roll 2d6+1, g → ask likely Is it guarded?, g → spark words, g → npc Name — a note, g → thread …, g → counter Health 5/5, g → pick npc. The odds follow Ironsworn's (Shawn Tomkin, CC BY 4.0)."))
 	return d

@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"w5f/internal/discover"
 	"w5f/internal/doc"
@@ -35,6 +37,19 @@ func Route(ctx context.Context, target string, env Env) (*doc.Document, error) {
 		return env.table(), nil
 	case path == "solo/log":
 		return env.logDoc(), nil
+	case path == "solo/log/clear":
+		if q.Get("sure") != "yes" {
+			return env.clearLogDoc(), nil
+		}
+		kept, n, err := env.ClearLog(time.Now())
+		if err != nil {
+			return nil, err
+		}
+		note := "The log was already empty."
+		if n > 0 {
+			note = fmt.Sprintf("The log is cleared; its %d %s moved to %s.", n, map[bool]string{true: "day file was", false: "day files were"}[n == 1], kept)
+		}
+		return env.noted(note), nil
 	case path == "solo/roll":
 		return env.roll(q.Get("d"))
 	case strings.HasPrefix(path, "solo/ask/"):
@@ -181,6 +196,30 @@ func (env Env) logDoc() *doc.Document {
 		d.Blocks = []doc.Block{doc.Paragraph{Text: doc.Inline{{Text: "Nothing thrown yet.", Style: doc.Italic}}}}
 		return d
 	}
-	d.Blocks = []doc.Block{doc.Paragraph{Text: doc.Inline{{Text: "Every throw, answer and spark, newest first; kept as JSON lines in " + env.LogDir, Style: doc.Italic}}}, logList(es)}
+	d.Links = append(d.Links, doc.Link{Href: "w5f:solo/log/clear", Text: "clear the log"})
+	d.Blocks = []doc.Block{doc.Paragraph{Text: doc.Inline{{Text: "Every throw, answer and spark, newest first; kept as JSON lines in " + env.LogDir + "   ", Style: doc.Italic},
+		{Text: "clear the log…", Style: doc.Italic, Link: len(d.Links)}}}, logList(es)}
+	return d
+}
+
+// clearLogDoc asks before the log is cleared; "No" comes first, where the
+// selection starts.
+func (env Env) clearLogDoc() *doc.Document {
+	d := &doc.Document{Title: "Clear the log?", URL: "w5f:solo/log/clear", Origin: "local", Lang: "en"}
+	link := func(href, text string) int {
+		d.Links = append(d.Links, doc.Link{Href: href, Text: text})
+		return len(d.Links)
+	}
+	files, _ := filepath.Glob(filepath.Join(env.LogDir, "*.jsonl"))
+	if len(files) == 0 {
+		d.Blocks = []doc.Block{doc.Paragraph{Text: doc.Inline{{Text: "The log is already empty. "}, {Text: "back to the table", Link: link("w5f:solo", "table")}}}}
+		return d
+	}
+	d.Blocks = []doc.Block{
+		doc.Paragraph{Text: doc.Inline{{Text: fmt.Sprintf("Every throw, answer and spark (%d %s) leaves the table's log, for a new campaign.", len(files), map[bool]string{true: "day", false: "days"}[len(files) == 1])}}},
+		doc.Paragraph{Text: doc.Inline{{Text: "Kept: the day files themselves, moved into a dated folder beside the log; the characters, threads and counters.", Style: doc.Italic}}},
+		doc.Paragraph{Text: doc.Inline{{Text: "No, keep it", Link: link("w5f:solo/log", "keep")}, {Text: " · "},
+			{Text: "Yes, clear the log", Style: doc.Bold, Link: link("w5f:solo/log/clear?sure=yes", "clear")}}},
+	}
 	return d
 }

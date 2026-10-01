@@ -51,6 +51,10 @@ func TestDescendFindsATextPage(t *testing.T) {
 
 func TestTextfilesPicksAFile(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/occult/SUBDIR/" {
+			fmt.Fprint(w, `<html><body><TABLE><TR><TD><A HREF="deep.txt">deep.txt</A><TD>99<TD>Deeper Notes on the Tarot</TABLE></body></html>`)
+			return
+		}
 		if r.URL.Path == "/occult/" {
 			fmt.Fprint(w, `<html><body><TABLE><TR><TD><A HREF="chaos.txt">chaos.txt</A><TD>12345<TD>The Chaos Magick Primer (1993)
 <TR><TD><A HREF="SUBDIR/">SUBDIR</A><TD>[DIR]<TD>more
@@ -63,11 +67,58 @@ func TestTextfilesPicksAFile(t *testing.T) {
 	f := fetch.New("", "test")
 	f.HostGap = 0
 	d, err := textfilesDraw(context.Background(), f, srv.URL, []string{"occult"})
-	if err != nil || !strings.HasSuffix(d.Target, ".txt") || !strings.HasPrefix(d.Why, "textfiles/occult · ") {
+	if err != nil || !strings.HasSuffix(d.Target, ".txt") || !strings.HasPrefix(d.Why, "textfiles/occult") {
 		t.Fatalf("textfiles: %+v %v", d, err)
 	}
 	if !strings.Contains(d.Why, "Chaos Magick") && !strings.Contains(d.Why, "Tarot") {
 		t.Errorf("the file's description belongs in the why line: %q", d.Why)
+	}
+}
+
+// A directory of collections (bold links, no slash, as the site writes
+// them) is gone down into; the hidden .descs is never drawn.
+func TestTextfilesGoesIntoCollections(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/magazines/":
+			fmt.Fprint(w, `<html><body><TABLE><TR VALIGN=TOP><TD VALIGN=TOP><B><A HREF="40HEX">40HEX</A></B><TD WIDTH=20></TD><TD><B>40HEX Virus Magazine</B></TD></TR></TABLE></body></html>`)
+		case "/magazines/40HEX/":
+			fmt.Fprint(w, `<html><body><TABLE><TR VALIGN=TOP><TD><A HREF=".descs">.descs</A><TD> 42<BR><TD>
+<TR VALIGN=TOP><TD><A HREF="40hex-01.txt">40hex-01.txt</A><TD> 9000<BR><TD>The first issue</TABLE></body></html>`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	f := fetch.New("", "test")
+	f.HostGap = 0
+	for range 5 {
+		d, err := textfilesDraw(context.Background(), f, srv.URL, []string{"magazines"})
+		if err != nil || !strings.HasSuffix(d.Target, "/magazines/40HEX/40hex-01.txt") || d.Why != "textfiles/magazines/40HEX · 40hex-01.txt — The first issue" {
+			t.Fatalf("collection: %+v %v", d, err)
+		}
+	}
+}
+
+// Every directory, the adult and the outlaw ones too (asked for by the
+// owner); none the site does not have.
+func TestTextfilesEveryDirectory(t *testing.T) {
+	have := map[string]bool{}
+	for _, d := range textfilesDirs {
+		have[d] = true
+	}
+	for _, d := range []string{"anarchy", "drugs", "hacking", "phreak", "sex", "virus", "occult", "magazines"} {
+		if !have[d] {
+			t.Errorf("%s is left out", d)
+		}
+	}
+	if have["religion"] {
+		t.Error("textfiles.com has no religion directory (404)")
+	}
+	for _, e := range encyclopedias {
+		if strings.Contains(e.start, "tr.wikipedia") {
+			t.Error("Turkish Wikipedia was taken out of deep random")
+		}
 	}
 }
 

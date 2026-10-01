@@ -76,7 +76,7 @@ func Base(ctx context.Context) (string, error) {
 	}
 	cmd := exec.Command(bin, "--address", "127.0.0.1", "--port", fmt.Sprint(cfg.Port))
 	cmd.Env = append(os.Environ(),
-		"REDLIB_DEFAULT_SHOW_NSFW=off", "REDLIB_DEFAULT_BLUR_NSFW=on",
+		"REDLIB_DEFAULT_SHOW_NSFW=on", "REDLIB_DEFAULT_BLUR_NSFW=off", // every kind of content (the owner, 2026-10-02)
 		"REDLIB_DEFAULT_USE_HLS=off", "REDLIB_DEFAULT_HIDE_HLS_NOTIFICATION=on",
 		"REDLIB_ROBOTS_DISABLE_INDEXING=on")
 	hideWindow(cmd)

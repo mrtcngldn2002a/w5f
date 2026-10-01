@@ -75,3 +75,24 @@ func (e Env) Recent(n int) []Entry {
 	}
 	return out
 }
+
+// ClearLog empties the log at the owner's word (2026-10-02): its day files
+// are not deleted but moved together into a dated folder beside it, so a
+// campaign can still be read back. It returns that folder and how many
+// files went ("" and 0 when the log was empty).
+func (e Env) ClearLog(now time.Time) (string, int, error) {
+	files, _ := filepath.Glob(filepath.Join(e.LogDir, "*.jsonl"))
+	if len(files) == 0 {
+		return "", 0, nil
+	}
+	kept := filepath.Join(filepath.Dir(e.LogDir), "log-"+now.Format("20060102-150405"))
+	if err := os.MkdirAll(kept, 0o755); err != nil {
+		return "", 0, err
+	}
+	for i, f := range files {
+		if err := os.Rename(f, filepath.Join(kept, filepath.Base(f))); err != nil {
+			return kept, i, err
+		}
+	}
+	return kept, len(files), nil
+}

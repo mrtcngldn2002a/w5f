@@ -264,3 +264,35 @@ func TestTableLists(t *testing.T) {
 		t.Errorf("kept: %+v", tb)
 	}
 }
+
+func TestClearLogAsksAndKeeps(t *testing.T) {
+	env, _ := testEnv(t)
+	ctx := context.Background()
+	if _, err := Route(ctx, "w5f:solo/roll?d=d6", env); err != nil {
+		t.Fatal(err)
+	}
+	d, _ := Route(ctx, "w5f:solo/log/clear", env)
+	if d.Title != "Clear the log?" || d.Links[0].Href != "w5f:solo/log" || !strings.Contains(flat(d), "No, keep it · Yes, clear the log") {
+		t.Fatalf("asking:\n%s %+v", flat(d), d.Links)
+	}
+	if len(env.Recent(10)) != 1 {
+		t.Fatal("asking cleared the log")
+	}
+	d, err := Route(ctx, "w5f:solo/log/clear?sure=yes", env)
+	if err != nil || !strings.Contains(flat(d), "! The log is cleared; its 1 day file was moved to") || strings.Contains(flat(d), "# Log") {
+		t.Fatalf("cleared: %v\n%s", err, flat(d))
+	}
+	if len(env.Recent(10)) != 0 {
+		t.Error("log not empty")
+	}
+	kept, _ := filepath.Glob(filepath.Join(filepath.Dir(env.LogDir), "log-*", "*.jsonl"))
+	if len(kept) != 1 {
+		t.Errorf("kept files: %v", kept)
+	}
+	if _, err := Route(ctx, "w5f:solo/roll?d=d6", env); err != nil || len(env.Recent(10)) != 1 {
+		t.Error("a new log begins")
+	}
+	if d := env.logDoc(); !strings.Contains(flat(d), "clear the log…") {
+		t.Errorf("log page:\n%s", flat(d))
+	}
+}

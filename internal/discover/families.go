@@ -209,49 +209,83 @@ func (folklore) Draw(ctx context.Context, env Env) (Draw, error) {
 	return drawFromSites(ctx, env, "folklore", folkloreSites)
 }
 
-// textfiles: BBS-era text files from textfiles.com.
+// textfiles: BBS-era text files from textfiles.com, from every one of its
+// directories (the owner asked for every kind of content, 2026-10-02: no
+// directory is left out, anarchy, drugs, hacking, sex and virus included).
 type textfiles struct{}
 
 var textfilesBase = "http://www.textfiles.com"
 
-var textfilesDirs = []string{"occult", "ufo", "stories", "fun", "humor", "conspiracy", "religion", "science", "rpg", "bbs"}
+// textfilesDirs is the site's directory list (textfiles.com/directory.html,
+// 2026-10-02).
+var textfilesDirs = []string{"100", "adventure", "anarchy", "apple", "art", "bbs", "computers", "conspiracy", "drugs", "etext",
+	"food", "fun", "games", "groups", "hacking", "hamradio", "holiday", "humor", "internet", "law", "magazines", "media",
+	"messages", "music", "news", "occult", "phreak", "piracy", "politics", "programming", "reports", "rpg", "science", "sex",
+	"sf", "stories", "survival", "ufo", "uploads", "virus"}
 
 func (textfiles) Name() string { return "textfiles" }
 func (textfiles) Draw(ctx context.Context, env Env) (Draw, error) {
-	return textfilesDraw(ctx, env.Fetcher, textfilesBase, textfilesDirs)
+	// An empty or vanished listing is tried again elsewhere, twice.
+	var err error
+	for range 3 {
+		var d Draw
+		if d, err = textfilesDraw(ctx, env.Fetcher, textfilesBase, textfilesDirs); err == nil || ctx.Err() != nil {
+			return d, err
+		}
+	}
+	return Draw{}, err
 }
 
+// textfilesDraw picks a directory, then an entry of its listing: a file
+// (a plain link), or a collection (a bold link: a magazine, a group, a
+// BBS), whose own listing is then drawn from, up to three levels down.
 func textfilesDraw(ctx context.Context, f *fetch.Fetcher, base string, dirs []string) (Draw, error) {
 	dir := pick(dirs)
-	gq, u, err := get(ctx, f, base+"/"+dir+"/")
-	if err != nil {
-		return Draw{}, err
-	}
-	type file struct{ href, desc string }
-	var files []file
-	gq.Find("tr").Each(func(_ int, tr *goquery.Selection) {
-		a := tr.Find("a[href]").First()
-		href, _ := a.Attr("href")
-		if href == "" || strings.HasSuffix(href, "/") || strings.Contains(href, "?") {
-			return
+	where := base + "/" + dir + "/"
+	trail := []string{dir}
+	for depth := 0; depth < 3; depth++ {
+		gq, u, err := get(ctx, f, where)
+		if err != nil {
+			return Draw{}, err
 		}
-		cells := tr.Find("td")
-		desc := strings.Join(strings.Fields(cells.Last().Text()), " ")
-		files = append(files, file{href, desc})
-	})
-	if len(files) == 0 {
-		return Draw{}, fmt.Errorf("textfiles/%s: no files listed", dir)
+		type entry struct {
+			href, desc string
+			sub        bool
+		}
+		var entries []entry
+		gq.Find("tr").Each(func(_ int, tr *goquery.Selection) {
+			a := tr.Find("a[href]").First()
+			href, _ := a.Attr("href")
+			if href == "" || strings.Contains(href, "?") || strings.HasPrefix(href, ".") || strings.HasPrefix(href, "/") || strings.Contains(href, "://") {
+				return
+			}
+			desc := strings.Join(strings.Fields(tr.Find("td").Last().Text()), " ")
+			sub := strings.HasSuffix(href, "/") || a.ParentsFiltered("b").Length() > 0
+			entries = append(entries, entry{href, desc, sub})
+		})
+		if len(entries) == 0 {
+			return Draw{}, fmt.Errorf("textfiles/%s: nothing listed", strings.Join(trail, "/"))
+		}
+		e := pick(entries)
+		target, err := u.Parse(e.href)
+		if err != nil {
+			return Draw{}, err
+		}
+		if e.sub {
+			trail = append(trail, strings.TrimSuffix(e.href, "/"))
+			where = strings.TrimSuffix(target.String(), "/") + "/"
+			continue
+		}
+		why := "textfiles/" + strings.Join(trail, "/") + " · " + path.Base(target.Path)
+		if r := []rune(e.desc); len(r) > 160 {
+			e.desc = strings.TrimSpace(string(r[:160])) + "…"
+		}
+		if e.desc != "" {
+			why += " — " + e.desc
+		}
+		return Draw{Target: target.String(), Why: why}, nil
 	}
-	fl := pick(files)
-	target, err := u.Parse(fl.href)
-	if err != nil {
-		return Draw{}, err
-	}
-	why := "textfiles/" + dir + " · " + path.Base(target.Path)
-	if fl.desc != "" {
-		why += " — " + fl.desc
-	}
-	return Draw{Target: target.String(), Why: why}, nil
+	return Draw{}, fmt.Errorf("textfiles/%s: no file within three levels", strings.Join(trail, "/"))
 }
 
 // encyclopedic: the sites' own random-article addresses.
@@ -260,7 +294,6 @@ type encyclopedic struct{}
 var encyclopedias = []site{
 	{"Britannica", "https://www.britannica.com/browse/Philosophy-Religion"},
 	{"Wikipedia (EN)", "https://en.wikipedia.org/wiki/Special:Random"},
-	{"Wikipedia (TR)", "https://tr.wikipedia.org/wiki/%C3%96zel:Rastgele"},
 	{"Stanford Encyclopedia of Philosophy", "https://plato.stanford.edu/cgi-bin/encyclopedia/random"},
 	{"Internet Encyclopedia of Philosophy", "https://iep.utm.edu/"},
 }
