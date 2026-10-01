@@ -38,13 +38,15 @@ reading.
   </tr>
   <tr>
     <td><img src="docs/screenshots/scp-055-cold.png" alt="SCP-055 read in the cold theme"></td>
-    <td valign="top">
-      <b>A Wikidot page</b> · cold archive<br>
-      <sub>SCP-055 by qntm (SCP Wiki, CC BY-SA 3.0), its redactions kept as blocks</sub><br><br>
-      All four were taken on the W5F itself: X and xterm at 1280×800, Terminus 16, 160 × 50 cells, with sample data.
-    </td>
+    <td><img src="docs/screenshots/iching-night.png" alt="An I Ching cast in the night theme"></td>
+  </tr>
+  <tr>
+    <td><b>A Wikidot page</b> · cold archive<br><sub>SCP-055 by qntm (SCP Wiki, CC BY-SA 3.0), its redactions kept as blocks</sub></td>
+    <td><b>An I Ching cast</b> · night red<br><sub>three coins six times, the moving lines marked, Legge's translation (1882)</sub></td>
   </tr>
 </table>
+
+<p align="center"><sub>All five themes, taken on the W5F itself: X and xterm at 1280×800, Terminus 16, 160 × 50 cells, with sample data.</sub></p>
 
 ## Quick start
 
@@ -275,7 +277,7 @@ Notes live in `~/Archive/Notes` (change with `W5F_NOTES` or `notes = "…"` in `
   - on/off and choices are links; anything else opens a form (secrets hidden, lists as `a, b`, conversions as JSON). A change goes to the server at once (`setSettings`), is checked by the server and stays in its server.conf.
   - What W5F gives on the java command line (address, port, folders, CBZ, WebUI off, …) wins over server.conf; those are shown as W5F's and are not changed here.
   - Authentication (Basic, simple login, UI login with tokens): the form changes the server and the account W5F signs in with together, so W5F never locks itself out; when it was changed elsewhere, W5F asks for the account (`w5f:comics/login`, kept in the suwayomi folder, mode 0600).
-- **Open in WebView**, as Suwayomi's own clients have it: on a source's page, a series' page, each chapter ("web") and every page a source could not load. It opens the site in Suwayomi's WebView (KCEF), shown through the server's `/api/v1/webview` page in the browser; a sign-in or a check for people you do there yourself stays in Suwayomi's cookies for its sources. Needs Suwayomi's WebView on (Server settings → Webview).
+- **Open in WebView**, as Suwayomi's own clients have it: on a source's page, a series' page, each chapter ("web") and every page a source could not load. It opens the site in Suwayomi's WebView (KCEF), shown through the server's `/api/v1/webview` page in the browser (any current browser will do: the page needs only WebSockets); a sign-in or a check for people you do there yourself stays in Suwayomi's cookies for its sources. Needs Suwayomi's WebView on (Server settings → Webview).
 - **Source settings** (`Comics → Sources → settings`): a source's own settings, as its extension offers them (image quality, languages, site options). Switches, choices and multiple choices are links, text opens a form. Each Suwayomi keeps its own: a choice made on one computer is not on the other.
 - **Settings sync**: `w5f comics sync <another server.conf>` compares another Suwayomi's settings (the PC launcher's `%LOCALAPPDATA%\Tachidesk\server.conf`, say) with this server's and lists the differences; `--apply` copies them and adds missing extension stores. What belongs to one computer is kept (addresses, folders, WebUI, database, accounts, the SOCKS proxy) and so are bot-check solver settings (FlareSolverr). Installed extensions and sources' own settings are not copied.
 - **Update**: `check for an update` compares the installed jar with the newest release; updating downloads it, checks it against the release's checksums, stops a server W5F started and starts it again. A server W5F did not start (the launcher) is left alone.
