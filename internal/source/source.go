@@ -43,6 +43,7 @@ import (
 	"w5f/internal/smallweb"
 	"w5f/internal/solo"
 	"w5f/internal/store"
+	"w5f/internal/ultan"
 	"w5f/internal/usenet"
 )
 
@@ -84,6 +85,13 @@ func Load(ctx context.Context, target string, opts Options) (*doc.Document, erro
 	}
 	if strings.HasPrefix(target, "w5f:search/") {
 		return loadSearch(ctx, target)
+	}
+	if target == ultan.LedgerTarget {
+		db, err := store.Default()
+		if err != nil {
+			return nil, fmt.Errorf("opening the local database: %w", err)
+		}
+		return ultan.Ledger(db, time.Now())
 	}
 	if personal.IsTarget(target) || index.IsTarget(target) {
 		db, err := store.Default()
@@ -348,6 +356,8 @@ func Resolve(input string) string {
 		return "w5f:notes"
 	case lower == "history":
 		return "w5f:history"
+	case lower == "ledger" || lower == "ultan":
+		return ultan.LedgerTarget
 	case strings.HasPrefix(lower, "find "):
 		return "w5f:find?" + url.Values{"q": {strings.TrimSpace(s[5:])}}.Encode()
 	case strings.HasPrefix(lower, "reddit "):

@@ -62,14 +62,14 @@ func TestViewBeforeWindowSize(t *testing.T) {
 
 func TestWelcomeFoldToggle(t *testing.T) {
 	m := sized(New("", "test"))
-	if strings.Contains(m.View().Content, "exactly as their authors intended") {
+	if strings.Contains(m.View().Content, "of which you hold the only card") {
 		t.Fatal("collapsible content visible before opening")
 	}
 	// The first link is selected on load; ↓ walks down to the collapsible.
 	if m.cur.focus != 1 {
 		t.Fatalf("first link not preselected: focus=%d", m.cur.focus)
 	}
-	for i := 0; i < 25; i++ {
+	for i := 0; i < 80; i++ {
 		if f := m.focused(); f != nil && f.Kind == render.FocusFold {
 			break
 		}
@@ -79,11 +79,11 @@ func TestWelcomeFoldToggle(t *testing.T) {
 		t.Fatalf("focus = %+v", f)
 	}
 	m = press(m, "right")
-	if !strings.Contains(m.View().Content, "exactly as their authors intended") {
+	if !strings.Contains(m.View().Content, "of which you hold the only card") {
 		t.Error("collapsible did not open")
 	}
 	m = press(m, "enter")
-	if strings.Contains(m.View().Content, "exactly as their authors intended") {
+	if strings.Contains(m.View().Content, "of which you hold the only card") {
 		t.Error("collapsible did not close again")
 	}
 }

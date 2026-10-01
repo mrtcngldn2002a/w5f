@@ -15,6 +15,7 @@ import (
 	"w5f/internal/doc"
 	"w5f/internal/personal"
 	"w5f/internal/store"
+	"w5f/internal/ultan"
 )
 
 // Packet is one day's issue of the Daily Packet.
@@ -155,7 +156,7 @@ func addColumns(ctx context.Context, env Env, p *Packet) {
 
 // columnBlocks are the cover's almanac and oracle columns.
 func columnBlocks(p Packet, link func(href, text string) int) []doc.Block {
-	var bs []doc.Block
+	var bs, oracle []doc.Block
 	if a := p.Almanac; a != nil {
 		date := p.Date
 		if t, err := time.Parse("2006-01-02", p.Date); err == nil {
@@ -185,10 +186,14 @@ func columnBlocks(p Packet, link func(href, text string) int) []doc.Block {
 		}
 	}
 	if p.Oracle != nil {
-		bs = append(bs, doc.Heading{Level: 2, Text: doc.Inline{{Text: "The oracle"}}})
-		bs = append(bs, oracleBlocks(p.Oracle, link)...)
+		oracle = append(oracle, doc.Heading{Level: 2, Text: doc.Inline{{Text: "The oracle"}}})
+		oracle = append(oracle, oracleBlocks(p.Oracle, link)...)
 	}
-	return bs
+	if len(bs) > 0 && len(oracle) > 0 {
+		// Side by side on a wide page.
+		return []doc.Block{doc.Columns{Cols: [][]doc.Block{bs, oracle}}}
+	}
+	return append(bs, oracle...)
 }
 
 var kindLabel = map[string]string{"periodical": "Periodicals", "weird": "Weird Worlds", "esoteric": "Esoterica & folklore",
@@ -218,6 +223,16 @@ func coverDoc(p Packet) *doc.Document {
 		d.Blocks = append(d.Blocks, doc.Paragraph{Text: doc.Inline{{Text: "Nothing could be gathered today (offline?). Try reshuffle later.", Style: doc.Italic}}})
 	} else {
 		d.Blocks = append(d.Blocks, doc.List{Items: items})
+		var kinds []string
+		for _, e := range p.Entries {
+			kinds = append(kinds, e.Kind)
+		}
+		oracle := ""
+		if p.Oracle != nil {
+			oracle = p.Oracle.Title
+		}
+		when, _ := time.Parse("2006-01-02", p.Date)
+		d.Blocks = append(d.Blocks, ultan.Cover(kinds, oracle, when).Blocks(link)...)
 	}
 	d.Blocks = append(d.Blocks, columnBlocks(p, link)...)
 	actions := doc.Inline{}
@@ -396,4 +411,28 @@ func Welcome(db *store.DB) string {
 		return fmt.Sprintf("Daily Packet No. %d — %d items", p.Number, len(p.Entries))
 	}
 	return "today's Daily Packet — press p"
+}
+
+// TodayItem is a line of the reading room's "Today".
+type TodayItem struct{ Label, Text, Href string }
+
+// Today is what the day holds, from today's issue when it is made (offline:
+// it never fetches).
+func Today(db *store.DB) []TodayItem {
+	p, ok := loadPacket(db, today())
+	if !ok {
+		return []TodayItem{{"Daily Packet", "today's issue is not made yet — press p", "w5f:packet"}}
+	}
+	out := []TodayItem{{"Daily Packet", fmt.Sprintf("No. %d · %d items", p.Number, len(p.Entries)), "w5f:packet"}}
+	if a := p.Almanac; a != nil && len(a.Headlines) > 0 {
+		out = append(out, TodayItem{"On this day", a.Headlines[0], AlmanacHref(a.Day)})
+	}
+	if o := p.Oracle; o != nil {
+		target := o.Target
+		if strings.HasPrefix(target, "http") {
+			target = localOracleHref(o)
+		}
+		out = append(out, TodayItem{"The oracle", o.Title, target})
+	}
+	return out
 }

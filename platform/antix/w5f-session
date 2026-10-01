@@ -3,6 +3,8 @@
 # one-key menu. Installed as ~/.local/bin/w5f-session.
 W5F=${W5F:-$HOME/.local/bin/w5f}
 export LANG=${LANG:-en_US.UTF-8}
+# xterm clears COLORTERM; W5F's themes need their exact colours (24-bit).
+export COLORTERM=${COLORTERM:-truecolor}
 
 readkey() {
 	old=$(stty -g 2>/dev/null)

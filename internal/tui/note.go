@@ -226,7 +226,7 @@ func (m Model) overlayNote(page []string) []string {
 	for len(out) < m.bodyHeight() {
 		out = append(out, "")
 	}
-	x := strings.Repeat(" ", max(0, (m.width-w)/2))
+	x := strings.Repeat(" ", max(0, (m.pageWidth()-w)/2))
 	for i, l := range lines {
 		r := 1 + i
 		if r >= len(out) {

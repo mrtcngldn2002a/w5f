@@ -77,6 +77,11 @@ func writeBlocks(b *strings.Builder, d *doc.Document, bs []doc.Block, prefix str
 			blankLine(b, prefix)
 			writeBlocks(b, d, x.Blocks, prefix)
 			continue
+		case doc.Columns:
+			for _, col := range x.Cols {
+				writeBlocks(b, d, col, prefix)
+			}
+			continue
 		case doc.Image:
 			b.WriteString(prefix + "![" + mdEscape(x.Alt) + "](" + x.Src + ")\n")
 		case doc.Rule:

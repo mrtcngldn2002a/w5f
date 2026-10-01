@@ -49,7 +49,8 @@ func navigationW5F(href string) bool {
 		return true
 	}
 	switch href {
-	case "w5f:queue", "w5f:notes", "w5f:books", "w5f:feeds", "w5f:welcome", "w5f:catalogs", "w5f:fiction", "w5f:following":
+	case "w5f:queue", "w5f:notes", "w5f:books", "w5f:feeds", "w5f:welcome", "w5f:catalogs", "w5f:fiction", "w5f:following",
+		"w5f:ledger", "w5f:cabinet":
 		return true
 	}
 	return false

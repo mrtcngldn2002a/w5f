@@ -280,6 +280,8 @@ func (r *renderer) block(b doc.Block, c ctx) {
 			label = b.Alt
 		}
 		r.wrapPrefixed(doc.Inline{{Text: label}}, c, ImageRole, Seg{Text: "▒▒ ", Role: ImageRole})
+	case doc.Columns:
+		r.columns(b, c)
 	case doc.Notice:
 		r.wrapPrefixed(doc.Inline{{Text: b.Text}}, c, NoticeRole, Seg{Text: "※ ", Role: NoticeRole})
 	case doc.Embed:
@@ -290,6 +292,80 @@ func (r *renderer) block(b doc.Block, c ctx) {
 			r.wrapPrefixed(n.Text, c.nest(Seg{}, Seg{Text: "    "}), Dim, Seg{Text: padRight("["+n.Label+"]", 4), Role: Dim})
 		}
 	}
+}
+
+// Columns need this much room each, and this gap between them.
+const minColumn, columnGap = 34, 4
+
+// columns lays blocks out side by side: each column on its own, then the
+// lines joined. Its links come in column order, left column first.
+func (r *renderer) columns(b doc.Columns, c ctx) {
+	avail := c.width - segsWidth(c.rest)
+	n := len(b.Cols)
+	if n == 0 {
+		return
+	}
+	colW := (avail - columnGap*(n-1)) / n
+	if n == 1 || colW < minColumn {
+		var all []doc.Block
+		for _, col := range b.Cols {
+			all = append(all, col...)
+		}
+		r.blocks(all, c)
+		return
+	}
+	base := len(r.out.Lines)
+	var cols [][]Line
+	rows := 0
+	for _, col := range b.Cols {
+		sub := &renderer{d: r.d, o: Options{Width: colW, Open: r.o.Open}, out: &Layout{Width: colW}, lastLinkFocus: map[int]int{}}
+		sub.blocks(col, ctx{width: colW})
+		for len(sub.out.Lines) > 0 && len(sub.out.Lines[len(sub.out.Lines)-1].Segs) == 0 {
+			sub.out.Lines = sub.out.Lines[:len(sub.out.Lines)-1]
+		}
+		shift := len(r.out.Focus)
+		for _, f := range sub.out.Focus {
+			f.Line += base
+			r.out.Focus = append(r.out.Focus, f)
+		}
+		for i := range sub.out.Lines {
+			for j := range sub.out.Lines[i].Segs {
+				if sub.out.Lines[i].Segs[j].Focus > 0 {
+					sub.out.Lines[i].Segs[j].Focus += shift
+				}
+			}
+		}
+		for _, h := range sub.out.Headings {
+			h.Line += base
+			r.out.Headings = append(r.out.Headings, h)
+		}
+		for _, p := range sub.out.Paras {
+			p.Start, p.End = p.Start+base, p.End+base
+			r.out.Paras = append(r.out.Paras, p)
+		}
+		cols = append(cols, sub.out.Lines)
+		rows = max(rows, len(sub.out.Lines))
+	}
+	for i := 0; i < rows; i++ {
+		line := append([]Seg{}, c.rest...)
+		if i == 0 {
+			line = append([]Seg{}, c.first...)
+		}
+		for k, col := range cols {
+			var segs []Seg
+			if i < len(col) {
+				segs = col[i].Segs
+			}
+			line = append(line, segs...)
+			if k < len(cols)-1 {
+				if pad := colW - segsWidth(segs) + columnGap; pad > 0 {
+					line = append(line, Seg{Text: strings.Repeat(" ", pad)})
+				}
+			}
+		}
+		r.emit(trimTrailingSpace(line))
+	}
+	r.lastLinkFocus = map[int]int{}
 }
 
 func (r *renderer) collapsible(b doc.Collapsible, c ctx) {

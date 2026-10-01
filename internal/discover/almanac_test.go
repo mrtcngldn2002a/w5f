@@ -148,11 +148,18 @@ func TestAlmanacColumnAndPage(t *testing.T) {
 			t.Errorf("cover lacks %q:\n%s", want, text)
 		}
 	}
-	drawn := false
-	for _, bl := range coverDoc(p).Blocks {
+	drawn, columns := false, false
+	doc.ReplaceBlocks(coverDoc(p).Blocks, func(bl doc.Block) ([]doc.Block, bool) {
 		if pre, ok := bl.(doc.Pre); ok && strings.Count(pre.Text, "━━━━━━━━━") == 6 {
 			drawn = true
 		}
+		if _, ok := bl.(doc.Columns); ok {
+			columns = true // the almanac and the oracle side by side
+		}
+		return nil, false
+	})
+	if !columns {
+		t.Error("the cover's two columns are not side by side")
 	}
 	if !drawn {
 		t.Error("the hexagram is drawn on the cover")

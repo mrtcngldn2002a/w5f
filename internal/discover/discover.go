@@ -17,6 +17,7 @@ import (
 	"w5f/internal/fetch"
 	"w5f/internal/smallweb"
 	"w5f/internal/store"
+	"w5f/internal/ultan"
 )
 
 // Draw is one random pick: where to go, from which family, and why.
@@ -98,7 +99,13 @@ func Next(ctx context.Context, env Env) (Draw, *doc.Document, error) {
 			if page, err = env.Load(ctx, d.Target); err == nil {
 				d.Family = f.Name()
 				_ = env.DB.Set(lastKey, d.Family)
-				page.Blocks = append([]doc.Block{doc.Notice{Kind: "info", Text: "Deep random · " + d.Why + " · press x for another"}}, page.Blocks...)
+				head := []doc.Block{doc.Notice{Kind: "info", Text: "Deep random · " + d.Why + " · press x for another"}}
+				// Ultan's note on the shelf it came from.
+				head = append(head, ultan.Shelf(env.DB, d.Family, time.Now()).Blocks(func(href, text string) int {
+					page.Links = append(page.Links, doc.Link{Href: href, Text: text})
+					return len(page.Links)
+				})...)
+				page.Blocks = append(head, page.Blocks...)
 				return d, page, nil
 			}
 		}

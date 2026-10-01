@@ -19,6 +19,13 @@ func ReplaceBlocks(bs []Block, fn func(Block) (repl []Block, ok bool)) []Block {
 		case Quote:
 			x.Blocks = ReplaceBlocks(x.Blocks, fn)
 			b = x
+		case Columns:
+			cols := make([][]Block, 0, len(x.Cols))
+			for _, col := range x.Cols {
+				cols = append(cols, ReplaceBlocks(col, fn))
+			}
+			x.Cols = cols
+			b = x
 		case List:
 			items := make([][]Block, 0, len(x.Items))
 			for _, it := range x.Items {

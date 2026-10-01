@@ -188,3 +188,39 @@ func stamp() int64 {
 		}
 	}
 }
+
+// LoggedVisit is one opening of a page, from history.log.
+type LoggedVisit struct {
+	Target, Title, Kind string
+	At                  time.Time
+}
+
+// VisitLog lists every opening since a time, oldest first: the history
+// table keeps one row per page, the log keeps each visit.
+func (db *DB) VisitLog(since time.Time) ([]LoggedVisit, error) {
+	p := db.logPath()
+	if p == "" {
+		return nil, nil
+	}
+	f, err := os.Open(p)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	var out []LoggedVisit
+	sc := bufio.NewScanner(f)
+	sc.Buffer(make([]byte, 64<<10), 1<<20)
+	for sc.Scan() {
+		var e logEntry
+		if json.Unmarshal(sc.Bytes(), &e) != nil || e.Target == "" {
+			continue
+		}
+		if at := time.Unix(0, e.At); !at.Before(since) {
+			out = append(out, LoggedVisit{Target: e.Target, Title: e.Title, Kind: e.Kind, At: at})
+		}
+	}
+	return out, sc.Err()
+}

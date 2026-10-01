@@ -119,7 +119,7 @@ func TestWelcomeContinueReading(t *testing.T) {
 		}
 		return nil, false
 	})
-	for _, want := range []string{"Continue reading", "Half read", "40%", "Reading queue", "Notes & clippings", "History"} {
+	for _, want := range []string{"On the desk", "Half read", "40%", "Today", "Ultan's note", "— U.", "The Lectern", "The Scriptorium", "The Register", "Ultan's Ledger"} {
 		if !strings.Contains(b.String(), want) {
 			t.Errorf("welcome lacks %q:\n%s", want, b.String())
 		}

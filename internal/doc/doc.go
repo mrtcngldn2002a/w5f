@@ -76,6 +76,9 @@ type (
 		Text string
 	}
 	Footnotes struct{ Notes []Footnote }
+	// Columns sets blocks side by side on a wide page; on a narrow one
+	// they follow each other.
+	Columns struct{ Cols [][]Block }
 	// Embed is an unresolved embedded document (e.g. a Wikidot HTML block).
 	// The source layer replaces it with the embedded content or removes it;
 	// the renderer only sees it when resolution was not possible.
@@ -98,6 +101,7 @@ func (Image) block()       {}
 func (Rule) block()        {}
 func (Pre) block()         {}
 func (Notice) block()      {}
+func (Columns) block()     {}
 func (Footnotes) block()   {}
 func (Embed) block()       {}
 

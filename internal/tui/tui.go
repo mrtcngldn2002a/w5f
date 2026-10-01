@@ -94,15 +94,22 @@ type Model struct {
 
 	loading string
 	status  string
+	sideOff bool // the side menu hidden (\)
 }
 
 // New creates the model; target may be empty for the welcome page.
 func New(target, version string) Model {
 	m := Model{version: version, theme: theme.Default, width: 80, height: 24}
+	m.loadPrefs()
 	if target == "" {
 		m.cur = newPage("w5f:welcome", welcomeDoc(version))
 		// Bubble Tea renders once before the first WindowSizeMsg arrives, so
 		// the page needs a layout for the default size right away.
+		m.relayout()
+		m.focusFirstVisible()
+	} else if d := m.localDoc(target); d != nil {
+		// A page the reader makes itself (w5f:cabinet, w5f:themes …).
+		m.cur = newPage(target, d)
 		m.relayout()
 		m.focusFirstVisible()
 	} else {
@@ -188,6 +195,9 @@ func (m *Model) textWidth() int {
 	w := m.width - 4
 	if w > maxMeasure {
 		w = maxMeasure
+	}
+	if m.sideShown() {
+		w = min(m.pageWidth()-4, wideMeasure)
 	}
 	if w < 20 {
 		w = 20
@@ -456,6 +466,10 @@ func (m Model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		m.loading = p.target
 		return m, load(p.target, true)
+	case "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "L":
+		return m.openRoom(s)
+	case `\`:
+		return m.toggleSide()
 	case "T", "I":
 		// A tarot card, or an I Ching hexagram, drawn now.
 		target := "w5f:discover/tarot"
@@ -734,6 +748,10 @@ func (m *Model) isOpen(id int) bool {
 				visit(b.Blocks)
 			case doc.Quote:
 				visit(b.Blocks)
+			case doc.Columns:
+				for _, col := range b.Cols {
+					visit(col)
+				}
 			case doc.List:
 				for _, it := range b.Items {
 					visit(it)
@@ -768,6 +786,15 @@ func (m Model) follow(href string) (tea.Model, tea.Cmd) {
 		m.loading = href
 		return m, load(href, false)
 	case "w5f":
+		if href == "w5f:themes" {
+			return m.openThemes(false)
+		}
+		if d := m.localDoc(href); d != nil && (m.cur == nil || w5fPage(m.cur)) {
+			return m, func() tea.Msg { return loadedMsg{target: href, doc: d} }
+		}
+		if name, ok := strings.CutPrefix(href, "w5f:theme/"); ok && m.cur != nil && m.cur.target == "w5f:themes" {
+			return m.setTheme(name)
+		}
 		if m.cur != nil && !w5fPage(m.cur) && fromNetwork(m.cur.target) {
 			m.status = "W5F addresses are not opened from web pages (use g to go there yourself)"
 			return m, nil
@@ -925,6 +952,13 @@ func (m Model) gotoKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
+		if low := strings.ToLower(strings.TrimSpace(m.gotoBuf)); low == "theme" || low == "themes" {
+			m.mode = modeRead
+			return m.openThemes(false)
+		} else if name, ok := strings.CutPrefix(low, "theme "); ok {
+			m.mode = modeRead
+			return m.setTheme(name)
+		}
 		if low := strings.ToLower(strings.TrimSpace(m.gotoBuf)); low == "chromium" || strings.HasPrefix(low, "chromium ") {
 			// g → chromium [address]: a page in Chromium (no address: this one).
 			addr := strings.TrimSpace(strings.TrimSpace(m.gotoBuf)[len("chromium"):])
@@ -956,6 +990,13 @@ func (m Model) gotoKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		if target == "" {
 			return m, nil
+		}
+		if low := strings.ToLower(strings.TrimSpace(m.gotoBuf)); low == "cabinet" || low == "reading room" || low == "home" {
+			target = map[string]string{"cabinet": "w5f:cabinet", "reading room": "w5f:welcome", "home": "w5f:welcome"}[low]
+		}
+		if d := m.localDoc(target); d != nil {
+			m.mode = modeRead
+			return m, func() tea.Msg { return loadedMsg{target: target, doc: d} }
 		}
 		m.loading = target
 		if t := catalogLoading(target); t != "" {
@@ -1112,7 +1153,17 @@ func (m Model) View() tea.View {
 	b.WriteString(m.topBar())
 	b.WriteByte('\n')
 	body := m.bodyLines()
+	var side []string
+	if m.sideShown() {
+		side = m.sideLines(m.bodyHeight())
+	}
 	for i := 0; i < m.bodyHeight(); i++ {
+		if side != nil {
+			if i < len(side) {
+				b.WriteString(side[i])
+			}
+			b.WriteString(m.sideSeparator())
+		}
 		if i < len(body) {
 			b.WriteString(body[i])
 		}
@@ -1132,6 +1183,9 @@ func (m Model) View() tea.View {
 }
 
 func (m Model) margin() string {
+	if m.sideShown() {
+		return "  " // the page starts beside the side menu
+	}
 	pad := (m.width - m.textWidth()) / 2
 	if pad < 0 {
 		pad = 0
@@ -1178,7 +1232,15 @@ func (m Model) bodyLines() []string {
 	}
 	for li, ln := range p.layout.Lines[p.offset:end] {
 		var sb strings.Builder
-		sb.WriteString(margin)
+		lead := margin
+		for _, sg := range ln.Segs {
+			if p.focus != 0 && sg.Focus == p.focus && len(margin) >= 2 {
+				// A mark beside the selected line, whatever the colours.
+				lead = margin[:len(margin)-2] + m.theme.Seg(render.Seg{Role: render.Title}, false).Render("»") + " "
+				break
+			}
+		}
+		sb.WriteString(lead)
 		for _, sg := range ln.Segs {
 			if label, ok := labelFor[sg.Focus]; ok && sg.Focus > 0 {
 				sb.WriteString(m.theme.Hint().Render(strconv.Itoa(label)))
@@ -1187,7 +1249,7 @@ func (m Model) bodyLines() []string {
 			sel := p.offset+li >= selLo && p.offset+li <= selHi
 			sb.WriteString(m.theme.Seg(sg, sel || (sg.Focus != 0 && sg.Focus == p.focus)).Render(sg.Text))
 		}
-		out = append(out, ansi.Truncate(sb.String(), m.width, ""))
+		out = append(out, ansi.Truncate(sb.String(), m.pageWidth(), ""))
 	}
 	return out
 }
@@ -1259,6 +1321,10 @@ func (m Model) helpLines() []string {
 		{"+ / -", "expand / fold all sections"}, {"o", "show link address"}, {"ctrl+r", "reload"},
 		{"B", "open this page (or the selected link) in Chromium · g → chromium <address>"},
 		{"T · I", "draw a tarot card · cast an I Ching hexagram (kept: the texts come once from sacred-texts)"},
+		{"1 … 9, 0", "the rooms of the library: 1 Reading Room (home) · 2 Periodical Gallery (periodicals) · 3 The Stacks (books) · 4 The Serial Hall (internet fiction) · 5 The Picture Vault (comics) · 6 The Gaming Table (solo RPG) · 7 The Newsroom (Usenet) · 8 Curiosity Cabinet (discovery) · 9 The Lectern (queue) · 0 The Scriptorium (notes)"},
+		{"H · L", "The Register (your history) · Ultan's Ledger (your reading, counted)"},
+		{`\`, "hide / show the side menu (wide windows)"},
+		{"g → theme", "choose a theme: amber, day, cold, night (g → theme day puts one on)"},
 		{"g → reddit-login chromium", "take your Reddit (or ao3-login chromium: AO3) session from Chromium, where you signed in"},
 		{"/", "search everything you have read (feeds, wikis, web pages, books, notes)"},
 		{"a / A", "add this page / the selected link to the reading queue (g → queue)"},

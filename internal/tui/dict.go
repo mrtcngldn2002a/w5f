@@ -156,7 +156,7 @@ func (m *Model) clampDict() {
 }
 
 func (m Model) dictWidth() int {
-	w := m.width - 6
+	w := m.pageWidth() - 6
 	if w > 78 {
 		w = 78
 	}
@@ -253,7 +253,7 @@ func (m Model) overlayDict(page []string) []string {
 	for len(out) < m.bodyHeight() {
 		out = append(out, "")
 	}
-	x := strings.Repeat(" ", max(0, (m.width-w)/2))
+	x := strings.Repeat(" ", max(0, (m.pageWidth()-w)/2))
 	for i, l := range lines {
 		r := 1 + i
 		if r >= len(out) {
