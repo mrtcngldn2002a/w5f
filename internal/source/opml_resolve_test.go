@@ -22,7 +22,8 @@ func TestOPMLCommands(t *testing.T) {
 			t.Errorf("%s → %s (file %q, want %q)", in, got, u.Query().Get("f"), want)
 		}
 	}
-	for in, want := range map[string]string{"tarot": "w5f:discover/tarot", "I Ching": "w5f:discover/iching", "iching": "w5f:discover/iching", "almanac": "w5f:almanac"} {
+	for in, want := range map[string]string{"tarot": "w5f:discover/tarot", "I Ching": "w5f:discover/iching", "iching": "w5f:discover/iching", "almanac": "w5f:almanac",
+		"usenet": "w5f:usenet", "usenet folklore": "w5f:usenet/find?q=folklore", "news:alt.magick": "w5f:usenet/g/alt.magick"} {
 		if got := Resolve(in); got != want {
 			t.Errorf("%s → %s, want %s", in, got, want)
 		}

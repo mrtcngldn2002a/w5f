@@ -26,6 +26,7 @@ w5f w5f:feeds            Periodicals: shelves, unread, starred, feed status
 w5f sync                 refresh all feeds (cron/timer friendly)
 w5f feeds import x.opml  add another reader's feeds (folders become shelves; in the reader: g → opml-import <file>)
 w5f feeds export [file]  your shelves as OPML (in the reader: g → opml-export [file], default ~/w5f-periodicals.opml)
+w5f w5f:usenet           Usenet, read only: your groups with new posts, threads, g → usenet <word> finds groups, news:alt.magick opens one
 w5f w5f:books            Library: continue reading, your books, catalogs
 w5f "gut lovecraft"      search Project Gutenberg (also: se <words> for Standard Ebooks)
 w5f "libgen dracula"     search Library Genesis (also: lg <words>)
@@ -137,6 +138,16 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v1 go build -trimpath -ldflags "-s
   | `q` | back to W5F |
 
   Progress is saved on every page turn, and to Suwayomi for its chapters. On the laptop: about 250 ms per page turn, 66 MB.
+
+## Usenet
+
+Read only, over NNTP (`w5f:usenet`, or `g → usenet`).
+
+- **Server.** `freenews.netfront.net`, which lets everyone read (Eternal September now wants an account even for reading). Change it in `usenet.toml` in the data folder.
+- **Groups.** Your groups show how many posts are new; a group read for the first time starts with its last 100 as new. `g → usenet <word>` finds groups on the server, with subscribe links; `news:alt.magick` opens a group.
+- **Threads.** A group page lists its threads (the last 300 posts, `]` for older), newest activity first. A thread page shows its posts in order, replies indented with `›`. Quotes and signatures fold away; poems, tables and ASCII art keep their lines; web addresses are links. What you open is marked read (kept per server and group, like a .newsrc).
+- **Kill file.** "hide this poster" and "hide this thread" add to `[kill]` in `usenet.toml`; posts whose subject or poster contains one of its words are not shown, and the group page says how many were hidden.
+- On the laptop: about 2–3 s per page (half a second of it is connecting to the server).
 
 ## Update, releases, doctor
 

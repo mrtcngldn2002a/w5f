@@ -41,6 +41,7 @@ import (
 	"w5f/internal/sitecat"
 	"w5f/internal/smallweb"
 	"w5f/internal/store"
+	"w5f/internal/usenet"
 )
 
 // Version is reported in the User-Agent.
@@ -116,6 +117,13 @@ func Load(ctx context.Context, target string, opts Options) (*doc.Document, erro
 			return nil, err
 		}
 		return feeds.Route(ctx, target, env)
+	}
+	if usenet.IsTarget(target) {
+		env, err := UsenetEnv()
+		if err != nil {
+			return nil, err
+		}
+		return usenet.Route(ctx, target, env)
 	}
 	if comics.IsTarget(target) {
 		env, err := ComicsEnv()
@@ -240,6 +248,12 @@ func Resolve(input string) string {
 		return "w5f:catalog/check?" + v.Encode()
 	case lower == "catalogs":
 		return "w5f:catalogs"
+	case lower == "usenet", lower == "news":
+		return "w5f:usenet"
+	case strings.HasPrefix(lower, "usenet ") && len(strings.Fields(s)) > 1:
+		return "w5f:usenet/find?" + url.Values{"q": {strings.TrimSpace(s[len("usenet "):])}}.Encode()
+	case strings.HasPrefix(lower, "news:") && usenet.ValidGroup(strings.TrimPrefix(lower, "news:")):
+		return "w5f:usenet/g/" + strings.TrimPrefix(lower, "news:")
 	case lower == "tarot":
 		return "w5f:discover/tarot"
 	case lower == "iching", lower == "i ching", lower == "i-ching":
@@ -385,6 +399,15 @@ func ComicsServer() suwayomi.Server {
 }
 
 // ComicsEnv is what the Comics pages need.
+// UsenetEnv assembles what the Usenet pages need.
+func UsenetEnv() (usenet.Env, error) {
+	db, err := store.Default()
+	if err != nil {
+		return usenet.Env{}, fmt.Errorf("opening the local database: %w", err)
+	}
+	return usenet.Env{DB: db, ConfigPath: filepath.Join(store.DataDir(), "usenet.toml")}, nil
+}
+
 func ComicsEnv() (comics.Env, error) {
 	db, err := store.Default()
 	if err != nil {
