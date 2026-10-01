@@ -126,3 +126,31 @@ func TestThemes(t *testing.T) {
 		t.Error("an unknown theme")
 	}
 }
+
+// The bottom bar shows the keys of the room the reader is in; on a narrow
+// window it drops room hints before help.
+func TestBottomBarFollowsTheRoom(t *testing.T) {
+	m := wide(New("", "test"))
+	bar := func(m Model) string { return ansi.Strip(m.bottomBar()) }
+	if b := bar(m); !strings.Contains(b, "1…0 rooms") || !strings.Contains(b, "? help") || ansi.StringWidth(b) != 160 {
+		t.Errorf("reading room: %q", b)
+	}
+	for target, want := range map[string]string{
+		"w5f:feeds":                "g → sync fetch new",
+		"w5f:solo":                 "g → roll 2d6+1",
+		"w5f:discover/tarot/ar16":  "T another card",
+		"w5f:serial/3/ch/2":        "F follow",
+		"https://example.org/page": "/ search",
+	} {
+		mm := m
+		mm.cur = newPage(target, textPage("x", "y"))
+		mm.relayout()
+		if b := bar(mm); !strings.Contains(b, want) {
+			t.Errorf("%s: %q lacks %q", target, b, want)
+		}
+	}
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 60, Height: 20})
+	if b := bar(next.(Model)); !strings.HasSuffix(strings.TrimSpace(b), "? help · q quit") || ansi.StringWidth(b) > 60 {
+		t.Errorf("narrow: %q", b)
+	}
+}

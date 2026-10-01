@@ -1396,7 +1396,7 @@ func (m Model) bottomBar() string {
 	case m.status != "":
 		text = " " + m.status
 	default:
-		text = " ↑↓ select · → open · ← back · / search · a queue · n note · y clip · g go · ? help · q quit"
+		return m.hintBar() // the keys of the room the reader is in
 	}
 	text = ansi.Truncate(text, m.width, "…")
 	if pad := m.width - ansi.StringWidth(text); pad > 0 {
