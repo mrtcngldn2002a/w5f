@@ -61,6 +61,19 @@ func TestSettingsPages(t *testing.T) {
 	if !strings.Contains(text(cf), "your choice") || !hasLink(cf, "w5f:comics/settings/set?g=cloudflare&n=flareSolverrEnabled&v=on") {
 		t.Errorf("cloudflare:\n%s", text(cf))
 	}
+	// The Extension tab shows the stores, as the launcher does (Suwayomi 2.4
+	// keeps them apart from its settings).
+	ext, err := Route(ctx, "w5f:comics/settings/extension", env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(text(ext), "https://example.org/repo/index.min.json") || !hasLink(ext, RepoPage()) ||
+		!hasLink(ext, "w5f:comics/repo/remove?back=settings&url=https%3A%2F%2Fexample.org%2Frepo%2Findex.min.json") {
+		t.Errorf("extension tab:\n%s", text(ext))
+	}
+	if !strings.Contains(text(home), "Given by W5F at start: ") || !strings.Contains(text(home), "rootDir = ") {
+		t.Errorf("home shows what W5F gives at start:\n%s", text(home))
+	}
 }
 
 func TestSettingForms(t *testing.T) {

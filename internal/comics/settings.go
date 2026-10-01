@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -144,7 +145,20 @@ func settingsHome(ctx context.Context, env Env, notice string) (*doc.Document, e
 		items = append(items, doc.Inline{p.a("w5f:comics/settings/"+g.ID, g.Title), dim(fmt.Sprintf("  %d", count[g.ID]))})
 	}
 	p.list(items)
-	p.para(doc.Inline{p.a("w5f:comics/extensions", "Extension repositories"), dim(" are on the Extensions page.")})
+	p.para(doc.Inline{p.a("w5f:comics/settings/extension", "Extension stores"), dim(" are on the Extension tab.")})
+	// What W5F gives at start and the server does not list among its
+	// settings (the launcher's Root directory, for one).
+	forced := env.Server.Forced()
+	var given []string
+	for k, v := range forced {
+		if _, listed := st.Get(k); !listed {
+			given = append(given, k+" = "+v)
+		}
+	}
+	if len(given) > 0 {
+		sort.Strings(given)
+		p.para(doc.Inline{{Text: "Given by W5F at start: ", Style: doc.Bold}, dim(strings.Join(given, " · "))})
+	}
 	p.para(doc.Inline{p.a("w5f:comics", "← Comics")})
 	return p.d, nil
 }
@@ -164,6 +178,26 @@ func settingsGroup(ctx context.Context, env Env, group, notice string) (*doc.Doc
 		user := suwayomi.FormatValue(suwayomi.Setting{}, st.Values["authUsername"])
 		p.para(doc.Inline{{Text: "Authentication: ", Style: doc.Bold}, {Text: firstOf(mode, "NONE")}, dim("  user: " + firstOf(user, "(none)") + " · password hidden")})
 		p.para(doc.Inline{p.a(AuthFormPrefix, "change Authentication"), dim("  (W5F keeps signing in with the new account)")})
+	}
+	if group == "extension" {
+		// Suwayomi 2.4 keeps the repositories apart from its settings (the
+		// launcher shows them on this tab as "Extension stores").
+		p.heading("Extension stores")
+		if _, stores, err := env.client().Extensions(ctx, false); err != nil {
+			p.note("warn", err.Error())
+		} else {
+			var repos []doc.Inline
+			for _, s := range stores {
+				repos = append(repos, doc.Inline{{Text: s.IndexURL}, dim("  "),
+					p.a("w5f:comics/repo/remove?"+url.Values{"url": {s.IndexURL}, "back": {"settings"}}.Encode(), "remove")})
+			}
+			if len(repos) == 0 {
+				p.para(doc.Inline{dim("None yet. W5F comes with no repositories; the ones you add are your choice.")})
+			}
+			p.list(repos)
+		}
+		p.para(doc.Inline{p.a(RepoPage(), "+ add a repository"), dim("   "), p.a("w5f:comics/extensions", "the extensions they offer")})
+		p.heading("Settings")
 	}
 	if group == "cloudflare" {
 		p.note("warn", "FlareSolverr is a separate service that answers bot checks for Suwayomi's sources. W5F itself never bypasses such checks; using it here is your choice.")

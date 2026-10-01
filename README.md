@@ -126,6 +126,7 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v1 go build -trimpath -ldflags "-s
   - CLI: `w5f comics list|update|server start|stop|restart|status|update`, `w5f comics settings [group]`, `w5f comics set <setting> <value>`, `w5f comics login`.
 - **Server settings** (`Comics → Server settings`): Suwayomi's own settings, grouped as its launcher's tabs (SOCKS proxy, Downloader, Conversions, Library updates, Authentication, Backup, Cloudflare, OPDS, KOReader, Sync, Database, Misc, …).
   - Read from the running server's schema, so a newer Suwayomi's settings show too; each with the default, range and meaning Suwayomi writes in its server.conf.
+  - The Extension tab lists the extension stores (Suwayomi 2.4 keeps them apart from its settings), with remove and add; what W5F gives the server at start (its root directory, the WebUI off) is listed on the settings page.
   - on/off and choices are links; anything else opens a form (secrets hidden, lists as `a, b`, conversions as JSON). A change goes to the server at once (`setSettings`), is checked by the server and stays in its server.conf.
   - What W5F gives on the java command line (address, port, folders, CBZ, WebUI off, …) wins over server.conf; those are shown as W5F's and are not changed here.
   - Authentication (Basic, simple login, UI login with tokens): the form changes the server and the account W5F signs in with together, so W5F never locks itself out; when it was changed elsewhere, W5F asks for the account (`w5f:comics/login`, kept in the suwayomi folder, mode 0600).

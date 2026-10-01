@@ -248,6 +248,9 @@ func route(ctx context.Context, target string, env Env) (*doc.Document, error) {
 		if err != nil {
 			msg = err.Error()
 		}
+		if query.Get("back") == "settings" {
+			return settingsGroup(ctx, env, "extension", msg)
+		}
 		return extensionsDoc(ctx, env, c, err == nil, msg, "")
 	}
 	return nil, errors.New("unknown comics address: " + target)

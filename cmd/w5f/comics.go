@@ -203,6 +203,16 @@ func runComics(args []string) int {
 				}
 				fmt.Printf("  %-36s %s%s\n", s.Name, v, note)
 			}
+			if g.ID == "extension" {
+				// Suwayomi 2.4 keeps the repositories apart from its settings.
+				if _, stores, err := c.Extensions(ctx, false); err == nil {
+					names := []string{}
+					for _, s := range stores {
+						names = append(names, s.IndexURL)
+					}
+					fmt.Printf("  %-36s %s\n", "extension stores", firstNonEmpty(strings.Join(names, ", "), "(none)"))
+				}
+			}
 		}
 		return 0
 	case "login":

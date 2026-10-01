@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -155,7 +156,8 @@ func TestAuthIsKeptPrivately(t *testing.T) {
 	if err := s.SaveAuth(Auth{Mode: "BASIC_AUTH", Username: "u", Password: "p"}); err != nil {
 		t.Fatal(err)
 	}
-	if st, _ := os.Stat(s.authFile()); st.Mode().Perm() != 0o600 {
+	// Windows has no Unix modes (the file sits in the user's own profile).
+	if st, _ := os.Stat(s.authFile()); runtime.GOOS != "windows" && st.Mode().Perm() != 0o600 {
 		t.Errorf("mode %v", st.Mode())
 	}
 	if c := s.Client(); c.Auth.Password != "p" {

@@ -164,6 +164,9 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{"data": map[string]any{"__type": typeOf(fmt.Sprint(req.Variables["n"]))}})
 	case strings.Contains(q, "aboutServer"):
 		writeJSON(w, map[string]any{"data": map[string]any{"aboutServer": map[string]any{"version": "v2.4.2366"}}})
+	case strings.Contains(q, "extensionStores"):
+		writeJSON(w, map[string]any{"data": map[string]any{"extensions": map[string]any{"nodes": []any{}},
+			"extensionStores": map[string]any{"nodes": []any{map[string]any{"name": "Example", "indexUrl": "https://example.org/repo/index.min.json"}}}}})
 	case strings.Contains(q, "setSettings"):
 		in, _ := req.Variables["input"].(map[string]any)
 		set, _ := in["settings"].(map[string]any)
