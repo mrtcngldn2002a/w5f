@@ -91,7 +91,7 @@ func (e Env) Draw(ctx context.Context, kind string) (Spark, error) {
 		}
 		return Spark{Kind: kind, Text: strings.Join(ws, " · "), Source: "the English–Turkish dictionary's English headwords"}, nil
 	case "tarot", "iching":
-		o, err := discover.DrawOracle(ctx, e.Fetcher, kind)
+		o, err := discover.DrawOracle(ctx, e.Fetcher, e.DB, kind)
 		if err != nil {
 			return Spark{}, err
 		}

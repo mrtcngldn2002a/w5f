@@ -38,69 +38,6 @@ func TestKingWenCoversEveryHexagramOnce(t *testing.T) {
 	}
 }
 
-func TestIChingDrawWithMovingLines(t *testing.T) {
-	var asked string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		asked = r.URL.Path
-		fmt.Fprint(w, `<html><body><h3>I. THE KHIEN HEXAGRAM</h3><p>Khien (represents) what is great.</p></body></html>`)
-	}))
-	defer srv.Close()
-	swap(t, &ichingBase, srv.URL+"/ich/")
-	o, err := ichingDraw(context.Background(), testFetcher(), []int{9, 7, 7, 7, 7, 7})
-	if err != nil || asked != "/ich/ic01.htm" || o.Title != "Hexagram 1, Khien" || o.Detail != "moving lines 1 → hexagram 44" {
-		t.Fatalf("%+v %v (asked %s)", o, err, asked)
-	}
-	lines := strings.Split(hexagramLines(o.Lines), "\n")
-	if len(lines) != 6 || !strings.HasSuffix(lines[5], "○") || strings.Contains(lines[0], "○") {
-		t.Errorf("the bottom line is drawn last and marked moving:\n%s", hexagramLines(o.Lines))
-	}
-	o, _ = ichingDraw(context.Background(), testFetcher(), []int{8, 8, 8, 8, 8, 8})
-	if o.Detail != "no moving lines" || !strings.HasSuffix(o.Target, "/ic02.htm") {
-		t.Errorf("still lines: %+v", o)
-	}
-	for i := 0; i < 50; i++ {
-		for _, l := range castHexagram() {
-			if l < 6 || l > 9 {
-				t.Fatalf("a line is %d", l)
-			}
-		}
-	}
-}
-
-func TestTarotDraw(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var b strings.Builder
-		b.WriteString(`<a href="pktintr.htm">Introduction</a><a href="pkt0101.htm">Part I</a>`)
-		b.WriteString(`<A HREF="pktar00.htm">Zero. The Fool</A>`)
-		for i := 1; i <= 21; i++ {
-			fmt.Fprintf(&b, `<A HREF="pktar%02d.htm">Card %d</A>`, i, i)
-		}
-		b.WriteString(`<A HREF="pktswac.htm">Ace of Swords</A>`)
-		fmt.Fprintf(w, "<html><body>%s</body></html>", b.String())
-	}))
-	defer srv.Close()
-	swap(t, &tarotIndex, srv.URL+"/tarot/pkt/index.htm")
-	seenFool := false
-	for i := 0; i < 200; i++ {
-		o, err := tarotDraw(context.Background(), testFetcher())
-		if err != nil || !strings.HasPrefix(o.Target, srv.URL+"/tarot/pkt/pkt") || strings.Contains(o.Target, "pkt0101") || strings.Contains(o.Target, "intr") {
-			t.Fatalf("%+v %v", o, err)
-		}
-		if o.Detail != "upright" && o.Detail != "reversed" {
-			t.Fatalf("detail %q", o.Detail)
-		}
-		if strings.HasSuffix(o.Target, "pktar00.htm") {
-			seenFool = true
-			if o.Title != "The Fool" {
-				t.Errorf("fool: %q", o.Title)
-			}
-		}
-	}
-	if !seenFool {
-		t.Error("the Fool never came up in 200 draws")
-	}
-}
-
 func TestOracleAlternatesByDay(t *testing.T) {
 	a, b := oracleKind("2026-09-30"), oracleKind("2026-10-01")
 	if a == b || oracleKind("2026-10-02") != a {

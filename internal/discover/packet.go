@@ -142,7 +142,7 @@ func addColumns(ctx context.Context, env Env, p *Packet) {
 	}
 	oracle := make(chan *Oracle, 1)
 	go func() {
-		o, _ := drawOracle(ctx, env.Fetcher, oracleKind(p.Date))
+		o, _ := drawOracle(ctx, env.Fetcher, env.DB, oracleKind(p.Date))
 		oracle <- o
 	}()
 	if t, err := time.Parse("2006-01-02", p.Date); err == nil {

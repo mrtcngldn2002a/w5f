@@ -4,20 +4,22 @@ import (
 	"context"
 	"fmt"
 	"math/rand/v2"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
 
-	"github.com/PuerkitoBio/goquery"
-
 	"w5f/internal/doc"
 	"w5f/internal/fetch"
+	"w5f/internal/store"
 )
 
-// The daily oracle (chosen with the owner, 2026-09-30): on alternate days a
-// tarot card with A. E. Waite's The Pictorial Key to the Tarot (1910), or an
-// I Ching hexagram cast with three coins, with James Legge's translation
-// (1882) — both at the Internet Sacred Text Archive.
+// The oracle (chosen with the owner, 2026-09-30, made its own pages on
+// 2026-10-01): a tarot card with A. E. Waite's The Pictorial Key to the
+// Tarot (1910), or an I Ching hexagram cast with three coins, with James
+// Legge's translation (1882) — both read from the Internet Sacred Text
+// Archive, cleaned and kept. The Daily Packet alternates them; T and I
+// draw one any time.
 
 // Oracle is one draw.
 type Oracle struct {
@@ -31,7 +33,6 @@ type Oracle struct {
 var (
 	tarotIndex = "https://archive.sacred-texts.com/tarot/pkt/index.htm"
 	ichingBase = "https://archive.sacred-texts.com/ich/"
-	reCardPage = regexp.MustCompile(`(?i)^pkt(ar\d\d|(wa|cu|sw|pe)\w\w)\.htm$`)
 	reHexTitle = regexp.MustCompile(`(?i)\b[IVXLC]+\.\s+THE\s+(.+?)\s+HEXAGRAM`)
 )
 
@@ -47,38 +48,13 @@ func oracleKind(date string) string {
 	return "iching"
 }
 
-func drawOracle(ctx context.Context, f *fetch.Fetcher, kind string) (*Oracle, error) {
+func drawOracle(ctx context.Context, f *fetch.Fetcher, db *store.DB, kind string) (*Oracle, error) {
 	if kind == "iching" {
-		return ichingDraw(ctx, f, castHexagram())
+		return ichingDraw(ctx, f, db, castHexagram())
 	}
-	return tarotDraw(ctx, f)
-}
-
-// tarotDraw picks one of the 78 cards of Waite's book, upright or reversed.
-func tarotDraw(ctx context.Context, f *fetch.Fetcher) (*Oracle, error) {
-	gq, base, err := get(ctx, f, tarotIndex)
-	if err != nil {
-		return nil, err
-	}
-	type card struct{ href, name string }
-	var cards []card
-	gq.Find("a[href]").Each(func(_ int, a *goquery.Selection) {
-		href, _ := a.Attr("href")
-		if !reCardPage.MatchString(strings.TrimSpace(href)) {
-			return
-		}
-		u, err := base.Parse(strings.TrimSpace(href))
-		if err != nil {
-			return
-		}
-		cards = append(cards, card{u.String(), strings.Join(strings.Fields(a.Text()), " ")})
-	})
-	if len(cards) < 22 {
-		return nil, fmt.Errorf("tarot: only %d cards on Waite's contents page", len(cards))
-	}
-	c := pick(cards)
-	o := &Oracle{Kind: "tarot", Title: strings.TrimPrefix(c.name, "Zero. "), Target: c.href, Detail: "upright"}
-	if rand.IntN(2) == 0 {
+	c, rev := DrawCard()
+	o := &Oracle{Kind: "tarot", Title: c.Name, Target: TarotHref(c.Key, rev), Detail: "upright"}
+	if rev {
 		o.Detail = "reversed"
 	}
 	return o, nil
@@ -110,6 +86,9 @@ var kingWenTable = [8][8]int{
 	{43, 17, 47, 31, 45, 28, 49, 58},
 }
 
+// trigramNames are the trigrams' images, in the table's order.
+var trigramNames = []string{"heaven", "thunder", "water", "mountain", "earth", "wind", "fire", "lake"}
+
 // trigramIndex: bottom, middle, top line (yang = true) → position in the
 // table's order.
 func trigramIndex(b, m, t bool) int {
@@ -135,38 +114,31 @@ func kingWen(yang [6]bool) int {
 	return kingWenTable[trigramIndex(yang[3], yang[4], yang[5])][trigramIndex(yang[0], yang[1], yang[2])]
 }
 
-// ichingDraw names the cast hexagram (from Legge's page) and the one its
-// moving lines turn it into.
-func ichingDraw(ctx context.Context, f *fetch.Fetcher, lines []int) (*Oracle, error) {
-	var now, then [6]bool
-	var moving []string
-	for i, l := range lines {
-		now[i] = l == 7 || l == 9
-		then[i] = now[i]
-		if l == 6 || l == 9 {
-			then[i] = !now[i]
-			moving = append(moving, fmt.Sprint(i+1))
-		}
-	}
-	n := kingWen(now)
-	o := &Oracle{Kind: "iching", Target: fmt.Sprintf("%sic%02d.htm", ichingBase, n), Lines: lines}
-	o.Title = fmt.Sprintf("Hexagram %d", n)
-	if gq, _, err := get(ctx, f, o.Target); err == nil {
-		if m := reHexTitle.FindStringSubmatch(gq.Text()); m != nil {
-			o.Title = fmt.Sprintf("Hexagram %d, %s", n, titleCase(m[1]))
-		}
-	} else {
+// ichingDraw names the cast hexagram (Legge's name, read and kept) and the
+// one its moving lines turn it into.
+func ichingDraw(ctx context.Context, f *fetch.Fetcher, db *store.DB, lines []int) (*Oracle, error) {
+	n, then, moving := castNumbers(lines)
+	o := &Oracle{Kind: "iching", Target: IChingHref(lines), Lines: lines, Title: fmt.Sprintf("Hexagram %d", n)}
+	h, err := HexagramOf(ctx, f, db, n)
+	if err != nil {
 		return nil, err
+	}
+	if h.Name != "" {
+		o.Title = fmt.Sprintf("Hexagram %d, %s", n, h.Name)
 	}
 	if len(moving) == 0 {
 		o.Detail = "no moving lines"
 	} else {
-		o.Detail = fmt.Sprintf("moving lines %s → hexagram %d", strings.Join(moving, ", "), kingWen(then))
+		var ms []string
+		for _, m := range moving {
+			ms = append(ms, fmt.Sprint(m))
+		}
+		o.Detail = fmt.Sprintf("moving lines %s → hexagram %d", strings.Join(ms, ", "), then)
 	}
 	return o, nil
 }
 
-// hexagramLines draws the hexagram, top line first; moving lines are
+// hexagramLines draws the hexagram small, top line first; moving lines are
 // marked (○ old yang, × old yin).
 func hexagramLines(lines []int) string {
 	var b strings.Builder
@@ -185,7 +157,58 @@ func hexagramLines(lines []int) string {
 	return strings.TrimSuffix(b.String(), "\n")
 }
 
-// oracleBlocks is the oracle as it is shown on a page.
+// bigLine is one line of the large figure.
+func bigLine(yang bool) string {
+	if yang {
+		return "━━━━━━━━━━━━━━━"
+	}
+	return "━━━━━━   ━━━━━━"
+}
+
+// hexagramFigure draws the cast hexagram large with its line numbers, its
+// trigrams and, beside it, the hexagram its moving lines turn it into.
+func hexagramFigure(lines []int) string {
+	var now, then [6]bool
+	moves := false
+	for i, l := range lines {
+		now[i] = l == 7 || l == 9
+		then[i] = now[i]
+		if l == 6 || l == 9 {
+			then[i] = !now[i]
+			moves = true
+		}
+	}
+	upper := trigramNames[trigramIndex(now[3], now[4], now[5])]
+	lower := trigramNames[trigramIndex(now[0], now[1], now[2])]
+	var b strings.Builder
+	for i := 5; i >= 0; i-- {
+		mark := "   "
+		switch lines[i] {
+		case 9:
+			mark = " ○ "
+		case 6:
+			mark = " × "
+		}
+		side := ""
+		switch i {
+		case 4:
+			side = upper
+		case 1:
+			side = lower
+		}
+		fmt.Fprintf(&b, "%d  %s%s %-9s", i+1, bigLine(now[i]), mark, side)
+		if moves {
+			b.WriteString(" " + bigLine(then[i]))
+		}
+		b.WriteString("\n")
+		if i == 3 {
+			b.WriteString("\n") // the two trigrams apart
+		}
+	}
+	return strings.TrimRight(b.String(), "\n ")
+}
+
+// oracleBlocks is the oracle as the Daily Packet's cover shows it.
 func oracleBlocks(o *Oracle, link func(href, text string) int) []doc.Block {
 	src := "Tarot · A. E. Waite, The Pictorial Key to the Tarot (1910)"
 	if o.Kind == "iching" {
@@ -195,32 +218,32 @@ func oracleBlocks(o *Oracle, link func(href, text string) int) []doc.Block {
 	if len(o.Lines) == 6 {
 		bs = append(bs, doc.Pre{Text: hexagramLines(o.Lines)})
 	}
-	return append(bs, doc.Paragraph{Text: doc.Inline{{Text: o.Title, Style: doc.Bold, Link: link(o.Target, o.Title)}, {Text: " — " + o.Detail}}})
+	target := o.Target
+	if strings.HasPrefix(target, "http") { // drawn before 0.9.8: its card page now
+		target = localOracleHref(o)
+	}
+	return append(bs, doc.Paragraph{Text: doc.Inline{{Text: o.Title, Style: doc.Bold, Link: link(target, o.Title)}, {Text: " — " + o.Detail}}})
 }
 
-// oracleRoute draws now (g → tarot, g → iching) and opens the text.
-func oracleRoute(ctx context.Context, env Env, kind string) (*doc.Document, error) {
-	o, err := drawOracle(ctx, env.Fetcher, kind)
-	if err != nil {
-		return nil, err
+// localOracleHref is the W5F page of a draw kept from before (its Target
+// was Waite's or Legge's page).
+func localOracleHref(o *Oracle) string {
+	if o.Kind == "iching" && len(o.Lines) == 6 {
+		return IChingHref(o.Lines)
 	}
-	page, err := env.Load(ctx, o.Target)
-	if err != nil {
-		return nil, err
+	if u, err := url.Parse(o.Target); err == nil {
+		key := strings.TrimSuffix(strings.TrimPrefix(u.Path[strings.LastIndex(u.Path, "/")+1:], "pkt"), ".htm")
+		if _, ok := CardByKey(key); ok {
+			return TarotHref(key, o.Detail == "reversed")
+		}
 	}
-	head := oracleBlocks(o, func(href, text string) int {
-		page.Links = append(page.Links, doc.Link{Href: href, Text: text})
-		return len(page.Links)
-	})
-	head = append(head, doc.Paragraph{Text: doc.Inline{{Text: "Open it again for another draw.", Style: doc.Italic}}}, doc.Rule{})
-	page.Blocks = append(head, page.Blocks...)
-	return page, nil
+	return o.Target
 }
 
 // DrawOracle draws now: a tarot card ("tarot") or an I Ching hexagram
 // ("iching"), for the solo RPG table among others.
-func DrawOracle(ctx context.Context, f *fetch.Fetcher, kind string) (*Oracle, error) {
-	return drawOracle(ctx, f, kind)
+func DrawOracle(ctx context.Context, f *fetch.Fetcher, db *store.DB, kind string) (*Oracle, error) {
+	return drawOracle(ctx, f, db, kind)
 }
 
 // HexagramText draws a cast hexagram, top line first.

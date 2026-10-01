@@ -456,6 +456,14 @@ func (m Model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		m.loading = p.target
 		return m, load(p.target, true)
+	case "T", "I":
+		// A tarot card, or an I Ching hexagram, drawn now.
+		target := "w5f:discover/tarot"
+		if s == "I" {
+			target = "w5f:discover/iching"
+		}
+		m.loading = target
+		return m, load(target, false)
 	case "B":
 		// This page (or the selected link) in Chromium.
 		target := p.target
@@ -1250,6 +1258,7 @@ func (m Model) helpLines() []string {
 		{"enter / g → ? text", "answer a page that asks for input (g → smallweb, g → worlds)"},
 		{"+ / -", "expand / fold all sections"}, {"o", "show link address"}, {"ctrl+r", "reload"},
 		{"B", "open this page (or the selected link) in Chromium · g → chromium <address>"},
+		{"T · I", "draw a tarot card · cast an I Ching hexagram (kept: the texts come once from sacred-texts)"},
 		{"g → reddit-login chromium", "take your Reddit (or ao3-login chromium: AO3) session from Chromium, where you signed in"},
 		{"/", "search everything you have read (feeds, wikis, web pages, books, notes)"},
 		{"a / A", "add this page / the selected link to the reading queue (g → queue)"},

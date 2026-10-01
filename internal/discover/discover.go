@@ -116,8 +116,10 @@ func IsTarget(t string) bool {
 // Route builds the page of a discovery address.
 func Route(ctx context.Context, target string, env Env) (*doc.Document, error) {
 	switch {
-	case target == "w5f:discover/tarot", target == "w5f:discover/iching":
-		return oracleRoute(ctx, env, strings.TrimPrefix(target, "w5f:discover/"))
+	case target == "w5f:discover/tarot", strings.HasPrefix(target, "w5f:discover/tarot/"):
+		return tarotRoute(ctx, env, target)
+	case target == "w5f:discover/iching", strings.HasPrefix(target, "w5f:discover/iching/"):
+		return ichingRoute(ctx, env, target)
 	case target == "w5f:almanac":
 		return almanacDoc(ctx, env, time.Now().Format("01-02"))
 	case strings.HasPrefix(target, "w5f:almanac/"):
