@@ -34,7 +34,7 @@ type ViewRequest struct {
 	Title     string // for messages
 }
 
-func (e Env) client() *suwayomi.Client { return suwayomi.New(e.Server.Addr()) }
+func (e Env) client() *suwayomi.Client { return e.Server.Client() }
 
 // AutoStart starts Suwayomi in the background when the Comics page opens;
 // the interactive reader turns it on (one-shot commands would exit and leave
@@ -133,7 +133,16 @@ func (p *page) a(href, text string) doc.Span { return doc.Span{Text: text, Link:
 func dim(t string) doc.Span { return doc.Span{Text: t, Style: doc.Italic} }
 
 // Route builds a Comics page (and performs its action, for action links).
+// A server that asks W5F to sign in gets a page that asks for the account.
 func Route(ctx context.Context, target string, env Env) (*doc.Document, error) {
+	d, err := route(ctx, target, env)
+	if errors.Is(err, suwayomi.ErrUnauthorized) {
+		return unauthorizedDoc(), nil
+	}
+	return d, err
+}
+
+func route(ctx context.Context, target string, env Env) (*doc.Document, error) {
 	path, query := target, url.Values{}
 	if i := strings.Index(target, "?"); i >= 0 {
 		path, query = target[:i], parseQuery(target[i+1:])
@@ -169,6 +178,21 @@ func Route(ctx context.Context, target string, env Env) (*doc.Document, error) {
 	}
 	c := env.client()
 	switch parts[0] {
+	case "settings":
+		notice := ""
+		if ch := query.Get("changed"); ch == "auth" {
+			notice = "Authentication changed; W5F signs in with the new account."
+		} else if ch != "" {
+			notice = label(ch) + " saved."
+		}
+		switch g := at(parts, 1); g {
+		case "":
+			return settingsHome(ctx, env, notice)
+		case "set":
+			return setSetting(ctx, env, query.Get("n"), query.Get("v"), query.Get("g"))
+		default:
+			return settingsGroup(ctx, env, g, notice)
+		}
 	case "following":
 		return followingDoc(ctx, c)
 	case "update":
@@ -280,12 +304,14 @@ func home(ctx context.Context, env Env) (*doc.Document, error) {
 			{p.a("w5f:comics/sources", "Sources"), dim("  — browse and search what your extensions offer")},
 			{p.a("w5f:comics/downloads", "Downloads")},
 			{p.a("w5f:comics/extensions", "Extensions and repositories")},
+			{p.a("w5f:comics/settings", "Server settings"), dim("  — Suwayomi " + firstOf(env.Server.Version(), "") + " · "), p.a("w5f:comics/server/check", "check for an update")},
 			{p.a("w5f:comics/server/stop", "Stop Suwayomi"), dim("  (it stops by itself when W5F closes)")},
 		})
 	case env.Server.Jar() == "":
 		p.para(doc.Inline{dim("Suwayomi is not installed. Install it with "), {Text: "w5f comics server install", Style: doc.Code}, dim(" (Java 21 needed).")})
 	case !AutoStart:
-		p.para(doc.Inline{dim("Suwayomi is not running. "), p.a("w5f:comics/server/start", "▶ start it"), dim(" (about 15 seconds)")})
+		p.para(doc.Inline{dim("Suwayomi is not running. "), p.a("w5f:comics/server/start", "▶ start it"), dim(" (about 15 seconds) · "),
+			p.a("w5f:comics/server/check", "check for an update")})
 	default:
 		env.startInBackground()
 		serverMu.Lock()
@@ -380,6 +406,18 @@ func seriesDoc(env Env, name string) (*doc.Document, error) {
 
 func serverDoc(ctx context.Context, env Env, action string) (*doc.Document, error) {
 	switch action {
+	case "check":
+		return updateCheck(ctx, env)
+	case "update":
+		return updateServer(ctx, env)
+	case "restart":
+		if err := env.Server.Restart(ctx); err != nil {
+			return nil, err
+		}
+		serverMu.Lock()
+		serverStarted = true
+		serverMu.Unlock()
+		return settingsHome(ctx, env, "Suwayomi restarted.")
 	case "start":
 		if err := env.ensureServer(ctx); err != nil {
 			return nil, err

@@ -62,7 +62,7 @@ func (p *HTTPPages) Open(i int) (io.ReadCloser, error) {
 	if len(u) > 0 && u[0] == '/' {
 		u = p.c.Base + u
 	}
-	resp, err := p.c.HTTP.Get(u)
+	resp, err := p.c.get(context.Background(), u)
 	if err != nil {
 		return nil, err
 	}

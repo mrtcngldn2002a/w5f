@@ -123,7 +123,13 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v1 go build -trimpath -ldflags "-s
   - W5F starts it when Comics opens and stops it when W5F closes. On the W5F laptop: about 13 s to start, 352 MB while idle.
   - Settings: headless, local only (`127.0.0.1:4567`); downloads are CBZ into `Comics/Suwayomi`; its Local source is `Comics/Local`.
   - Pages: followed series, series pages (follow, refresh, download), sources and search, downloads, extensions.
-  - CLI: `w5f comics list|update|server start|stop|status`.
+  - CLI: `w5f comics list|update|server start|stop|restart|status|update`, `w5f comics settings [group]`, `w5f comics set <setting> <value>`, `w5f comics login`.
+- **Server settings** (`Comics → Server settings`): Suwayomi's own settings, grouped as its launcher's tabs (SOCKS proxy, Downloader, Conversions, Library updates, Authentication, Backup, Cloudflare, OPDS, KOReader, Sync, Database, Misc, …).
+  - Read from the running server's schema, so a newer Suwayomi's settings show too; each with the default, range and meaning Suwayomi writes in its server.conf.
+  - on/off and choices are links; anything else opens a form (secrets hidden, lists as `a, b`, conversions as JSON). A change goes to the server at once (`setSettings`), is checked by the server and stays in its server.conf.
+  - What W5F gives on the java command line (address, port, folders, CBZ, WebUI off, …) wins over server.conf; those are shown as W5F's and are not changed here.
+  - Authentication (Basic, simple login, UI login with tokens): the form changes the server and the account W5F signs in with together, so W5F never locks itself out; when it was changed elsewhere, W5F asks for the account (`w5f:comics/login`, kept in the suwayomi folder, mode 0600).
+- **Update**: `check for an update` compares the installed jar with the newest release; updating downloads it, checks it against the release's checksums, stops a server W5F started and starts it again. A server W5F did not start (the launcher) is left alone.
 - **Extensions.** W5F ships and pre-configures no extension repositories. You add a repository by its address and choose what to install; the rights of what a source offers are yours to mind.
 - **Viewer.** `w5f view` is a full-screen X11 window, pure Go with no OpenGL.
 

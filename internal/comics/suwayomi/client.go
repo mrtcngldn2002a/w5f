@@ -20,6 +20,11 @@ import (
 type Client struct {
 	Base string // e.g. http://127.0.0.1:4567
 	HTTP *http.Client
+	// Auth signs in when the server's Authentication is on (Server.Client
+	// fills it in from what W5F saved).
+	Auth Auth
+
+	sess session
 }
 
 // New returns a client for a server address.
@@ -31,13 +36,25 @@ func New(base string) *Client {
 var ErrNotRunning = errors.New("the Suwayomi server is not running")
 
 func (c *Client) do(ctx context.Context, query string, vars map[string]any, out any) error {
+	err := c.doOnce(ctx, query, vars, out)
+	if errors.Is(err, ErrUnauthorized) && (c.Auth.Mode == "SIMPLE_LOGIN" || c.Auth.Mode == "UI_LOGIN") {
+		c.signOut() // the session expired: sign in again, once
+		err = c.doOnce(ctx, query, vars, out)
+	}
+	return err
+}
+
+func (c *Client) doOnce(ctx context.Context, query string, vars map[string]any, out any) error {
 	body, _ := json.Marshal(map[string]any{"query": query, "variables": vars})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.Base+"/api/graphql", bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := c.HTTP.Do(req)
+	if err := c.authorize(ctx, req); err != nil {
+		return err
+	}
+	resp, err := c.httpClient().Do(req)
 	if err != nil {
 		if ctx.Err() == nil {
 			return fmt.Errorf("%w (%v)", ErrNotRunning, err)
@@ -55,20 +72,48 @@ func (c *Client) do(ctx context.Context, query string, vars map[string]any, out 
 			Message string `json:"message"`
 		} `json:"errors"`
 	}
-	if err := json.Unmarshal(b, &r); err != nil {
+	jerr := json.Unmarshal(b, &r)
+	var msgs []string
+	for _, e := range r.Errors {
+		msgs = append(msgs, cleanMessage(e.Message))
+	}
+	if unauthorized(resp.StatusCode, msgs) {
+		return ErrUnauthorized
+	}
+	if jerr != nil {
 		return fmt.Errorf("Suwayomi: HTTP %d, unreadable answer", resp.StatusCode)
 	}
-	if len(r.Errors) > 0 {
-		var msgs []string
-		for _, e := range r.Errors {
-			msgs = append(msgs, e.Message)
-		}
+	if len(msgs) > 0 {
 		return errors.New("Suwayomi: " + strings.Join(msgs, "; "))
 	}
 	if out == nil {
 		return nil
 	}
 	return json.Unmarshal(r.Data, out)
+}
+
+// cleanMessage keeps what a server error says, without the Java stack
+// trace and the wrapping it comes in.
+func cleanMessage(m string) string {
+	if i := strings.Index(m, "\n"); i >= 0 {
+		m = m[:i]
+	}
+	if _, rest, ok := strings.Cut(m, ") : "); ok && strings.HasPrefix(m, "Exception while fetching data") {
+		m = rest
+	}
+	return strings.TrimSpace(strings.TrimPrefix(m, "java.lang.Exception: "))
+}
+
+// get fetches a server address (a page picture) signed in as the API is.
+func (c *Client) get(ctx context.Context, u string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	if err := c.authorize(ctx, req); err != nil {
+		return nil, err
+	}
+	return c.httpClient().Do(req)
 }
 
 // Source is a manga source (from an extension, or the built-in Local source).
