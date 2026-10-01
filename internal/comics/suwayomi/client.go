@@ -124,6 +124,7 @@ type Source struct {
 	Lang           string `json:"lang"`
 	ContentWarning string `json:"contentWarning"`
 	SupportsLatest bool   `json:"supportsLatest"`
+	HomeURL        string `json:"homeUrl"`
 }
 
 // LocalSource is the id of Suwayomi's built-in source for the user's own files.
@@ -167,6 +168,7 @@ type Chapter struct {
 	LastPageRead  int     `json:"lastPageRead"`
 	PageCount     int     `json:"pageCount"`
 	SourceOrder   int     `json:"sourceOrder"`
+	RealURL       string  `json:"realUrl"`
 }
 
 // Uploaded is the chapter's upload time (zero when unknown).
@@ -210,7 +212,7 @@ type Download struct {
 }
 
 const mangaFields = `id title author artist description status inLibrary unreadCount downloadCount realUrl source { displayName }`
-const chapterFields = `id mangaId name chapterNumber scanlator uploadDate isRead isDownloaded lastPageRead pageCount sourceOrder`
+const chapterFields = `id mangaId name chapterNumber scanlator uploadDate isRead isDownloaded lastPageRead pageCount sourceOrder realUrl`
 
 // Version asks the server who it is; it doubles as a ping.
 func (c *Client) Version(ctx context.Context) (string, error) {
@@ -241,7 +243,7 @@ func (c *Client) Sources(ctx context.Context) ([]Source, error) {
 			Nodes []Source `json:"nodes"`
 		} `json:"sources"`
 	}
-	err := c.do(ctx, `{ sources { nodes { id name displayName lang contentWarning supportsLatest } } }`, nil, &r)
+	err := c.do(ctx, `{ sources { nodes { id name displayName lang contentWarning supportsLatest homeUrl } } }`, nil, &r)
 	sort.Slice(r.Sources.Nodes, func(i, j int) bool { return r.Sources.Nodes[i].DisplayName < r.Sources.Nodes[j].DisplayName })
 	return r.Sources.Nodes, err
 }

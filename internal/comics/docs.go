@@ -209,7 +209,13 @@ func route(ctx context.Context, target string, env Env) (*doc.Document, error) {
 		if err != nil {
 			return nil, errors.New("bad series address")
 		}
-		return mangaRoute(ctx, c, id, at(parts, 2))
+		d, err := mangaRoute(ctx, c, id, at(parts, 2))
+		if err != nil {
+			// What the source said, and the series' own page to look at.
+			m, _, _ := c.Manga(ctx, id, false)
+			return failedDoc(target, firstOf(m.Title, "Series"), err, m.RealURL, "w5f:comics/following"), nil
+		}
+		return d, nil
 	case "chapter":
 		id, err := strconv.Atoi(at(parts, 1))
 		if err != nil {
@@ -226,10 +232,12 @@ func route(ctx context.Context, target string, env Env) (*doc.Document, error) {
 			return setSourcePref(ctx, c, at(parts, 1), query)
 		}
 		pg, _ := strconv.Atoi(query.Get("page"))
-		return browseDoc(ctx, c, at(parts, 1), strings.ToUpper(query.Get("type")), "", max(pg, 1))
+		return browseOrFail(ctx, c, target, at(parts, 1), strings.ToUpper(query.Get("type")), "", max(pg, 1))
 	case "search":
 		pg, _ := strconv.Atoi(query.Get("page"))
-		return browseDoc(ctx, c, at(parts, 1), "SEARCH", query.Get("q"), max(pg, 1))
+		return browseOrFail(ctx, c, target, at(parts, 1), "SEARCH", query.Get("q"), max(pg, 1))
+	case "webview":
+		return webviewDoc(ctx, env, query.Get("u"), query.Get("back"))
 	case "downloads":
 		return downloadsDoc(ctx, c)
 	case "extensions":
@@ -518,6 +526,7 @@ func mangaRoute(ctx context.Context, c *suwayomi.Client, id int, action string) 
 		follow = p.a(fmt.Sprintf("w5f:comics/manga/%d/follow", id), "★ follow")
 	}
 	actions := doc.Inline{follow, dim("   "), p.a(fmt.Sprintf("w5f:comics/manga/%d/refresh", id), "↻ refresh")}
+	actions = append(actions, webviewLink(p, m.RealURL, fmt.Sprintf("w5f:comics/manga/%d", id))...)
 	if m.SourceName() != "Local source" { // its chapters are files already
 		actions = append(actions, dim("   "), p.a(fmt.Sprintf("w5f:comics/manga/%d/download-unread", id), "download unread"))
 	}
@@ -547,6 +556,9 @@ func mangaRoute(ctx context.Context, c *suwayomi.Client, id int, action string) 
 		}
 		if !ch.IsDownloaded && m.SourceName() != "Local source" {
 			in = append(in, dim("  "), p.a(fmt.Sprintf("w5f:comics/chapter/%d/download?manga=%d", ch.ID, id), "download"))
+		}
+		if strings.HasPrefix(ch.RealURL, "http") {
+			in = append(in, dim(" · "), p.a(webviewHref(ch.RealURL, fmt.Sprintf("w5f:comics/manga/%d", id)), "web"))
 		}
 		items = append(items, in)
 	}
@@ -612,6 +624,9 @@ func sourcesDoc(ctx context.Context, env Env, c *suwayomi.Client, lang string) (
 		if s.ID != suwayomi.LocalSource {
 			in = append(in, dim(" · "), p.a(sourceSettingsHref(s.ID), "settings"))
 		}
+		if strings.HasPrefix(s.HomeURL, "http") {
+			in = append(in, dim(" · "), p.a(webviewHref(s.HomeURL, "w5f:comics/sources"), "web"))
+		}
 		if s.ContentWarning == "NSFW" {
 			in = append(in, dim("  (adult)"))
 		}
@@ -630,7 +645,18 @@ func SearchPage(sourceID, name string) string {
 	return smallweb.WebSearchPage("w5f:comics/search/"+sourceID, "q", "Search "+name+":")
 }
 
-func browseDoc(ctx context.Context, c *suwayomi.Client, source, kind, query string, pg int) (*doc.Document, error) {
+// browseOrFail is a source's list, or what went wrong with the source's
+// site to look at in the WebView.
+func browseOrFail(ctx context.Context, c *suwayomi.Client, self, source, kind, query string, pg int) (*doc.Document, error) {
+	home := sourceHome(ctx, c, source)
+	d, err := browseDoc(ctx, c, source, kind, query, pg, home)
+	if err != nil && !strings.Contains(err.Error(), "nothing to search for") {
+		return failedDoc(self, "Source", err, home, "w5f:comics/sources"), nil
+	}
+	return d, err
+}
+
+func browseDoc(ctx context.Context, c *suwayomi.Client, source, kind, query string, pg int, home string) (*doc.Document, error) {
 	if kind == "" {
 		kind = "POPULAR"
 	}
@@ -652,6 +678,9 @@ func browseDoc(ctx context.Context, c *suwayomi.Client, source, kind, query stri
 		return fmt.Sprintf("w5f:comics/source/%s?type=%s&page=%d", source, kind, n)
 	}
 	p := newPage(title, self(pg))
+	if w := webviewLink(p, home, self(pg)); w != nil {
+		p.para(append(doc.Inline{dim("The site:")}, w...))
+	}
 	if len(mangas) == 0 {
 		p.note("info", "Nothing found.")
 	}
