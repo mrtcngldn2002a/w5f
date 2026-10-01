@@ -23,6 +23,10 @@ type Server struct {
 	mu     sync.Mutex
 	Values map[string]any
 	Sets   int
+	// Prefs are source 42's own settings, as Suwayomi lists them; Stores
+	// are the extension stores.
+	Prefs  []map[string]any
+	Stores []string
 	// Releases is what the GitHub release API answers (see ReleaseAPI).
 	sessions map[string]bool
 	tokens   map[string]bool
@@ -68,6 +72,14 @@ func New(t *testing.T) *Server {
 		"webUIFlavor": "WEBUI", "authMode": "NONE", "authUsername": "", "authPassword": "",
 		"extensionRepos": []any{}, "flareSolverrEnabled": false, "aboutOnly": "x",
 		"downloadConversions": []any{map[string]any{"mimeType": "image/webp", "target": "image/jpeg"}},
+	}, Stores: []string{"https://example.org/repo/index.min.json"}, Prefs: []map[string]any{
+		{"__typename": "SwitchPreference", "key": "show_notes", "title": "Show author's notes", "visible": true, "enabled": true, "currentValue": nil, "default": true},
+		{"__typename": "ListPreference", "key": "quality", "title": "Image quality", "summary": "Pages as the site sends them", "visible": true, "enabled": true,
+			"currentValue": "high", "default": "high", "entries": []any{"High", "Low"}, "entryValues": []any{"high", "low"}},
+		{"__typename": "MultiSelectListPreference", "key": "langs", "title": "Languages", "visible": true, "enabled": true,
+			"currentValue": []any{"en"}, "default": []any{"en"}, "entries": []any{"English", "Turkish"}, "entryValues": []any{"en", "tr"}},
+		{"__typename": "EditTextPreference", "key": "ua", "title": "User agent", "visible": true, "enabled": true, "currentValue": nil, "default": "", "dialogMessage": "Leave empty for the default"},
+		{"__typename": "CheckBoxPreference", "key": "hidden", "title": "Hidden one", "visible": false, "enabled": true, "currentValue": false, "default": false},
 	}}
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -160,13 +172,67 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	switch {
-	case strings.Contains(q, "__type"):
+	case strings.Contains(q, "__type("):
 		writeJSON(w, map[string]any{"data": map[string]any{"__type": typeOf(fmt.Sprint(req.Variables["n"]))}})
 	case strings.Contains(q, "aboutServer"):
 		writeJSON(w, map[string]any{"data": map[string]any{"aboutServer": map[string]any{"version": "v2.4.2366"}}})
+	case strings.Contains(q, "updateSourcePreference"):
+		in, _ := req.Variables["in"].(map[string]any)
+		ch, _ := in["change"].(map[string]any)
+		pos := int(ch["position"].(float64))
+		s.mu.Lock()
+		for k, v := range ch {
+			if k != "position" && pos < len(s.Prefs) {
+				s.Prefs[pos]["currentValue"] = v
+			}
+		}
+		s.mu.Unlock()
+		writeJSON(w, map[string]any{"data": map[string]any{"updateSourcePreference": map[string]any{"clientMutationId": nil}}})
+	case strings.Contains(q, "preferences"):
+		if fmt.Sprint(req.Variables["id"]) != "42" {
+			writeJSON(w, map[string]any{"data": map[string]any{"source": nil}})
+			return
+		}
+		// As the real server: one field name may not carry a Boolean in one
+		// fragment and a String in another, so the client must use aliases.
+		if strings.Contains(q, "enabled currentValue") {
+			writeJSON(w, map[string]any{"errors": []any{map[string]any{"message": "Validation error (FieldsConflict) : 'source/preferences/currentValue' : returns different types 'Boolean' and 'String'"}}})
+			return
+		}
+		s.mu.Lock()
+		var prefs []map[string]any
+		for _, p := range s.Prefs {
+			kind := map[string]string{"SwitchPreference": "bool", "CheckBoxPreference": "bool", "EditTextPreference": "text",
+				"ListPreference": "text", "MultiSelectListPreference": "list"}[fmt.Sprint(p["__typename"])]
+			out := map[string]any{}
+			for k, v := range p {
+				switch k {
+				case "currentValue":
+					out[kind+"Value"] = v
+				case "default":
+					out[kind+"Default"] = v
+				default:
+					out[k] = v
+				}
+			}
+			prefs = append(prefs, out)
+		}
+		s.mu.Unlock()
+		writeJSON(w, map[string]any{"data": map[string]any{"source": map[string]any{"displayName": "Test Source", "preferences": prefs}}})
+	case strings.Contains(q, "addExtensionStore"):
+		s.mu.Lock()
+		s.Stores = append(s.Stores, fmt.Sprint(req.Variables["u"]))
+		s.mu.Unlock()
+		writeJSON(w, map[string]any{"data": map[string]any{"addExtensionStore": map[string]any{"clientMutationId": nil}}})
 	case strings.Contains(q, "extensionStores"):
+		s.mu.Lock()
+		var nodes []any
+		for _, u := range s.Stores {
+			nodes = append(nodes, map[string]any{"name": "Store", "indexUrl": u})
+		}
+		s.mu.Unlock()
 		writeJSON(w, map[string]any{"data": map[string]any{"extensions": map[string]any{"nodes": []any{}},
-			"extensionStores": map[string]any{"nodes": []any{map[string]any{"name": "Example", "indexUrl": "https://example.org/repo/index.min.json"}}}}})
+			"extensionStores": map[string]any{"nodes": nodes}}})
 	case strings.Contains(q, "setSettings"):
 		in, _ := req.Variables["input"].(map[string]any)
 		set, _ := in["settings"].(map[string]any)

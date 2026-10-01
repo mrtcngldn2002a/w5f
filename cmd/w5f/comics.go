@@ -26,7 +26,9 @@ const comicsUsage = `usage:
   w5f comics server update          install the newest release when there is one
   w5f comics settings [group]       Suwayomi's settings (the server's own; W5F's are marked)
   w5f comics set <setting> <value>  change one (on/off, a number, text, a,b,c for lists, JSON for conversions)
-  w5f comics login                  the account W5F signs in with, when the server's Authentication is on`
+  w5f comics login                  the account W5F signs in with, when the server's Authentication is on
+  w5f comics sync <server.conf> [--apply]
+                                    compare another Suwayomi's settings with this one; --apply copies what is not this computer's own`
 
 func firstNonEmpty(vs ...string) string {
 	for _, v := range vs {
@@ -55,7 +57,7 @@ func registerComicsForms() {
 		}
 		return tf, nil
 	}
-	for _, p := range []string{comics.SettingFormPrefix, comics.AuthFormPrefix, comics.LoginFormPrefix} {
+	for _, p := range []string{comics.SettingFormPrefix, comics.SourcePrefFormPrefix, comics.AuthFormPrefix, comics.LoginFormPrefix} {
 		tui.RegisterForm(p, open)
 	}
 }
@@ -214,6 +216,52 @@ func runComics(args []string) int {
 				}
 			}
 		}
+		return 0
+	case "sync":
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stderr, comicsUsage)
+			return 2
+		}
+		apply := len(args) > 2 && args[2] == "--apply"
+		if _, err := srv.Start(ctx, 90*time.Second); err != nil {
+			return fail(err)
+		}
+		env, err := source.ComicsEnv()
+		if err != nil {
+			return fail(err)
+		}
+		items, missing, err := env.SyncPlan(ctx, args[1])
+		if err != nil {
+			return fail(err)
+		}
+		same, change, skip := 0, 0, 0
+		for _, it := range items {
+			switch {
+			case it.Same():
+				same++
+			case it.Skip != "":
+				skip++
+				fmt.Printf("  skip    %-34s here %q, there %q — %s\n", it.Name, it.Here, it.There, it.Skip)
+			default:
+				change++
+				fmt.Printf("  change  %-34s %q → %q\n", it.Name, it.Here, it.There)
+			}
+		}
+		for _, u := range missing {
+			fmt.Printf("  add     extension store %s\n", u)
+		}
+		fmt.Printf("%d the same, %d to copy, %d extension stores to add, %d kept as they are here\n", same, change, len(missing), skip)
+		if !apply {
+			if change+len(missing) > 0 {
+				fmt.Println("Nothing changed yet: add --apply to copy them.")
+			}
+			return 0
+		}
+		n, err := env.ApplySync(ctx, args[1])
+		if err != nil {
+			return fail(err)
+		}
+		fmt.Printf("%d changed. Sources' own settings and installed extensions are not copied (Comics → Sources → settings).\n", n)
 		return 0
 	case "login":
 		fmt.Print("Mode the server uses (BASIC_AUTH, SIMPLE_LOGIN, UI_LOGIN): ")

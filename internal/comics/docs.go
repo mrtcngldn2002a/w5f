@@ -219,6 +219,12 @@ func route(ctx context.Context, target string, env Env) (*doc.Document, error) {
 	case "sources":
 		return sourcesDoc(ctx, env, c, query.Get("lang"))
 	case "source":
+		switch at(parts, 2) {
+		case "settings":
+			return sourceSettingsDoc(ctx, c, at(parts, 1), "")
+		case "pref":
+			return setSourcePref(ctx, c, at(parts, 1), query)
+		}
 		pg, _ := strconv.Atoi(query.Get("page"))
 		return browseDoc(ctx, c, at(parts, 1), strings.ToUpper(query.Get("type")), "", max(pg, 1))
 	case "search":
@@ -603,6 +609,9 @@ func sourcesDoc(ctx context.Context, env Env, c *suwayomi.Client, lang string) (
 			in = append(in, dim(" · "), p.a(fmt.Sprintf("w5f:comics/source/%s?type=LATEST", s.ID), "latest"))
 		}
 		in = append(in, dim(" · "), p.a(SearchPage(s.ID, s.DisplayName), "search"))
+		if s.ID != suwayomi.LocalSource {
+			in = append(in, dim(" · "), p.a(sourceSettingsHref(s.ID), "settings"))
+		}
 		if s.ContentWarning == "NSFW" {
 			in = append(in, dim("  (adult)"))
 		}

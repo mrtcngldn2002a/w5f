@@ -43,7 +43,7 @@ const (
 
 // IsForm reports a link that opens a form.
 func IsForm(href string) bool {
-	return strings.HasPrefix(href, SettingFormPrefix) || href == AuthFormPrefix || href == LoginFormPrefix
+	return strings.HasPrefix(href, SettingFormPrefix) || strings.HasPrefix(href, SourcePrefFormPrefix) || href == AuthFormPrefix || href == LoginFormPrefix
 }
 
 // The settings read last (forms are built from them without asking again).
@@ -309,6 +309,8 @@ func (e Env) Form(href string) (*Form, error) {
 		return e.loginForm(), nil
 	case href == AuthFormPrefix:
 		return e.authForm(ctx)
+	case strings.HasPrefix(href, SourcePrefFormPrefix):
+		return e.sourcePrefForm(href)
 	}
 	name := strings.TrimPrefix(href, SettingFormPrefix)
 	st, err := e.serverSettings(ctx, false)
