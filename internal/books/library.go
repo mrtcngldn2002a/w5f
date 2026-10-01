@@ -9,18 +9,14 @@ import (
 	"runtime"
 	"strings"
 
+	"w5f/internal/config"
 	"w5f/internal/store"
 )
 
-// LibraryDir is where books live: ~/Archive/Books. Downloads go here too.
+// LibraryDir is where books live: W5F_BOOKS, else [folders] books in
+// config.toml, else ~/Archive/Books. Downloads go here too.
 func LibraryDir() string {
-	if d := os.Getenv("W5F_BOOKS"); d != "" {
-		return d
-	}
-	if h, err := os.UserHomeDir(); err == nil {
-		return filepath.Join(h, "Archive", "Books")
-	}
-	return "Books"
+	return config.Folder("W5F_BOOKS", config.Load().Folders.Books, "Archive", "Books")
 }
 
 // Formats with a reader in openers open in W5F with chapters (see

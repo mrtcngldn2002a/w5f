@@ -88,10 +88,10 @@ func setupPage(expired bool) *doc.Document {
 	p(doc.Span{Text: "Reddit shows its pages to terminal readers only when you are logged in. W5F reads "},
 		doc.Span{Text: "old.reddit.com", Style: doc.Code},
 		doc.Span{Text: " — the classic, JavaScript-free interface — with your own login session. Once connected you can browse freely: nested comments, every sort order, search, user pages and old posts."})
-	d.Blocks = append(d.Blocks, doc.Heading{Level: 2, Text: doc.Inline{{Text: "Connect from Chromium (the W5F laptop)"}}})
+	d.Blocks = append(d.Blocks, doc.Heading{Level: 2, Text: doc.Inline{{Text: "Connect from your browser (Chromium or Firefox)"}}})
 	d.Blocks = append(d.Blocks, doc.List{Ordered: true, Items: [][]doc.Block{
-		{doc.Paragraph{Text: doc.Inline{{Text: "Press "}, {Text: "g", Style: doc.Bold}, {Text: ", type "}, {Text: "chromium old.reddit.com/login", Style: doc.Code}, {Text: " and log in there."}}}},
-		{doc.Paragraph{Text: doc.Inline{{Text: "Back in W5F: "}, {Text: "g", Style: doc.Bold}, {Text: " → "}, {Text: "reddit-login chromium", Style: doc.Code}, {Text: ". W5F takes the session from Chromium's profile (if it says it is not there yet, wait half a minute: Chromium writes new cookies to disk in a while)."}}}},
+		{doc.Paragraph{Text: doc.Inline{{Text: "Press "}, {Text: "g", Style: doc.Bold}, {Text: ", type "}, {Text: "browser old.reddit.com/login", Style: doc.Code}, {Text: " and log in there."}}}},
+		{doc.Paragraph{Text: doc.Inline{{Text: "Back in W5F: "}, {Text: "g", Style: doc.Bold}, {Text: " → "}, {Text: "reddit-login browser", Style: doc.Code}, {Text: ". W5F takes the session from Chromium's or Firefox's profile (if it says it is not there yet, wait half a minute: Chromium writes new cookies to disk in a while)."}}}},
 	}})
 	d.Blocks = append(d.Blocks, doc.Heading{Level: 2, Text: doc.Inline{{Text: "Or paste it (once, takes a minute)"}}})
 	d.Blocks = append(d.Blocks, doc.List{Ordered: true, Items: [][]doc.Block{

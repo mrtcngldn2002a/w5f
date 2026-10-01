@@ -14,11 +14,14 @@ import (
 // "Open in WebView", as Suwayomi's own clients have it (asked for by the
 // owner, 2026-10-01): a source's, a series' or a chapter's page opens in
 // Suwayomi's WebView (KCEF), shown through the server's /api/v1/webview
-// page in Chromium. What you sign in to or answer there stays in
+// page in the browser. What you sign in to or answer there stays in
 // Suwayomi's cookies, for its sources to use.
 
 // openBrowser is how the page is shown (a variable for tests).
 var openBrowser = browser.Open
+
+// browserName names it (a variable for tests).
+var browserName = browser.Name
 
 func webviewHref(target, back string) string {
 	return "w5f:comics/webview?" + url.Values{"u": {target}, "back": {back}}.Encode()
@@ -48,7 +51,7 @@ func webviewDoc(ctx context.Context, env Env, target, back string) (*doc.Documen
 	if err := openBrowser(view); err != nil {
 		return nil, err
 	}
-	p.note("info", "Opened in Suwayomi's WebView (in Chromium): "+target)
+	p.note("info", "Opened in Suwayomi's WebView (in "+browserName()+"): "+target)
 	p.para(doc.Inline{dim("This is Suwayomi's own browser: if the site asks you to sign in or to confirm you are a person, do it there yourself, and Suwayomi keeps the cookies for its sources. Close the window when you are done, then reload the page here (ctrl+r).")})
 	p.para(doc.Inline{p.a(back, "← back")})
 	return p.d, nil

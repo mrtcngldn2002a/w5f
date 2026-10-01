@@ -44,7 +44,7 @@ var ErrNoCookie = errors.New("no such cookie in Chromium")
 // is asked for is decrypted; nothing is logged.
 func Cookies(profile, domain string, names []string) (map[string]string, error) {
 	if runtime.GOOS != "linux" {
-		return nil, errors.New("taking cookies from Chromium works on the W5F laptop (Linux) only; paste the cookie instead")
+		return nil, errors.New("taking cookies from Chromium works on Linux only: sign in with Firefox and use firefox (or browser) instead, or paste the cookie")
 	}
 	src := filepath.Join(profile, "Cookies")
 	if !fileExists(src) {

@@ -289,7 +289,7 @@ type hint struct{ key, does string }
 // roomHints are the keys that matter where the reader is (chosen with the
 // owner, 2026-10-01: the bottom bar follows the room).
 func (m Model) roomHints() []hint {
-	reading := []hint{{"/", "search"}, {"a", "queue"}, {"n", "note"}, {"y", "clip"}, {"d", "dictionary"}, {"B", "Chromium"}}
+	reading := []hint{{"/", "search"}, {"a", "queue"}, {"n", "note"}, {"y", "clip"}, {"d", "dictionary"}, {"B", "browser"}}
 	if m.cur == nil {
 		return nil
 	}
@@ -322,7 +322,7 @@ func (m Model) roomHints() []hint {
 		case "4":
 			return []hint{{"→", "open"}, {"F", "follow"}, {"g → following", "followed"}, {"g → fiction", "this hall"}}
 		case "5":
-			return []hint{{"→", "open"}, {"B", "in Chromium"}, {"g → comics", "this vault"}}
+			return []hint{{"→", "open"}, {"B", "in the browser"}, {"g → comics", "this vault"}}
 		case "6":
 			return []hint{{"g → roll", "2d6+1"}, {"g → ask", "likely <question>"}, {"g → spark", "words · tarot"}, {"g → npc / thread / counter", "keep"}, {"g → pick", "npc · thread"}}
 		case "7":

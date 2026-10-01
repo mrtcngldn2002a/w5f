@@ -227,3 +227,12 @@ func TestTableRedrawKeepsSelection(t *testing.T) {
 		t.Errorf("focus %d, back %d (was %d), target %q", m.cur.focus, len(m.back), back, m.cur.target)
 	}
 }
+
+func TestBrowserCommand(t *testing.T) {
+	for in, want := range map[string]string{"browser": "browser", "chromium": "chromium", "browser old.reddit.com/login": "browser",
+		"chromium https://example.org": "chromium", "Browser example.org": "browser", "browser wars": "", "chromium os history": "", "browsers": ""} {
+		if got, _ := browserCommand(in); got != want {
+			t.Errorf("%q → %q, want %q", in, got, want)
+		}
+	}
+}

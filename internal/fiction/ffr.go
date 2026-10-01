@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"w5f/internal/doc"
+	"w5f/internal/sysdeps"
 )
 
 // ffrCommand runs FanFicFare (a variable so tests can use a stand-in).
@@ -82,7 +83,7 @@ func ffrInstallDoc() *doc.Document {
 	d := &doc.Document{Title: "FanFicFare is not installed", URL: "w5f:fiction/ffr", Origin: "local", Lang: "en"}
 	d.Blocks = []doc.Block{
 		para(plain("FanFicFare saves stories from more than a hundred fiction sites as EPUB books. W5F uses it when the fanficfare command is installed; it does not install it for you.", 0)),
-		doc.Pre{Text: "pip install FanFicFare          # Windows, macOS\npipx install FanFicFare         # antiX / Debian (sudo apt install pipx)"},
+		doc.Pre{Text: ffrInstall()},
 		para(plain("Then: g → ffr <address of a story>. Sites that need a login or an adult-content choice are configured in FanFicFare's own personal.ini.", doc.Italic)),
 	}
 	return d
@@ -99,4 +100,14 @@ func ffrFailDoc(u, why, output string) *doc.Document {
 		d.Blocks = append(d.Blocks, doc.Heading{Level: 3, Text: doc.Inline{{Text: "FanFicFare said"}}}, doc.Pre{Text: strings.Join(lines, "\n")})
 	}
 	return d
+}
+
+// ffrInstall is how FanFicFare is installed here: with pipx where the
+// system has it as a package (Debian's Python refuses pip installs), else
+// with pip.
+func ffrInstall() string {
+	if h := sysdeps.Hint(sysdeps.Pipx); h != "" && sysdeps.Manager() != "winget" {
+		return h + "\npipx install FanFicFare"
+	}
+	return "pip install FanFicFare"
 }

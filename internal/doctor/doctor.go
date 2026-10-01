@@ -15,6 +15,8 @@ import (
 
 	"github.com/BurntSushi/toml"
 	_ "modernc.org/sqlite" // read-only look at the database
+
+	"w5f/internal/sysdeps"
 )
 
 // Status of one check.
@@ -49,6 +51,7 @@ type Env struct {
 	Getenv   func(string) string
 	TermSize func() (w, h int, err error)
 	FontList func() (string, error) // fc-list output (Linux)
+	Browser  func() (string, error) // the browser pages open in
 	// Comics (M8)
 	ComicsDir   string
 	SuwayomiJar string                 // "" = not installed
@@ -208,12 +211,12 @@ func font(e Env) Result {
 	}
 	list, err := e.FontList()
 	if err != nil {
-		return Result{Warn, "font", "fc-list is not available (apt install fontconfig); check by eye: " + TestLine}
+		return Result{Warn, "font", sysdeps.With("fc-list is not available", sysdeps.Fontconfig) + "; check by eye: " + TestLine}
 	}
 	if strings.Contains(strings.ToLower(list), "terminus") {
 		return Result{OK, "font", "Terminus installed · check by eye: " + TestLine}
 	}
-	return Result{Warn, "font", "Terminus not found (apt install fonts-terminus xfonts-terminus) · check by eye: " + TestLine}
+	return Result{Warn, "font", sysdeps.With("Terminus not found", sysdeps.Terminus) + " · check by eye: " + TestLine}
 }
 
 // FcList runs fc-list (Linux).
@@ -247,9 +250,16 @@ func comicsChecks(e Env) []Result {
 	case e.JavaPath == nil:
 	default:
 		if _, err := e.JavaPath(); err != nil {
-			out = append(out, Result{Warn, "suwayomi", "Java is missing: Suwayomi needs Java 21 (apt install openjdk-21-jre-headless)"})
+			out = append(out, Result{Warn, "suwayomi", err.Error()})
 		} else {
 			out = append(out, Result{OK, "suwayomi", filepath.Base(e.SuwayomiJar) + " with Java; started when Comics opens"})
+		}
+	}
+	if e.Browser != nil {
+		if name, err := e.Browser(); err != nil {
+			out = append(out, Result{Warn, "browser", err.Error()})
+		} else {
+			out = append(out, Result{OK, "browser", "pages open in " + name + " (B, g → browser)"})
 		}
 	}
 	if e.GOOS == "linux" {

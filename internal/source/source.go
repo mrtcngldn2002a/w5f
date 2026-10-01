@@ -22,11 +22,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/BurntSushi/toml"
-
 	"w5f/internal/books"
 	"w5f/internal/comics"
 	"w5f/internal/comics/suwayomi"
+	"w5f/internal/config"
 	"w5f/internal/crom"
 	"w5f/internal/dict"
 	"w5f/internal/discover"
@@ -410,20 +409,11 @@ func FictionEnv() (fiction.Env, error) {
 	if err != nil {
 		return fiction.Env{}, fmt.Errorf("opening the local database: %w", err)
 	}
-	var cfg struct {
-		Fiction struct {
-			Mature    bool   `toml:"mature"`
-			Downloads string `toml:"downloads"`
-		} `toml:"fiction"`
-	}
-	_, _ = toml.DecodeFile(filepath.Join(store.DataDir(), "config.toml"), &cfg)
-	if d := os.Getenv("W5F_DOWNLOADS"); d != "" {
-		cfg.Fiction.Downloads = d
-	}
+	cfg := config.Load()
 	fiction.SetRedditLister(func(ctx context.Context, author string, maxPages int, stop func(reddit.PostInfo) bool) ([]reddit.PostInfo, error) {
 		return reddit.Submitted(ctx, Fetcher, author, maxPages, stop)
 	})
-	return fiction.Env{Fetcher: Fetcher, DB: db, Mature: cfg.Fiction.Mature, Downloads: cfg.Fiction.Downloads,
+	return fiction.Env{Fetcher: Fetcher, DB: db, Mature: cfg.Fiction.Mature, Downloads: config.Downloads(),
 		Reddit: func(ctx context.Context, u *url.URL) (*doc.Document, error) {
 			return reddit.Load(ctx, Fetcher, u, false)
 		}}, nil
@@ -434,7 +424,7 @@ func FictionEnv() (fiction.Env, error) {
 // folder so the library sees them.
 func ComicsServer() suwayomi.Server {
 	root := comics.Root()
-	return suwayomi.Server{Dir: filepath.Join(store.DataDir(), "suwayomi"),
+	return suwayomi.Server{Dir: filepath.Join(store.DataDir(), "suwayomi"), Java: config.Load().Comics.Java,
 		Downloads: filepath.Join(root, "Suwayomi"), Local: filepath.Join(root, "Local")}
 }
 

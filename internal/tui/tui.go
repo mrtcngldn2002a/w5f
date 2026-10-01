@@ -483,7 +483,7 @@ func (m Model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.loading = target
 		return m, load(target, false)
 	case "B":
-		// This page (or the selected link) in Chromium.
+		// This page (or the selected link) in the browser.
 		target := p.target
 		if f := m.focused(); f != nil && f.Kind == render.FocusLink && strings.HasPrefix(p.doc.Links[f.Link-1].Href, "http") {
 			target = p.doc.Links[f.Link-1].Href
@@ -493,7 +493,7 @@ func (m Model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if err := browser.Open(target); err != nil {
 			m.status = "error: " + err.Error()
 		} else {
-			m.status = "Opened in Chromium: " + target
+			m.status = "Opened in " + browser.Name() + ": " + target
 		}
 		return m, nil
 	case "o":
@@ -947,9 +947,9 @@ func (m Model) gotoKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				m.status = "AO3 session removed from this computer."
 			}
 			return m, nil
-		case "reddit-login chromium", "ao3-login chromium":
-			site := strings.TrimSuffix(strings.Fields(strings.ToLower(m.gotoBuf))[0], "-login")
-			if msg, err := source.ImportSession(site); err != nil {
+		case "reddit-login browser", "ao3-login browser", "reddit-login chromium", "ao3-login chromium", "reddit-login firefox", "ao3-login firefox":
+			site, from, _ := source.SessionFrom(m.gotoBuf)
+			if msg, err := source.ImportSession(site, from); err != nil {
 				m.status = "error: " + err.Error()
 			} else {
 				m.status = msg
@@ -973,9 +973,10 @@ func (m Model) gotoKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.mode = modeRead
 			return m.setTheme(name)
 		}
-		if low := strings.ToLower(strings.TrimSpace(m.gotoBuf)); low == "chromium" || strings.HasPrefix(low, "chromium ") {
-			// g → chromium [address]: a page in Chromium (no address: this one).
-			addr := strings.TrimSpace(strings.TrimSpace(m.gotoBuf)[len("chromium"):])
+		if word, ok := browserCommand(m.gotoBuf); ok {
+			// g → browser [address] (or the older g → chromium): a page in
+			// the browser (no address: this one).
+			addr := strings.TrimSpace(strings.TrimSpace(m.gotoBuf)[len(word):])
 			if addr == "" && m.cur != nil {
 				addr = m.cur.target
 				if !strings.HasPrefix(addr, "http") && m.cur.doc != nil {
@@ -987,7 +988,7 @@ func (m Model) gotoKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			if err := browser.Open(addr); err != nil {
 				m.status = "error: " + err.Error()
 			} else {
-				m.status = "Opened in Chromium: " + addr
+				m.status = "Opened in " + browser.Name() + ": " + addr
 			}
 			return m, nil
 		}
@@ -1295,7 +1296,7 @@ func (m Model) secretLines() []string {
 		"",
 		margin + dim(fmt.Sprintf("%d characters · esc cancels · ctrl+u clears", len([]rune(m.secretBuf)))),
 		margin + dim("Stored only on this computer: "+path),
-		margin + dim("Signed in to "+m.secretSite()+" in Chromium? esc, then g → "+strings.ToLower(m.secretSite())+"-login chromium"),
+		margin + dim("Signed in to "+m.secretSite()+" in Chromium or Firefox? esc, then g → "+strings.ToLower(m.secretSite())+"-login browser"),
 	}
 }
 
@@ -1333,13 +1334,13 @@ func (m Model) helpLines() []string {
 		{"x / p", "deep random (eight families of sources) · today's Daily Packet"},
 		{"enter / g → ? text", "answer a page that asks for input (g → smallweb, g → worlds)"},
 		{"+ / -", "expand / fold all sections"}, {"o", "show link address"}, {"ctrl+r", "reload"},
-		{"B", "open this page (or the selected link) in Chromium · g → chromium <address>"},
+		{"B", "open this page (or the selected link) in the browser · g → browser <address>"},
 		{"T · I", "draw a tarot card · cast an I Ching hexagram (kept: the texts come once from sacred-texts)"},
 		{"1 … 9, 0", "the rooms of the library: 1 Reading Room (home) · 2 Periodical Gallery (periodicals) · 3 The Stacks (books) · 4 The Serial Hall (internet fiction) · 5 The Picture Vault (comics) · 6 The Gaming Table (solo RPG) · 7 The Newsroom (Usenet) · 8 Curiosity Cabinet (discovery) · 9 The Lectern (queue) · 0 The Scriptorium (notes)"},
 		{"H · L", "The Register (your history) · Ultan's Ledger (your reading, counted)"},
 		{`\`, "hide / show the side menu (wide windows)"},
 		{"g → theme", "choose a theme: amber, day, cold, night, green (g → theme day puts one on)"},
-		{"g → reddit-login chromium", "take your Reddit (or ao3-login chromium: AO3) session from Chromium, where you signed in"},
+		{"g → reddit-login browser", "take your Reddit (or ao3-login browser: AO3) session from Chromium or Firefox, where you signed in"},
 		{"/", "search everything you have read (feeds, wikis, web pages, books, notes)"},
 		{"a / A", "add this page / the selected link to the reading queue (g → queue)"},
 		{"n", "write a note about this page"}, {"y", "clip paragraphs (↑↓ choose, shift+↑↓ extend, enter save)"},
@@ -1430,4 +1431,22 @@ func soloEdit(href string) bool {
 		}
 	}
 	return false
+}
+
+// browserCommand reports g → browser [address], or the older chromium;
+// "browser wars" (no address after it) stays a web search.
+func browserCommand(buf string) (string, bool) {
+	low := strings.ToLower(strings.TrimSpace(buf))
+	for _, w := range []string{"browser", "chromium"} {
+		if low == w {
+			return w, true
+		}
+		if rest, ok := strings.CutPrefix(low, w+" "); ok {
+			rest = strings.TrimSpace(rest)
+			if !strings.Contains(rest, " ") && (strings.Contains(rest, ".") || strings.Contains(rest, "://")) {
+				return w, true
+			}
+		}
+	}
+	return "", false
 }

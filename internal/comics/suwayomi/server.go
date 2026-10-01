@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"w5f/internal/sysdeps"
 )
 
 // Server is a Suwayomi-Server that W5F starts on demand: headless, local
@@ -117,12 +119,9 @@ func (s Server) Start(ctx context.Context, wait time.Duration) (bool, error) {
 	if jar == "" {
 		return false, fmt.Errorf("no Suwayomi-Server jar in %s (w5f comics server install)", s.Dir)
 	}
-	java := s.Java
-	if java == "" {
-		var err error
-		if java, err = exec.LookPath("java"); err != nil {
-			return false, errors.New("Java is not installed (Suwayomi needs Java 21: apt install openjdk-21-jre-headless)")
-		}
+	java, err := sysdeps.FindJava(s.Java)
+	if err != nil {
+		return false, err
 	}
 	for _, d := range []string{s.Downloads, s.Local, filepath.Join(s.Dir, "data")} {
 		if d != "" {

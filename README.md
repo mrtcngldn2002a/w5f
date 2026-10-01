@@ -58,6 +58,8 @@ w5f update          # later: the next signed release (--rollback goes back)
 
 Inside, `↑ ↓` move from link to link, `→` opens, `←` goes back, `g` goes anywhere, `?` lists every key. On the W5F laptop, `platform/antix/` makes the machine boot straight into W5F (see its README).
 
+On any other computer it works as it is: a terminal of 80 × 24 or more (110 columns for the side menu), a UTF-8 locale, and a font with `» ○ × │`. Folders, the browser and Java can be set in `config.toml` (see *Settings* below); `w5f doctor` checks the setup and says how this system installs what is missing.
+
 ## The library
 
 On a window of 110 columns or more the rooms stay in a side menu on the left (`\` hides it) and the page sits beside it, left-aligned, up to 112 columns; on narrower windows the page is a centred 72-column column. Most rooms are two columns wide.
@@ -90,7 +92,7 @@ On a window of 110 columns or more the rooms stay in a side menu on the left (`\
 | `x` · `p` · `T` · `I` | deep random · Daily Packet · a tarot card · an I Ching cast |
 | `t` · `]` `[` | contents (a book's chapters) · next / previous chapter |
 | `d` · `f` · `r` | dictionary pop-up (EN→TR) · link hints · random page of this wiki |
-| `B` | open the page (or the selected link) in Chromium |
+| `B` | open the page (or the selected link) in the browser |
 | `+` `-` · `o` · `ctrl+r` | open / fold all sections · show the address · reload |
 | `1`…`0` `H` `L` · `\` | the rooms · hide the side menu |
 | `?` · `q` | help · quit |
@@ -132,8 +134,8 @@ w5f scp-173              shorthand for the SCP Wiki page
 w5f w5f:random/scp       random SCP (also: tale, wl, backrooms)
 w5f --offline <target>   read from the cache only
 w5f r/nosleep            Reddit (connect once: g → reddit-login, paste your own session cookie; read via old.reddit)
-                         or sign in to Reddit in Chromium and g → reddit-login chromium (AO3: ao3-login chromium)
-B / g → chromium <url>   open this page (or the selected link, or an address) in Chromium
+                         or sign in to Reddit in Chromium or Firefox and g → reddit-login browser (AO3: ao3-login browser)
+B / g → browser <url>    open this page (or the selected link, or an address) in the browser
 w5f eksisozluk.com       Ekşi Sözlük: gündem, topics with entries and paging
 w5f w5f:feeds            the Periodical Gallery: shelves, unread, starred, feed status
 w5f sync                 refresh all feeds (cron/timer friendly)
@@ -212,7 +214,7 @@ Logins, captchas and bot checks are never bypassed.
 <details>
 <summary><b>Books, Library Genesis and custom catalogs</b></summary>
 
-W5F reads EPUB, MOBI/AZW/AZW3 (Kindle, including KF8 and combo files), FB2 and `.fb2.zip`, PDF text (10 pages per chapter; uses `pdftotext` when installed — `sudo apt install poppler-utils` — otherwise a built-in reader; every PDF keeps an "external viewer" link), TXT/HTML/Markdown. DJVU, CBZ and CBR open in the external viewer. DRM-protected and KFX books are listed but not opened — W5F never removes DRM.
+W5F reads EPUB, MOBI/AZW/AZW3 (Kindle, including KF8 and combo files), FB2 and `.fb2.zip`, PDF text (10 pages per chapter; uses `pdftotext` from Poppler when installed — `poppler-utils` on Debian and Fedora, `poppler` on Arch and Homebrew — otherwise a built-in reader; every PDF keeps an "external viewer" link), TXT/HTML/Markdown. DJVU, CBZ and CBR open in the external viewer. DRM-protected and KFX books are listed but not opened — W5F never removes DRM.
 
 **Library Genesis** is integrated through a native adapter of the [halfurness/libgen-cli](https://github.com/halfurness/libgen-cli) libgen.li protocol: search tables, file/edition metadata, fresh mirror-specific download keys, Referer, mirror fallback and MD5-verified downloads. EPUBs open in the reader; other supported formats follow the existing external-viewer flow. Search accepts `ext:epub,pdf`, `lang:english`, `year:1897`, `author:"Bram Stoker"`, `title:Dracula`, `publisher:Penguin`, `sort:title`, `sort:-year`, and page sizes `limit:25`, `limit:50`, `limit:100`. Filters apply to each page; follow the next-page link for more matches. The library keeps the canonical `libgen:<md5>` source, avoiding duplicate downloads across mirrors.
 
@@ -255,7 +257,7 @@ Notes live in `~/Archive/Notes` (change with `W5F_NOTES` or `notes = "…"` in `
 
 `g → comics` (key `5`).
 
-- **Library.** CBZ, CBR, CB7 and CBT files and image folders in `~/Archive/Comics` (`W5F_COMICS`), one folder per series.
+- **Library.** CBZ, CBR, CB7 and CBT files and image folders in `~/Archive/Comics` (`W5F_COMICS` or `[folders] comics`), one folder per series.
   - `ComicInfo.xml` is used when present; natural page order.
   - Your page is kept.
   - Pictures (JPG, PNG, WebP, GIF, BMP): a folder with at least one is a comic; loose pictures at the top are "Loose images". `w5f view picture.jpg`, or opening a picture in the reader, shows its folder from that picture on.
@@ -273,7 +275,7 @@ Notes live in `~/Archive/Notes` (change with `W5F_NOTES` or `notes = "…"` in `
   - on/off and choices are links; anything else opens a form (secrets hidden, lists as `a, b`, conversions as JSON). A change goes to the server at once (`setSettings`), is checked by the server and stays in its server.conf.
   - What W5F gives on the java command line (address, port, folders, CBZ, WebUI off, …) wins over server.conf; those are shown as W5F's and are not changed here.
   - Authentication (Basic, simple login, UI login with tokens): the form changes the server and the account W5F signs in with together, so W5F never locks itself out; when it was changed elsewhere, W5F asks for the account (`w5f:comics/login`, kept in the suwayomi folder, mode 0600).
-- **Open in WebView**, as Suwayomi's own clients have it: on a source's page, a series' page, each chapter ("web") and every page a source could not load. It opens the site in Suwayomi's WebView (KCEF), shown through the server's `/api/v1/webview` page in Chromium; a sign-in or a check for people you do there yourself stays in Suwayomi's cookies for its sources. Needs Suwayomi's WebView on (Server settings → Webview).
+- **Open in WebView**, as Suwayomi's own clients have it: on a source's page, a series' page, each chapter ("web") and every page a source could not load. It opens the site in Suwayomi's WebView (KCEF), shown through the server's `/api/v1/webview` page in the browser; a sign-in or a check for people you do there yourself stays in Suwayomi's cookies for its sources. Needs Suwayomi's WebView on (Server settings → Webview).
 - **Source settings** (`Comics → Sources → settings`): a source's own settings, as its extension offers them (image quality, languages, site options). Switches, choices and multiple choices are links, text opens a form. Each Suwayomi keeps its own: a choice made on one computer is not on the other.
 - **Settings sync**: `w5f comics sync <another server.conf>` compares another Suwayomi's settings (the PC launcher's `%LOCALAPPDATA%\Tachidesk\server.conf`, say) with this server's and lists the differences; `--apply` copies them and adds missing extension stores. What belongs to one computer is kept (addresses, folders, WebUI, database, accounts, the SOCKS proxy) and so are bot-check solver settings (FlareSolverr). Installed extensions and sources' own settings are not copied.
 - **Update**: `check for an update` compares the installed jar with the newest release; updating downloads it, checks it against the release's checksums, stops a server W5F started and starts it again. A server W5F did not start (the launcher) is left alone.
@@ -308,6 +310,40 @@ Read only, over NNTP (`w5f:usenet`, or `g → usenet`).
 </details>
 
 <details>
+<summary><b>Settings: config.toml and the environment</b></summary>
+
+W5F needs no settings; every one is optional, and what is not set keeps the defaults below. `config.toml` lives in the data folder: `~/.local/share/w5f/` on Linux (`$XDG_DATA_HOME/w5f`), `%APPDATA%\w5f\` on Windows, `~/Library/Application Support/w5f/` on macOS. An environment variable, where there is one, wins over the file. `~` at the start of a path is the home folder.
+
+```toml
+notes = "~/Archive/Notes"        # W5F_NOTES: queue, notes, clippings, saved pages
+
+[folders]
+books = "~/Archive/Books"        # W5F_BOOKS
+comics = "~/Archive/Comics"      # W5F_COMICS
+downloads = "~/Downloads"        # W5F_DOWNLOADS: where AO3 EPUBs are imported from
+
+[browser]
+command = "firefox --new-window" # W5F_BROWSER; the page's address goes last
+
+[comics]
+java = "/usr/lib/jvm/java-21-openjdk-amd64/bin/java"
+
+[fiction]
+mature = true                    # show Questionable Questing
+
+[update]
+repo = "owner/w5f"
+```
+
+- **Folders.** Without a setting, books and comics are under `~/Archive`. The download folder is the desktop's own: on Linux the one named in `~/.config/user-dirs.dirs` (a Turkish desktop's `~/İndirilenler`), else `~/Downloads`. The older `downloads` under `[fiction]` still counts.
+- **Browser** (`B`, `g → browser <address>`, Suwayomi's WebView page): the configured command, else Chromium or Chrome when installed, else the system's default browser (`xdg-open`, `open`, Windows' own). `g → chromium` still works.
+- **Sessions from a browser** (`g → reddit-login browser`, `g → ao3-login browser`): signed in to Reddit or AO3 in a browser, W5F takes that session from its profile — Chromium's or Chrome's on Linux, Firefox's on Linux, Windows and macOS (`… chromium` or `… firefox` picks one; `W5F_CHROMIUM_PROFILE`, `W5F_FIREFOX_PROFILE` point at another profile). Chrome and Edge on Windows lock their cookies; there, use Firefox or paste the cookie.
+- **Java** for Suwayomi: `[comics] java`, else `JAVA_HOME`, else `java` on the `PATH`.
+- **The comics viewer** (`w5f view`) is an X11 window: on Linux with a desktop. Elsewhere local comics open in the system's viewer, and Suwayomi chapters are read on Linux.
+
+</details>
+
+<details>
 <summary><b>Update, releases, doctor</b></summary>
 
 - **Update.** `w5f update` installs the latest release from GitHub Releases:
@@ -327,7 +363,7 @@ Read only, over NNTP (`w5f:usenet`, or `g → usenet`).
   - Once: `go run ./cmd/w5f-release keygen`. The private key goes to `%APPDATA%\w5f-release\release.key` (Linux: `~/.config/w5f-release/`). Keep it out of the repo and back it up: without it, installed copies cannot be updated.
   - Each release: `go run ./cmd/w5f-release build -version X.Y.Z -repo owner/w5f`. Always give `-repo`, so the new binary can find the next release. This builds and signs `dist/vX.Y.Z/`; upload every file in it as the assets of release `vX.Y.Z`.
   - Before a push: `sh scripts/secret-scan.sh`.
-- **Doctor.** `w5f doctor` checks folders and config, the database and FTS5, the dictionary, the terminal, locale and font, and the update setup. `--live` fetches one source of each kind; `--bench` times a 12k-word page against the 150 ms budget. Doctor only reads.
+- **Doctor.** `w5f doctor` checks folders and config, the database and FTS5, the dictionary, the terminal, locale and font, Suwayomi's Java, and the update setup; what is missing comes with this system's install command (apt, dnf, pacman, Homebrew or winget). `--live` fetches one source of each kind; `--bench` times a 12k-word page against the 150 ms budget. Doctor only reads.
 - **Laptop.** `platform/antix/` makes the W5F boot into W5F (kmscon or X); see its README.
 
 </details>

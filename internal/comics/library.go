@@ -7,19 +7,15 @@ import (
 	"strconv"
 	"strings"
 
+	"w5f/internal/config"
 	"w5f/internal/store"
 )
 
-// Root is the comics folder: W5F_COMICS, else ~/Archive/Comics. Suwayomi's
-// downloads and its Local source live inside it, so they are scanned too.
+// Root is the comics folder: W5F_COMICS, else [folders] comics in
+// config.toml, else ~/Archive/Comics. Suwayomi's downloads and its Local
+// source live inside it, so they are scanned too.
 func Root() string {
-	if d := os.Getenv("W5F_COMICS"); d != "" {
-		return d
-	}
-	if h, err := os.UserHomeDir(); err == nil {
-		return filepath.Join(h, "Archive", "Comics")
-	}
-	return "Comics"
+	return config.Folder("W5F_COMICS", config.Load().Folders.Comics, "Archive", "Comics")
 }
 
 // External reports files the library lists but a system viewer opens.

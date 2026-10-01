@@ -46,3 +46,17 @@ func TestOPMLCommands(t *testing.T) {
 		t.Errorf("opml-export → %s", got)
 	}
 }
+
+func TestSessionFrom(t *testing.T) {
+	for in, want := range map[string]string{"reddit-login browser": "reddit/browser", "ao3-login chromium": "ao3/chromium",
+		"AO3-login Firefox": "ao3/firefox", "reddit-login": "", "reddit-login opera": "", "w5f reddit-login browser": ""} {
+		site, from, ok := SessionFrom(in)
+		got := ""
+		if ok {
+			got = site + "/" + from
+		}
+		if got != want {
+			t.Errorf("%q → %q, want %q", in, got, want)
+		}
+	}
+}

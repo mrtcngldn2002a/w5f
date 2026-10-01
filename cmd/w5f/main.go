@@ -41,10 +41,11 @@ Usage:
   w5f feeds import|export     move periodicals in or out as OPML (w5f feeds for more)
   w5f reindex                 rebuild the search index (pages from the cache, feeds, books, notes)
   w5f dict-install [zip|url]  install the pop-up dictionary (default: English–Turkish)
-  w5f reddit-login [chromium] connect Reddit with your own session cookie
-                              (chromium: take it from Chromium, where you signed in)
+  w5f reddit-login [browser]  connect Reddit with your own session cookie
+                              (browser: take it from Chromium or Firefox, where you
+                              signed in; chromium or firefox picks one)
   w5f reddit-logout           remove the stored Reddit session
-  w5f ao3-login [chromium] / ao3-logout
+  w5f ao3-login [browser] / ao3-logout
                               connect AO3 the same way / remove it
   w5f view [--comic ID] [file] the comics viewer (X11; opened from Comics pages)
   w5f comics list|update       comics: local library and followed series (w5f comics for more)
@@ -98,8 +99,8 @@ func main() {
 			fmt.Println("Installed:", title)
 			return
 		case "reddit-login", "ao3-login":
-			if len(args) > 1 && args[1] == "chromium" {
-				msg, err := source.ImportSession(strings.TrimSuffix(args[0], "-login"))
+			if site, from, ok := source.SessionFrom(strings.Join(args, " ")); ok {
+				msg, err := source.ImportSession(site, from)
 				if err != nil {
 					fmt.Fprintln(os.Stderr, "w5f:", err)
 					os.Exit(1)
