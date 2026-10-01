@@ -470,7 +470,7 @@ func (m Model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		m.loading = p.target
 		return m, load(p.target, true)
-	case "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "L":
+	case "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "L", "W":
 		return m.openRoom(s)
 	case `\`:
 		return m.toggleSide()
@@ -1337,7 +1337,7 @@ func (m Model) helpLines() []string {
 		{"B", "open this page (or the selected link) in the browser · g → browser <address>"},
 		{"T · I", "draw a tarot card · cast an I Ching hexagram (kept: the texts come once from sacred-texts)"},
 		{"1 … 9, 0", "the rooms of the library: 1 Reading Room (home) · 2 Periodical Gallery (periodicals) · 3 The Stacks (books) · 4 The Serial Hall (internet fiction) · 5 The Picture Vault (comics) · 6 The Gaming Table (solo RPG) · 7 The Newsroom (Usenet) · 8 Curiosity Cabinet (discovery) · 9 The Lectern (queue) · 0 The Scriptorium (notes)"},
-		{"H · L", "The Register (your history) · Ultan's Ledger (your reading, counted)"},
+		{"H · L · W", "The Register (your history) · Ultan's Ledger (your reading, counted) · The Weeding Room (what is kept, and what can go)"},
 		{`\`, "hide / show the side menu (wide windows)"},
 		{"g → theme", "choose a theme: amber, day, cold, night, green (g → theme day puts one on)"},
 		{"g → reddit-login browser", "take your Reddit (or ao3-login browser: AO3) session from Chromium or Firefox, where you signed in"},

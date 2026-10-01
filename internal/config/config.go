@@ -40,6 +40,18 @@ type File struct {
 	Update struct {
 		Repo string `toml:"repo"`
 	} `toml:"update"`
+	Cache struct {
+		LimitMB *int `toml:"limit_mb"` // W5F's page cache; unset: 500, 0: no limit
+	} `toml:"cache"`
+}
+
+// CacheLimit is the most W5F's own page cache may hold, in bytes (0: no
+// limit).
+func CacheLimit() int64 {
+	if p := Load().Cache.LimitMB; p != nil {
+		return int64(max(*p, 0)) << 20
+	}
+	return 500 << 20
 }
 
 // Path is config.toml's place.

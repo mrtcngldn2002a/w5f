@@ -15,6 +15,7 @@ import (
 	xterm "github.com/charmbracelet/x/term"
 
 	"w5f/internal/comics"
+	"w5f/internal/config"
 	"w5f/internal/dict"
 	"w5f/internal/doc"
 	"w5f/internal/feeds"
@@ -26,6 +27,7 @@ import (
 	"w5f/internal/source"
 	"w5f/internal/store"
 	"w5f/internal/tui"
+	"w5f/internal/weeding"
 )
 
 var version = "0.0.0-dev"
@@ -144,6 +146,9 @@ func main() {
 	comics.AutoStart = true  // the reader stops it again on exit
 	source.OpenImages = true // pictures open in the comics viewer
 	registerComicsForms()
+	// Keep W5F's own page cache under its limit, in the background (only its
+	// own folders: see weeding.CacheParts).
+	go weeding.TrimCache(cacheDir(), config.CacheLimit())
 	p := tea.NewProgram(tui.New(target, version))
 	_, err := p.Run()
 	reddit.Shutdown()                      // stop a Redlib that W5F started

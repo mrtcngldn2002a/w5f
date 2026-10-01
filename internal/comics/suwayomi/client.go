@@ -439,3 +439,42 @@ func (c *Client) AddStore(ctx context.Context, indexURL string) error {
 func (c *Client) RemoveStore(ctx context.Context, indexURL string) error {
 	return c.do(ctx, `mutation($u: String!) { removeExtensionStore(input: {indexUrl: $u}) { clientMutationId } }`, map[string]any{"u": indexURL}, nil)
 }
+
+// DownloadedChapter is a chapter Suwayomi keeps downloaded.
+type DownloadedChapter struct {
+	ID        int
+	Name      string
+	Scanlator string
+	Manga     string
+}
+
+// DownloadedChapters lists every chapter Suwayomi has downloaded.
+func (c *Client) DownloadedChapters(ctx context.Context) ([]DownloadedChapter, error) {
+	var r struct {
+		C struct {
+			Nodes []struct {
+				ID        int    `json:"id"`
+				Name      string `json:"name"`
+				Scanlator string `json:"scanlator"`
+				Manga     struct {
+					Title string `json:"title"`
+				} `json:"manga"`
+			} `json:"nodes"`
+		} `json:"chapters"`
+	}
+	if err := c.do(ctx, `{ chapters(condition: {isDownloaded: true}) { nodes { id name scanlator manga { title } } } }`, nil, &r); err != nil {
+		return nil, err
+	}
+	var out []DownloadedChapter
+	for _, n := range r.C.Nodes {
+		out = append(out, DownloadedChapter{ID: n.ID, Name: n.Name, Scanlator: n.Scanlator, Manga: n.Manga.Title})
+	}
+	return out, nil
+}
+
+// DeleteDownload removes a downloaded chapter's files, through Suwayomi, so
+// it knows the chapter is no longer downloaded.
+func (c *Client) DeleteDownload(ctx context.Context, chapterID int) error {
+	return c.do(ctx, `mutation($id: Int!) { deleteDownloadedChapter(input: {id: $id}) { chapters { id } } }`,
+		map[string]any{"id": chapterID}, nil)
+}

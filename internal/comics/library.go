@@ -70,6 +70,9 @@ func Scan(db *store.DB, root string) (int, error) {
 			if p != root && (strings.HasPrefix(name, ".") || name == "data") {
 				return filepath.SkipDir
 			}
+			if p == filepath.Join(SuwayomiDir(root), "thumbnails") {
+				return filepath.SkipDir // Suwayomi's series covers, not a comic
+			}
 			if p != root && imageFolder(p) {
 				add(p, true)
 				return filepath.SkipDir

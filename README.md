@@ -80,6 +80,7 @@ On a window of 110 columns or more the rooms stay in a side menu on the left (`\
 | `0` | **The Scriptorium** | notes, clippings, saved pages |
 | `H` | **The Register** | the reading history |
 | `L` | **Ultan's Ledger** | your reading, counted |
+| `W` | **The Weeding Room** | what the library keeps on disk, and what can go |
 
 ## Keys
 
@@ -96,7 +97,7 @@ On a window of 110 columns or more the rooms stay in a side menu on the left (`\
 | `d` · `f` · `r` | dictionary pop-up (EN→TR) · link hints · random page of this wiki |
 | `B` | open the page (or the selected link) in the browser |
 | `+` `-` · `o` · `ctrl+r` | open / fold all sections · show the address · reload |
-| `1`…`0` `H` `L` · `\` | the rooms · hide the side menu |
+| `1`…`0` `H` `L` `W` · `\` | the rooms · hide the side menu |
 | `?` · `q` | help · quit |
 
 The bottom bar follows the room: it shows the keys that matter where you are (in the Gallery `*` and `m`, in a book `t` and `] [`, at the Gaming Table `g → roll / ask / spark`).
@@ -116,6 +117,14 @@ The bottom bar follows the room: it shows the keys that matter where you are (in
 ## Ultan's library
 
 Ultan leaves notes in the margin, italic and signed "— U.", in a voice after Wolfe's (the words are W5F's own; nothing is quoted). Every note is made by rule from your reading — never by a model, never invented — and on days with nothing to report he offers one of his sayings. In the Reading Room: how long you have been away, new chapters, a book left open for days, heavy shelves, a long queue, a reading habit. Deep random adds his note on the shelf a page came from; the Daily Packet's cover, his note on the issue. **Ultan's Ledger** (`L`, `g → ledger`) counts your reading from `history.log`: days at the desk, pages opened and different pages over 7 days, 30 days and all told, by kind; the pages most returned to; what is left open.
+
+**The Weeding Room** (`W`, `g → weeding`), after the librarian's word for culling a collection. It shows what the library keeps on disk and how much — the page cache, the catalogue (history, periodicals, search index), the visit log, the dictionary, Suwayomi, books, comics, notes — and what can go:
+
+- **The page cache**, emptied whole: the pages, pictures and PDF texts kept for quick and offline reading; they are fetched again when next opened. It is also kept under a limit on its own (500 MB unless `[cache] limit_mb` says otherwise; 0 keeps everything): past it, the pages read longest ago go first. Only W5F's own cache folders are touched (`http`, `smallweb`, `images`, `pdftext`, and `internet-fiction`, left by W5F v1); whatever other programs keep in the cache folder is never measured, emptied or trimmed.
+- **A note, a book, a comic**, one at a time — there is no way to remove all of them together. A note leaves the notes folder; a book's file is deleted with its place in The Stacks; a comic's file (or a picture folder's pages, never the folders below it) is deleted with its place in The Picture Vault. A chapter Suwayomi downloaded is removed through Suwayomi, so it knows, and the series stays followed. What is removed leaves the search too. Removal is for good: there is no bin.
+- **The history, the desk, the Gaming Table's log**: the clearings below.
+
+Nothing is removed outside W5F's own folders. Every removal asks first, and the question's selection starts on *No*.
 
 **Clearing.** Every clearing asks first, and the question's selection starts on *No*.
 
@@ -335,6 +344,9 @@ mature = true                    # show Questionable Questing
 
 [update]
 repo = "owner/w5f"
+
+[cache]
+limit_mb = 500                   # W5F's page cache; 0 keeps everything
 ```
 
 - **Folders.** Without a setting, books and comics are under `~/Archive`. The download folder is the desktop's own: on Linux the one named in `~/.config/user-dirs.dirs` (a Turkish desktop's `~/İndirilenler`), else `~/Downloads`. The older `downloads` under `[fiction]` still counts.
@@ -410,6 +422,9 @@ internal/smallweb  Gemini (trust on first use) and Gopher clients, gemtext and g
 internal/fiction   internet fiction: serial adapters (Royal Road, XenForo, AO3, WordPress), Reddit series, following, FanFicFare bridge
 internal/solo      the Gaming Table: oracle, dice, sparks, characters, threads, counters, log
 internal/ultan     Ultan's notes and ledger
+internal/weeding   The Weeding Room: what is kept on disk, the page cache limit, removal one thing at a time
+internal/config    config.toml: folders, browser, Java, cache limit
+internal/sysdeps   system programs (Java, fonts, Poppler) and how this system installs them
 internal/usenet    NNTP reader, read state, kill file
 internal/personal  reading queue, notes, clippings, saved pages (Markdown files)
 internal/index     full-text search over everything read (SQLite FTS5, Turkish folding)

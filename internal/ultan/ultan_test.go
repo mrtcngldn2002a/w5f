@@ -124,7 +124,10 @@ func TestCoverNote(t *testing.T) {
 }
 
 func TestLedger(t *testing.T) {
-	now := time.Now()
+	// Noon today: an hour ago and a day ago must be different days, which
+	// they are not just after midnight.
+	y, mo, day := time.Now().Date()
+	now := time.Date(y, mo, day, 12, 0, 0, 0, time.Local)
 	db := testDB(t,
 		store.LoggedVisit{Target: "w5f:item/1", Title: "An essay", Kind: "feed", At: now.AddDate(0, 0, -20)},
 		store.LoggedVisit{Target: "https://a.example/b", Title: "B", Kind: "web", At: now.AddDate(0, 0, -2)},

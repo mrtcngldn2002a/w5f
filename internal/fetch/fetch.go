@@ -135,6 +135,10 @@ func (f *Fetcher) load(u string) (*meta, []byte) {
 	if err != nil {
 		return nil, nil
 	}
+	// Read now: the cache's limit removes the pages read longest ago first.
+	now := time.Now()
+	_ = os.Chtimes(bp, now, now)
+	_ = os.Chtimes(mp, now, now)
 	return &m, body
 }
 

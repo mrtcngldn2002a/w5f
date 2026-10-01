@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -251,5 +252,39 @@ func TestSourcesFilterByLanguage(t *testing.T) {
 	ja, _ := Route(ctx, "w5f:comics/sources", env)
 	if s := text(ja); !strings.Contains(s, "(JA)") || strings.Contains(s, "(EN)") || !strings.Contains(s, "Local source") {
 		t.Errorf("Japanese sources:\n%s", s)
+	}
+}
+
+func TestMatchDownload(t *testing.T) {
+	chs := []suwayomi.DownloadedChapter{
+		{ID: 513, Name: "Ch.1 - Don't Forget Your Name", Manga: "The Backwards House"},
+		{ID: 4325, Name: "Issue #1", Manga: "Punisher (2026)"},
+		{ID: 9, Name: "Chapter 1", Scanlator: "Team X", Manga: "Berserk"},
+		{ID: 10, Name: "Chapter 1", Manga: "Another"},
+	}
+	root := filepath.Join("C", "Comics", "Suwayomi", "mangas")
+	for p, want := range map[string]int{
+		filepath.Join(root, "GlobalComix (EN)", "The Backwards House", "Ch.1 - Don't Forget Your Name.cbz"): 513,
+		filepath.Join(root, "XOXO Comics (EN)", "Punisher (2026)", "Issue #1.cbz"):                          4325,
+		filepath.Join(root, "Src", "Berserk", "Team X_Chapter 1.cbz"):                                       9,
+		filepath.Join(root, "Src", "Another", "Chapter 1.cbz"):                                              10,
+		filepath.Join(root, "Src", "Berserk", "Chapter 2.cbz"):                                              0,
+	} {
+		if id, _ := matchDownload(p, chs); id != want {
+			t.Errorf("%s → %d, want %d", filepath.Base(p), id, want)
+		}
+	}
+}
+
+// Suwayomi's thumbnails folder is not a comic.
+func TestThumbnailsAreNotAComic(t *testing.T) {
+	env, _ := testEnv(t)
+	thumbs := filepath.Join(env.Root, "Suwayomi", "thumbnails")
+	os.MkdirAll(thumbs, 0o755)
+	os.WriteFile(filepath.Join(thumbs, "75.webp"), []byte("x"), 0o644)
+	os.WriteFile(filepath.Join(thumbs, "84.jpg"), []byte("x"), 0o644)
+	Scan(env.DB, env.Root)
+	if _, ok := env.DB.ComicByPath(thumbs); ok {
+		t.Error("the thumbnails folder was listed as a comic")
 	}
 }

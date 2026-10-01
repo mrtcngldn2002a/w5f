@@ -43,6 +43,7 @@ var rooms = []room{
 	{"0", "The Scriptorium", "w5f:notes", nil},
 	{"H", "The Register", "w5f:history", nil},
 	{"L", "Ultan's Ledger", "w5f:ledger", nil},
+	{"W", "The Weeding Room", "w5f:weeding", []string{"w5f:weeding/"}}, // what is kept, and what can go (2026-10-02)
 }
 
 // roomList is the rooms in order.

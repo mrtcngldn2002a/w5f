@@ -44,6 +44,7 @@ import (
 	"w5f/internal/store"
 	"w5f/internal/ultan"
 	"w5f/internal/usenet"
+	"w5f/internal/weeding"
 )
 
 // Version is reported in the User-Agent.
@@ -91,6 +92,13 @@ func Load(ctx context.Context, target string, opts Options) (*doc.Document, erro
 			return nil, fmt.Errorf("opening the local database: %w", err)
 		}
 		return ultan.Ledger(db, time.Now())
+	}
+	if weeding.IsTarget(target) {
+		env, err := WeedingEnv()
+		if err != nil {
+			return nil, err
+		}
+		return weeding.Route(ctx, target, env)
 	}
 	if personal.IsTarget(target) || index.IsTarget(target) {
 		db, err := store.Default()
@@ -366,6 +374,8 @@ func Resolve(input string) string {
 		return "w5f:notes"
 	case lower == "history":
 		return "w5f:history"
+	case lower == "weeding" || lower == "weeding room":
+		return "w5f:weeding"
 	case lower == "ledger" || lower == "ultan":
 		return ultan.LedgerTarget
 	case strings.HasPrefix(lower, "find "):
@@ -426,6 +436,18 @@ func ComicsServer() suwayomi.Server {
 	root := comics.Root()
 	return suwayomi.Server{Dir: filepath.Join(store.DataDir(), "suwayomi"), Java: config.Load().Comics.Java,
 		Downloads: filepath.Join(root, "Suwayomi"), Local: filepath.Join(root, "Local")}
+}
+
+// WeedingEnv is what the Weeding Room needs.
+func WeedingEnv() (weeding.Env, error) {
+	db, err := store.Default()
+	if err != nil {
+		return weeding.Env{}, fmt.Errorf("opening the local database: %w", err)
+	}
+	cenv := comics.Env{DB: db, Root: comics.Root(), Server: ComicsServer()}
+	return weeding.Env{DB: db, CacheDir: Fetcher.CacheDir, DataDir: store.DataDir(), NotesDir: personal.Dir(),
+		BooksDir: books.LibraryDir(), ComicsDir: comics.Root(), CacheLimit: config.CacheLimit(),
+		RemoveSuwayomi: cenv.RemoveDownloaded, RescanComics: func() { comics.Scan(db, comics.Root()) }}, nil
 }
 
 // ComicsEnv is what the Comics pages need.

@@ -236,3 +236,14 @@ func TestBrowserCommand(t *testing.T) {
 		}
 	}
 }
+
+// The Weeding Room is in the side menu under the archive, opened with W.
+func TestWeedingRoomInTheMenu(t *testing.T) {
+	m := wide(New("", "test"))
+	if s := strings.Join(plainView(m), "\n"); !strings.Contains(s, "W  The Weeding Room") {
+		t.Errorf("no Weeding Room in the menu:\n%s", s)
+	}
+	if r := roomFor("w5f:weeding/notes"); r == nil || r.key != "W" {
+		t.Errorf("roomFor: %+v", r)
+	}
+}
