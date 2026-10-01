@@ -216,3 +216,12 @@ func oracleRoute(ctx context.Context, env Env, kind string) (*doc.Document, erro
 	page.Blocks = append(head, page.Blocks...)
 	return page, nil
 }
+
+// DrawOracle draws now: a tarot card ("tarot") or an I Ching hexagram
+// ("iching"), for the solo RPG table among others.
+func DrawOracle(ctx context.Context, f *fetch.Fetcher, kind string) (*Oracle, error) {
+	return drawOracle(ctx, f, kind)
+}
+
+// HexagramText draws a cast hexagram, top line first.
+func HexagramText(lines []int) string { return hexagramLines(lines) }

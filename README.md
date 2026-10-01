@@ -152,6 +152,15 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v1 go build -trimpath -ldflags "-s
 
   Progress is saved on every page turn, and to Suwayomi for its chapters. On the laptop: about 250 ms per page turn, 66 MB.
 
+## Solo RPG table
+
+`w5f:solo` (or `g → solo`): what playing alone needs at hand, with every throw your own if you want it.
+
+- **Oracle.** A yes/no question at one of five odds — almost certain 90, likely 75, 50/50, unlikely 25, small chance 10 — answered by a d100 at or under the chance; matching digits (11, 22 … 100) make it extreme, or a twist, and a spark comes with it. The odds follow Ironsworn's (Shawn Tomkin, CC BY 4.0). `g → ask likely Is the bridge guarded?`
+- **Dice.** `g → roll 2d6+1`, `d100`, `2d20kh1` (keep the highest: advantage), `4d6kl2`. Rolling your own? Add `= 9` (the total) or `= 3 6` (each die) and W5F reads yours; a face your dice cannot show is refused. The oracle takes yours too: `… = 57`.
+- **Sparks.** One or two English words from the dictionary (its English side only; `g → dict-install` first), a tarot card (Waite) or an I Ching hexagram (Legge), or a line from your own reading: a clipping, a page you read, a periodical's title. `g → spark words|word|tarot|iching|reading`.
+- **Log.** Every throw, answer and spark, with where it came from, is kept as JSON lines (a file a day) under `solo/log` in the data folder; the table shows the latest, `the whole log` the rest.
+
 ## Usenet
 
 Read only, over NNTP (`w5f:usenet`, or `g → usenet`).

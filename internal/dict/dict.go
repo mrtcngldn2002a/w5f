@@ -160,6 +160,12 @@ func (d *Dict) word(i int) string {
 	return string(d.idx[p : int(p)+z])
 }
 
+// Len is how many headwords the dictionary has.
+func (d *Dict) Len() int { return len(d.words) }
+
+// Word is headword i (0 ≤ i < Len), in the dictionary's order.
+func (d *Dict) Word(i int) string { return d.word(i) }
+
 func (d *Dict) synWord(i int) string {
 	p := d.syns[i].word
 	z := indexByte(d.synB[p:], 0)

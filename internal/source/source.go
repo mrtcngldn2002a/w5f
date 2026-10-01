@@ -28,6 +28,7 @@ import (
 	"w5f/internal/comics"
 	"w5f/internal/comics/suwayomi"
 	"w5f/internal/crom"
+	"w5f/internal/dict"
 	"w5f/internal/discover"
 	"w5f/internal/doc"
 	"w5f/internal/feeds"
@@ -40,6 +41,7 @@ import (
 	"w5f/internal/search"
 	"w5f/internal/sitecat"
 	"w5f/internal/smallweb"
+	"w5f/internal/solo"
 	"w5f/internal/store"
 	"w5f/internal/usenet"
 )
@@ -117,6 +119,13 @@ func Load(ctx context.Context, target string, opts Options) (*doc.Document, erro
 			return nil, err
 		}
 		return feeds.Route(ctx, target, env)
+	}
+	if solo.IsTarget(target) {
+		env, err := SoloEnv()
+		if err != nil {
+			return nil, err
+		}
+		return solo.Route(ctx, target, env)
 	}
 	if usenet.IsTarget(target) {
 		env, err := UsenetEnv()
@@ -248,6 +257,16 @@ func Resolve(input string) string {
 		return "w5f:catalog/check?" + v.Encode()
 	case lower == "catalogs":
 		return "w5f:catalogs"
+	case lower == "solo", lower == "solo rpg", lower == "oracle":
+		return "w5f:solo"
+	case strings.HasPrefix(lower, "roll ") && isDice(s[len("roll "):]):
+		return "w5f:solo/roll?" + url.Values{"d": {strings.TrimSpace(s[len("roll "):])}}.Encode()
+	case strings.HasPrefix(lower, "ask ") && askTarget(s[len("ask "):]) != "":
+		return askTarget(s[len("ask "):])
+	case lower == "spark":
+		return "w5f:solo/spark/words"
+	case strings.HasPrefix(lower, "spark ") && isSpark(strings.TrimSpace(lower[len("spark "):])):
+		return "w5f:solo/spark/" + strings.TrimSpace(lower[len("spark "):])
 	case lower == "usenet", lower == "news":
 		return "w5f:usenet"
 	case strings.HasPrefix(lower, "usenet ") && len(strings.Fields(s)) > 1:
@@ -399,6 +418,17 @@ func ComicsServer() suwayomi.Server {
 }
 
 // ComicsEnv is what the Comics pages need.
+// SoloEnv assembles what the solo RPG table needs.
+func SoloEnv() (solo.Env, error) {
+	db, err := store.Default()
+	if err != nil {
+		return solo.Env{}, fmt.Errorf("opening the local database: %w", err)
+	}
+	return solo.Env{DB: db, Fetcher: Fetcher, Notes: personal.Dir(),
+		LogDir: filepath.Join(store.DataDir(), "solo", "log"),
+		Dict:   func() (*dict.Dict, error) { return dict.Shared(dict.Dir(store.DataDir())) }}, nil
+}
+
 // UsenetEnv assembles what the Usenet pages need.
 func UsenetEnv() (usenet.Env, error) {
 	db, err := store.Default()

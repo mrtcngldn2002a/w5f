@@ -137,7 +137,7 @@ func Load(ctx context.Context, e Env, raw string) (*doc.Document, error) {
 		su, err := url.Parse(q.Get("u"))
 		// Web searches, and W5F's own Comics questions (source search, add
 		// a repository), which answer to w5f:comics/ addresses.
-		if err != nil || (su.Scheme != "http" && su.Scheme != "https" && !strings.HasPrefix(q.Get("u"), "w5f:comics/")) {
+		if err != nil || (su.Scheme != "http" && su.Scheme != "https" && !strings.HasPrefix(q.Get("u"), "w5f:comics/") && !strings.HasPrefix(q.Get("u"), "w5f:solo/")) {
 			return nil, errors.New("bad search address")
 		}
 		d := inputPage(raw, su, q.Get("p"), false)
