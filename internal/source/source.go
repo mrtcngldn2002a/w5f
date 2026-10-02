@@ -41,6 +41,7 @@ import (
 	"w5f/internal/sitecat"
 	"w5f/internal/smallweb"
 	"w5f/internal/solo"
+	"w5f/internal/solver"
 	"w5f/internal/store"
 	"w5f/internal/ultan"
 	"w5f/internal/usenet"
@@ -86,6 +87,13 @@ type Options struct {
 // Load resolves and converts target.
 func Load(ctx context.Context, target string, opts Options) (*doc.Document, error) {
 	target = strings.TrimSpace(target)
+	if solver.IsTarget(target) {
+		db, e := store.Default()
+		if e != nil {
+			return nil, e
+		}
+		return solver.Route(ctx, target, db, solver.Default())
+	}
 	if strings.HasPrefix(target, "w5f:random/") {
 		return loadRandom(ctx, strings.TrimPrefix(target, "w5f:random/"))
 	}
@@ -380,6 +388,8 @@ func Resolve(input string) string {
 		return "w5f:notes"
 	case lower == "history":
 		return "w5f:history"
+	case lower == "solver":
+		return "w5f:solver"
 	case lower == "weeding" || lower == "weeding room":
 		return "w5f:weeding"
 	case lower == "ledger" || lower == "ultan":

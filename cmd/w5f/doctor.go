@@ -16,6 +16,7 @@ import (
 	"w5f/internal/doctor"
 	"w5f/internal/fetch"
 	"w5f/internal/personal"
+	"w5f/internal/solver"
 	"w5f/internal/source"
 	"w5f/internal/store"
 	"w5f/internal/sysdeps"
@@ -48,6 +49,24 @@ func runDoctor(args []string) int {
 		Browser: func() (string, error) { l, err := browser.Choose(); return l.Name, err },
 		Solver:  config.SolverURL(), ProbeSolver: func(u string) (string, error) { return fetch.ProbeSolver(context.Background(), u) }}
 	fmt.Println("W5F doctor")
+	e.SolverInfo = func() []doctor.Result {
+		m := solver.Default()
+		s := m.Status(context.Background())
+		var out []doctor.Result
+		if s.Dir != "" {
+			out = append(out, doctor.Result{Status: doctor.OK, Name: "Byparr installation", Detail: fmt.Sprintf("%s in %s; %.1f GB; owner: %s", s.Version, s.Dir, float64(s.Bytes)/(1<<30), s.Owner)})
+		}
+		if s.Update != "" {
+			out = append(out, doctor.Result{Status: doctor.Warn, Name: "Byparr update", Detail: s.Update})
+		}
+		if hint := solver.XvfbHint(m.DataDir); hint != "" {
+			out = append(out, doctor.Result{Status: doctor.Warn, Name: "Byparr display", Detail: hint})
+		}
+		if err := solver.Supported(runtime.GOOS, runtime.GOARCH); err != nil {
+			out = append(out, doctor.Result{Status: doctor.Warn, Name: "Byparr install", Detail: err.Error()})
+		}
+		return out
+	}
 	fails := doctor.Print(os.Stdout, doctor.Check(e))
 	if live {
 		fmt.Println("\nLive sources")

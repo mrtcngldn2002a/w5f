@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"w5f/internal/solver"
 	"w5f/internal/sysdeps"
 )
 
@@ -89,6 +90,9 @@ func (s Server) Running(ctx context.Context) bool {
 // Start launches the server unless one already answers, and waits until it
 // does (up to wait). It reports whether this call started it.
 func (s Server) Start(ctx context.Context, wait time.Duration) (bool, error) {
+	if s.Jar() != "" && s.Solver != "" {
+		_ = solver.Ensure(ctx, s.Solver)
+	}
 	started, err := s.start(ctx, wait)
 	if err == nil && (started || s.ours()) {
 		s.solverDefault(ctx)

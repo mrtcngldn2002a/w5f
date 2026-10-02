@@ -6,8 +6,11 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net/url"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -19,11 +22,13 @@ import (
 	"w5f/internal/dict"
 	"w5f/internal/doc"
 	"w5f/internal/feeds"
+	"w5f/internal/fetch"
 	"w5f/internal/fiction"
 	"w5f/internal/index"
 	"w5f/internal/personal"
 	"w5f/internal/reddit"
 	"w5f/internal/render"
+	"w5f/internal/solver"
 	"w5f/internal/source"
 	"w5f/internal/store"
 	"w5f/internal/tui"
@@ -53,6 +58,7 @@ Usage:
   w5f comics list|update       comics: local library and followed series (w5f comics for more)
   w5f doctor [--live] [--bench]
                               check this install (--live: sources, --bench: speed)
+  w5f solver install [--yes]  install Byparr (status | start | stop | update | remove)
   w5f update [--check]        install the latest signed release (GitHub Releases)
   w5f update --rollback       go back to the previous version
   w5f version                 print the version
@@ -60,6 +66,7 @@ Usage:
 
 func main() {
 	source.Version = version
+	fetch.EnsureSolver = solver.Ensure
 	args := os.Args[1:]
 	if len(args) > 0 {
 		switch args[0] {
@@ -70,11 +77,14 @@ func main() {
 			fmt.Printf(usage, version)
 			return
 		case "dump":
+			solver.AutoStart = true
 			os.Exit(dump(args[1:]))
 		case "update":
 			os.Exit(runUpdate(args[1:]))
 		case "selftest":
 			os.Exit(selftest())
+		case "solver":
+			os.Exit(runSolver(args[1:]))
 		case "doctor":
 			os.Exit(runDoctor(args[1:]))
 		case "comics":
@@ -143,16 +153,29 @@ func main() {
 		}
 	}
 	source.Init(cacheDir(), offline)
+	solver.AutoStart = true
 	comics.AutoStart = true  // the reader stops it again on exit
 	source.OpenImages = true // pictures open in the comics viewer
 	registerComicsForms()
+	if !offline {
+		if db, e := store.Default(); e == nil && solver.ShouldAsk(context.Background(), db, solver.Default(), runtime.GOOS, runtime.GOARCH) {
+			next := target
+			if next == "" {
+				next = "w5f:welcome"
+			}
+			target = "w5f:solver/first?" + url.Values{"next": {next}}.Encode()
+			_ = db.Set("solver:asked", "shown")
+		}
+	}
 	// Keep W5F's own page cache under its limit, in the background (only its
 	// own folders: see weeding.CacheParts).
 	go weeding.TrimCache(cacheDir(), config.CacheLimit())
 	p := tea.NewProgram(tui.New(target, version))
 	_, err := p.Run()
-	reddit.Shutdown()                      // stop a Redlib that W5F started
-	comics.Shutdown(source.ComicsServer()) // and a Suwayomi
+	tui.CancelLoads()
+	reddit.Shutdown() // stop a Redlib that W5F started
+	comics.Shutdown(source.ComicsServer())
+	solver.Shutdown() // stop the helper started by this reader
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "w5f:", err)
 		os.Exit(1)
@@ -283,9 +306,12 @@ func dump(args []string) int {
 		fmt.Fprintf(os.Stderr, usage, version)
 		return 2
 	}
-	d, err := source.Load(context.Background(), source.Resolve(fs.Arg(0)), source.Options{})
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+	d, err := source.Load(ctx, source.Resolve(fs.Arg(0)), source.Options{})
 	reddit.Shutdown()
 	comics.Shutdown(source.ComicsServer())
+	solver.Shutdown()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "w5f:", err)
 		return 1

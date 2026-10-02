@@ -15,6 +15,7 @@ import (
 
 	"w5f/internal/doc"
 	"w5f/internal/personal"
+	"w5f/internal/solver"
 	"w5f/internal/store"
 	"w5f/internal/ultan"
 )
@@ -170,6 +171,11 @@ func (env Env) room(note string) *doc.Document {
 	row(fmt.Sprintf("The page cache (%d files)", cacheFiles), cache, env.CacheDir)
 	row("The catalogue: history, periodicals, search index", fileSize(db, db+"-wal", db+"-shm"), db)
 	row("The visit log", fileSize(logs...), filepath.Join(env.DataDir, "history.log"))
+	byparrDirs, _ := filepath.Glob(filepath.Join(env.DataDir, "byparr-v*"))
+	for _, dir := range byparrDirs {
+		n, _ := dirSize(dir)
+		row("Byparr: "+filepath.Base(dir), n, dir)
+	}
 	for _, d := range []struct{ what, dir string }{
 		{"The dictionary", filepath.Join(env.DataDir, "dict")},
 		{"Suwayomi: the server and its data", filepath.Join(env.DataDir, "suwayomi")},
@@ -179,6 +185,10 @@ func (env Env) room(note string) *doc.Document {
 		row(d.what, n, d.dir)
 	}
 	p.add(doc.Table{Header: true, Rows: rows})
+	if len(byparrDirs) > 0 {
+		p.italic("Byparr is managed in g → solver; it cannot be removed from the Weeding Room.")
+		p.add(doc.Paragraph{Text: doc.Inline{p.link(solver.Target, "Bot-check helper")}})
+	}
 	if env.CacheLimit > 0 {
 		p.italic(fmt.Sprintf("The page cache is kept under %s: when it grows past that, the pages read longest ago go first ([cache] limit_mb in config.toml; 0 keeps everything). Only W5F's own cache folders are ever touched.", Size(env.CacheLimit)))
 	} else {

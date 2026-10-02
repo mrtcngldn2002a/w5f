@@ -29,6 +29,7 @@ import (
 	"w5f/internal/render"
 	"w5f/internal/sitecat"
 	"w5f/internal/smallweb"
+	"w5f/internal/solver"
 	"w5f/internal/source"
 	"w5f/internal/store"
 	"w5f/internal/theme"
@@ -168,6 +169,10 @@ func cancelLoad() {
 	}
 	loadMu.Unlock()
 }
+
+// CancelLoads lets the application cancel pending installs and downloads
+// when the terminal closes as well as on esc or ctrl+c.
+func CancelLoads() { cancelLoad() }
 
 // catalogLoading is the status text while a site-catalog page loads.
 func catalogLoading(href string) string {
@@ -341,6 +346,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	s := k.String()
 	if s == "ctrl+c" {
+		cancelLoad()
 		m.leavePage()
 		return m, tea.Quit
 	}
@@ -378,9 +384,18 @@ func (m Model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	m.status = ""
 	p := m.cur
+	if strings.HasPrefix(p.doc.URL, "w5f:solver/first") {
+		if s == "y" {
+			return m.follow(p.doc.Links[1].Href)
+		}
+		if s == "n" {
+			return m.follow(p.doc.Links[0].Href)
+		}
+	}
 	switch s {
 	case "q":
 		m.leavePage()
+		cancelLoad()
 		return m, tea.Quit
 	case "]":
 		if p.doc.Next != "" {
@@ -1392,6 +1407,9 @@ func (m Model) bottomBar() string {
 			text = " " + p + " …   esc cancels"
 		}
 		if p, _ := fetch.SolverProgress.Load().(string); p != "" {
+			text = " " + p + " …   esc cancels"
+		}
+		if p, _ := solver.Progress.Load().(string); p != "" {
 			text = " " + p + " …   esc cancels"
 		}
 	case m.mode == modeDict:

@@ -100,7 +100,7 @@ func TestSolverCheck(t *testing.T) {
 	}{
 		{Env{Solver: "", ProbeSolver: probe("", nil)}, OK, "off"},
 		{Env{Solver: "http://127.0.0.1:8191", ProbeSolver: probe("Byparr", nil)}, OK, "Byparr answers at http://127.0.0.1:8191"},
-		{Env{Solver: "http://127.0.0.1:8191", ProbeSolver: probe("", errors.New("no bot-check helper is running"))}, Warn, ByparrURL},
+		{Env{Solver: "http://127.0.0.1:8191", ProbeSolver: probe("", errors.New("no bot-check helper is running"))}, Warn, "w5f solver install"},
 	} {
 		r, ok := solverCheck(tc.e)
 		if !ok || r.Status != tc.status || !strings.Contains(r.Detail, tc.want) {

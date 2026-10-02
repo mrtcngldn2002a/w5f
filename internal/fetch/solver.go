@@ -27,6 +27,13 @@ import (
 // SolverProgress is a status line for the UI while the helper works.
 var SolverProgress atomic.Value
 
+// EnsureSolver is set by the application, keeping HTTP-only clients and tests
+// independent from process management. It probes before starting a helper.
+var EnsureSolver func(context.Context, string) error
+
+// NoSolver distinguishes an absent listener from an unrecognized service.
+func NoSolver(err error) bool { return errors.Is(err, errNoSolver) }
+
 // solverMissFor is how long a site the helper could not open is left alone.
 const solverMissFor = 24 * time.Hour
 
@@ -144,6 +151,13 @@ func (f *Fetcher) solve(ctx context.Context, target *url.URL) (*Response, error)
 var errNoSolver = errors.New("no bot-check helper is running")
 
 func (f *Fetcher) askSolver(ctx context.Context, base, target *url.URL) (*Response, error) {
+	if EnsureSolver != nil {
+		raw := *base
+		raw.Path = strings.TrimSuffix(raw.Path, "/v1")
+		if err := EnsureSolver(ctx, raw.String()); err != nil {
+			return nil, err
+		}
+	}
 	payload, err := json.Marshal(map[string]any{
 		"cmd": "request.get", "url": target.String(), "maxTimeout": 60000,
 		"session": "w5f", "session_ttl_minutes": 15, "returnOnlyCookies": false,

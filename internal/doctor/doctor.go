@@ -59,6 +59,7 @@ type Env struct {
 	// The bot-check helper ([fetch] solver_url; "" = off) and its probe.
 	Solver      string
 	ProbeSolver func(string) (string, error)
+	SolverInfo  func() []Result
 }
 
 // Check runs the offline checks.
@@ -102,6 +103,9 @@ func Check(e Env) []Result {
 	out = append(out, comicsChecks(e)...)
 	if r, ok := solverCheck(e); ok {
 		out = append(out, r)
+	}
+	if e.SolverInfo != nil {
+		out = append(out, e.SolverInfo()...)
 	}
 
 	switch {
@@ -260,8 +264,7 @@ func solverCheck(e Env) (Result, bool) {
 	}
 	name, err := e.ProbeSolver(e.Solver)
 	if err != nil {
-		return Result{Warn, "bot-check helper", err.Error() + ": pages behind a bot check stay closed. W5F does not install one; run Byparr (" +
-			ByparrURL + ") or FlareSolverr (" + FlareSolverrURL + ") there, as their pages describe"}, true
+		return Result{Warn, "bot-check helper", err.Error() + ": pages behind a bot check stay closed. Run w5f solver install, or open g → solver. Existing Byparr/FlareSolverr services are reused."}, true
 	}
 	return Result{OK, "bot-check helper", name + " answers at " + e.Solver}, true
 }

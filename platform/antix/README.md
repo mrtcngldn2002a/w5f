@@ -38,7 +38,7 @@ included, then hang until the restart (seen on 2026-09-29).
 
 W5F and the Suwayomi it starts ask a local helper at `127.0.0.1:8191` when a
 site answers with a verification wall (see *Bot-check helper* in the main
-README). With Byparr in `~/.local/share/w5f/byparr-v*` (the newest one is
+README). `w5f solver install` installs Byparr when needed, with verified downloads; an existing manual installation is adopted without downloading or claiming its files. Declining the first-launch question does not prevent later installation. With Byparr in `~/.local/share/w5f/byparr-v*` (the newest one is
 used), this runs it as an s6 service, as your own user, started at boot:
 
 ```sh
@@ -50,7 +50,7 @@ sh install.sh byparr-undo   # takes the service away again (so does --undo)
 - It listens on 127.0.0.1 only; Byparr's own default would be every address.
 - A Byparr started by hand is stopped; the service takes the port over.
 - Byparr itself is not installed, changed or removed by this; neither is anything in `~/.cache/w5f`.
-- On the laptop (2026-10-02): about 100 MB while idle, about 560 MB more while it opens a page; it starts in about 4 s.
+- On the laptop (2026-10-02): about 100 MB while idle, about 816–832 MB more during consecutive page opens; it starts in about 4 s.
 
 ## The session
 
