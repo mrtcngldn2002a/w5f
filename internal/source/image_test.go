@@ -12,8 +12,36 @@ import (
 	"strings"
 	"testing"
 
+	"w5f/internal/books/fixtures"
 	"w5f/internal/doc"
 )
+
+// A PDF from the web (a journal's full text) is read as text, the file kept
+// in the cache's pdf folder.
+func TestWebPDFIsRead(t *testing.T) {
+	withFetcher(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/pdf")
+		w.Write(fixtures.PDF("Halk anlatilarinin elektronik kultur ortamindaki seruveni uzerine bir inceleme."))
+	}))
+	defer srv.Close()
+	d, err := Load(context.Background(), srv.URL+"/tr/download/article-file/42", Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var text strings.Builder
+	for _, b := range d.Blocks {
+		if p, ok := b.(doc.Paragraph); ok {
+			text.WriteString(p.Text.PlainText() + "\n")
+		}
+	}
+	if !strings.Contains(text.String(), "elektronik kultur ortamindaki") || !strings.Contains(text.String(), "page 1") {
+		t.Errorf("PDF text:\n%s", text.String())
+	}
+	if saved, _ := filepath.Glob(filepath.Join(Fetcher.CacheDir, "pdf", "*.pdf")); len(saved) != 1 {
+		t.Errorf("the PDF is kept in the cache: %v", saved)
+	}
+}
 
 func pngFile(t *testing.T) []byte {
 	var b bytes.Buffer

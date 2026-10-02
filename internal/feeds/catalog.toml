@@ -283,24 +283,12 @@ url = ["https://feeds2.feedburner.com/PhilosophicalReviews/News"]
 site = "https://ndpr.nd.edu/"
 
 [[feed]]
-id = "hopwag"
-name = "History of Philosophy without any gaps"
-shelf = "mind"
-url = ["https://historyofphilosophy.net/rss.xml"]
-site = "https://historyofphilosophy.net/"
-
-[[feed]]
 id = "philosophynow"
 name = "Philosophy Now"
 shelf = "mind"
 url = ["https://philosophynow.org/rss", "https://philosophynow.org/rss.xml"]
 
 # ---------------------------------------------------------------- Ancient world
-[[feed]]
-id = "archaeologymag"
-name = "Archaeology Magazine"
-shelf = "ancient"
-url = ["https://archaeology.org/feed/"]
 
 [[feed]]
 id = "anthronews"
@@ -355,12 +343,6 @@ shelf = "science"
 url = ["https://knowablemagazine.org/rss"]
 
 [[feed]]
-id = "sciencenews"
-name = "Science News"
-shelf = "science"
-url = ["https://www.sciencenews.org/feed"]
-
-[[feed]]
 id = "smithsonianscience"
 name = "Smithsonian — Science & Nature"
 shelf = "science"
@@ -368,6 +350,7 @@ url = ["https://www.smithsonianmag.com/rss/science-nature/"]
 
 [[feed]]
 id = "jpl"
+disabled = true  # the address answers with a page that is not a feed (checked 2026-10-02)
 name = "NASA JPL"
 shelf = "science"
 url = ["https://www.jpl.nasa.gov/feeds/news/"]
@@ -460,12 +443,6 @@ shelf = "specfic"
 url = ["https://www.uncannymagazine.com/feed/"]
 
 [[feed]]
-id = "bcs"
-name = "Beneath Ceaseless Skies"
-shelf = "specfic"
-url = ["https://www.beneath-ceaseless-skies.com/feed/"]
-
-[[feed]]
 id = "apex"
 disabled = true  # magazine moved to apexbookcompany.com, no feed (checked 2026-09-28)
 name = "Apex Magazine"
@@ -532,12 +509,6 @@ shelf = "tech"
 url = ["https://feeds.arstechnica.com/arstechnica/index"]
 
 [[feed]]
-id = "hackaday"
-name = "Hackaday"
-shelf = "tech"
-url = ["https://hackaday.com/blog/feed/"]
-
-[[feed]]
 id = "lobsters"
 name = "Lobsters"
 shelf = "tech"
@@ -548,12 +519,6 @@ id = "hackernews"
 name = "Hacker News"
 shelf = "tech"
 url = ["https://hnrss.org/frontpage"]
-
-[[feed]]
-id = "planetdebian"
-name = "Planet Debian"
-shelf = "tech"
-url = ["https://planet.debian.org/rss20.xml"]
 
 # ---------------------------------------------------------------- New arrivals
 [[feed]]
@@ -568,12 +533,6 @@ url = ["https://blog.archive.org/feed/"]
 # long-running practitioners over sensational sites.
 
 [[feed]]
-id = "correspondences"
-name = "Correspondences (journal)"
-shelf = "occult"
-url = ["https://correspondencesjournal.com/feed/"]
-
-[[feed]]
 id = "threehands"
 name = "Three Hands Press"
 shelf = "occult"
@@ -584,12 +543,6 @@ id = "ecosophia"
 name = "Ecosophia (John Michael Greer)"
 shelf = "occult"
 url = ["https://www.ecosophia.net/feed/"]
-
-[[feed]]
-id = "goldendawn"
-name = "Hermetic Order of the Golden Dawn"
-shelf = "occult"
-url = ["https://www.hermeticgoldendawn.org/feed/"]
 
 [[feed]]
 id = "wildhunt"
@@ -726,3 +679,53 @@ id = "righto"
 name = "Ken Shirriff's blog"
 shelf = "tech"
 url = ["https://www.righto.com/feeds/posts/default?alt=rss"]
+
+# The same day, in place of short news and announcement feeds (Archaeology
+# Magazine, Science News, Hackaday, Planet Debian, HoPWaG's podcast notes,
+# the Golden Dawn's and Correspondences' announcements), chosen by the owner
+# and checked live (median words: Antigone ~1400, Peopling the Past ~1500,
+# Asimov Press ~7500, The Conversation ~1100, APA Blog ~1900, New Work in
+# Philosophy ~1250). Beneath Ceaseless Skies' main feed carried only slush
+# updates; its stories feed (~8500) replaces it under a new id.
+
+[[feed]]
+id = "antigone"
+name = "Antigone"
+shelf = "ancient"
+url = ["https://antigonejournal.com/feed/"]
+
+[[feed]]
+id = "peoplingthepast"
+name = "Peopling the Past"
+shelf = "ancient"
+url = ["https://peoplingthepast.com/feed/"]
+
+[[feed]]
+id = "asimov"
+name = "Asimov Press"
+shelf = "science"
+url = ["https://www.asimov.press/feed"]
+
+[[feed]]
+id = "conversationscience"
+name = "The Conversation — Science + Tech"
+shelf = "science"
+url = ["https://theconversation.com/us/technology/articles.atom"]
+
+[[feed]]
+id = "apablog"
+name = "Blog of the APA"
+shelf = "mind"
+url = ["https://blog.apaonline.org/feed/"]
+
+[[feed]]
+id = "newworkphil"
+name = "New Work in Philosophy"
+shelf = "mind"
+url = ["https://newworkinphilosophy.substack.com/feed"]
+
+[[feed]]
+id = "bcsstories"
+name = "Beneath Ceaseless Skies"
+shelf = "specfic"
+url = ["https://www.beneath-ceaseless-skies.com/stories/feed/"]

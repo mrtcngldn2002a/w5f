@@ -98,6 +98,40 @@ func TestRemovedFeedIsOutOfSight(t *testing.T) {
 	}
 }
 
+// A DergiPark item opens the article's full-text PDF, not its abstract page.
+func TestDergiParkItemOpensThePDF(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `<html><body><p>Öz: kısa.</p><a href="/tr/download/article-file/42">Tam Metin</a></body></html>`)
+	}))
+	defer srv.Close()
+	old := dergiparkHost
+	dergiparkHost = strings.TrimPrefix(srv.URL, "http://")
+	defer func() { dergiparkHost = old }()
+	e := env(t, srv, Feed{ID: "mf", Name: "Millî Folklor", Shelf: "s", Lang: "tr"})
+	var opened []string
+	e.Article = func(ctx context.Context, u string) (*doc.Document, error) {
+		opened = append(opened, u)
+		return &doc.Document{Blocks: []doc.Block{doc.Paragraph{Text: doc.Inline{{Text: strings.Repeat("Makalenin tam metni. ", 100)}}}}}, nil
+	}
+	// The feed carries the abstract, long enough to pass for the article.
+	e.DB.UpsertItem(store.Item{FeedID: "mf", GUID: "a", URL: srv.URL + "/tr/pub/millifolklor/article/1788179", Title: "Bir makale", Published: time.Now(),
+		Summary: strings.Repeat("Uzun bir öz cümlesi. ", 80)})
+	items, _ := e.DB.Items(store.Query{})
+	d, err := Route(context.Background(), fmt.Sprintf("w5f:item/%d", items[0].ID), e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(opened) != 1 || opened[0] != srv.URL+"/tr/download/article-file/42" {
+		t.Errorf("opened %v", opened)
+	}
+	if d.Links[len(d.Links)-1].Href != srv.URL+"/tr/pub/millifolklor/article/1788179" {
+		t.Errorf("the original page link is the article's page: %+v", d.Links)
+	}
+	if pdfOf(context.Background(), e.Fetcher, "https://example.org/article/1") != "" {
+		t.Error("only DergiPark's article pages")
+	}
+}
+
 func TestShelvesAndItemDocs(t *testing.T) {
 	recent := time.Now().Add(-time.Hour).Format(time.RFC1123Z)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

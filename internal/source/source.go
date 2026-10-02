@@ -817,10 +817,62 @@ func webImage(resp *fetch.Response) (*doc.Document, error) {
 	return imageDoc(path, "live", resp.URL.String()), nil
 }
 
+// webPDFChapters caps a PDF from the web shown as one page (ten PDF pages
+// each): enough for a journal article, the full text DergiPark and others
+// link to (2026-10-02).
+const webPDFChapters = 8
+
+// webPDF reads a PDF from the web with the Library's PDF reader: the file
+// is kept in the cache, its text shown as one document.
+func webPDF(resp *fetch.Response) (*doc.Document, error) {
+	sum := sha256.Sum256([]byte(resp.URL.String()))
+	dir := filepath.Join(os.TempDir(), "w5f-pdf")
+	if Fetcher.CacheDir != "" {
+		dir = filepath.Join(Fetcher.CacheDir, "pdf")
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, err
+	}
+	file := filepath.Join(dir, hex.EncodeToString(sum[:8])+".pdf")
+	if err := os.WriteFile(file, resp.Body, 0o644); err != nil {
+		return nil, err
+	}
+	r, err := books.Open(file)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", resp.URL, err)
+	}
+	defer r.Close()
+	d := &doc.Document{Title: r.Info().Title, URL: resp.URL.String(), Origin: "live"}
+	if d.Title == "" {
+		d.Title = filepath.Base(resp.URL.Path)
+	}
+	chs := r.Contents()
+	for i := range chs[:min(len(chs), webPDFChapters)] {
+		cd, err := r.ChapterDoc(i, func(int) string { return "" })
+		if err != nil {
+			continue
+		}
+		d.Blocks = append(d.Blocks, doc.ShiftLinks(cd.Blocks, len(d.Links))...)
+		d.Links = append(d.Links, cd.Links...)
+	}
+	if len(chs) > webPDFChapters {
+		d.Blocks = append(d.Blocks, doc.Notice{Kind: "info", Text: fmt.Sprintf("The first %d pages are shown; save the PDF to the Library for the rest.", webPDFChapters*10)})
+	}
+	d.Meta = []doc.KV{{Key: "from", Value: "a PDF, read as text"}}
+	if a := r.Info().Author; a != "" {
+		d.Meta = append(d.Meta, doc.KV{Key: "by", Value: a})
+	}
+	d.Renumber()
+	return d, nil
+}
+
 func convertResponse(resp *fetch.Response) (*doc.Document, error) {
 	ct := resp.ContentType
 	if strings.HasPrefix(ct, "image/") {
 		return webImage(resp)
+	}
+	if strings.HasPrefix(ct, "application/pdf") || bytes.HasPrefix(resp.Body, []byte("%PDF-")) {
+		return webPDF(resp)
 	}
 	if strings.HasPrefix(ct, "text/plain") {
 		return plainText(string(resp.Body), resp.URL.String(), "live"), nil

@@ -14,13 +14,14 @@ import (
 )
 
 // CacheParts are the only folders inside the cache folder that W5F ever
-// measures, empties or trims: its own four, and internet-fiction, the page
+// measures, empties or trims: its own five (pdf, the PDFs read from the web,
+// since 2026-10-02), and internet-fiction, the page
 // cache W5F v1's Internet Fiction tool left (pages of 2026-09-27; nothing
 // on the laptop uses it any more — checked 2026-10-02, the owner agreed).
 // Anything else there belongs to other programs set up beside W5F (uv,
 // flaresolverr-install, byparr-install on the laptop) and is never listed,
 // measured or touched (the owner's rule, 2026-10-02).
-var CacheParts = []string{"http", "smallweb", "images", "pdftext", "internet-fiction"}
+var CacheParts = []string{"http", "smallweb", "images", "pdftext", "pdf", "internet-fiction"}
 
 // cacheFiles lists the files of W5F's own cache parts.
 func cacheFiles(cacheDir string) []fileInfo {

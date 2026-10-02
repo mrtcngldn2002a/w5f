@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/PuerkitoBio/goquery"
+
 	"w5f/internal/catalog"
 	"w5f/internal/doc"
 	"w5f/internal/fetch"
@@ -338,6 +340,35 @@ func listDoc(env Env, title, base string, q store.Query, page int, note string) 
 	return d
 }
 
+var dergiparkHost = "dergipark.org.tr" // a test server's in tests
+
+// pdfOf finds the full-text PDF of a DergiPark article page: the feeds of
+// its journals link to the page, which shows only the abstract (2026-10-02,
+// the owner chose to read the articles in full). "" for other pages.
+func pdfOf(ctx context.Context, f *fetch.Fetcher, raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || f == nil || !strings.HasSuffix(u.Host, dergiparkHost) || !strings.Contains(u.Path, "/article/") {
+		return ""
+	}
+	resp, err := f.Get(ctx, u, fetch.Options{})
+	if err != nil {
+		return ""
+	}
+	gq, err := goquery.NewDocumentFromReader(bytes.NewReader(resp.Body))
+	if err != nil {
+		return ""
+	}
+	href, ok := gq.Find(`a[href*="/download/article-file/"]`).First().Attr("href")
+	if !ok {
+		return ""
+	}
+	pdf, err := u.Parse(href)
+	if err != nil {
+		return ""
+	}
+	return pdf.String()
+}
+
 // itemDoc shows one item, fetching the full article for excerpt-only feeds.
 func itemDoc(ctx context.Context, id int64, env Env) (*doc.Document, error) {
 	it, err := env.DB.Item(id)
@@ -372,8 +403,13 @@ func itemDoc(ctx context.Context, id int64, env Env) (*doc.Document, error) {
 	}
 	feedText := htmlconv.FragmentText(body)
 	source := "from the feed"
-	if len(strings.Join(strings.Fields(feedText), "")) < fullTextBelow && it.URL != "" && env.Article != nil {
-		if art, err := env.Article(ctx, it.URL); err == nil && doc.TextLength(art.Blocks) > len(strings.Join(strings.Fields(feedText), "")) {
+	articleURL := it.URL
+	if pdf := pdfOf(ctx, env.Fetcher, it.URL); pdf != "" {
+		articleURL = pdf // a journal's full text instead of its abstract page
+	}
+	// A journal's abstract can be long; its full text is still wanted.
+	if (len(strings.Join(strings.Fields(feedText), "")) < fullTextBelow || articleURL != it.URL) && it.URL != "" && env.Article != nil {
+		if art, err := env.Article(ctx, articleURL); err == nil && doc.TextLength(art.Blocks) > len(strings.Join(strings.Fields(feedText), "")) {
 			offset := len(d.Links)
 			d.Links = append(d.Links, art.Links...)
 			d.Blocks = append(d.Blocks, doc.ShiftLinks(art.Blocks, offset)...)
