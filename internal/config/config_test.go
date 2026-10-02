@@ -6,6 +6,38 @@ import (
 	"testing"
 )
 
+func TestSolverURL(t *testing.T) {
+	for _, env := range []string{"W5F_SOLVER_URL", "W5F_HERMETIC_SOLVER_URL"} {
+		t.Setenv(env, "")
+		os.Unsetenv(env)
+	}
+	data := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", data)
+	t.Setenv("APPDATA", data)
+	os.MkdirAll(filepath.Dir(Path()), 0755)
+	write := func(s string) { os.WriteFile(Path(), []byte(s), 0644) }
+	for _, tc := range []struct{ file, want string }{
+		{"", DefaultSolverURL}, // on by default, on every computer
+		{"[discovery]\nhermetic_solver_url = \"http://127.0.0.1:8193\"\n", "http://127.0.0.1:8193"},
+		{"[fetch]\nsolver_url = \"http://localhost:8192\"\n[discovery]\nhermetic_solver_url = \"http://127.0.0.1:8193\"\n", "http://localhost:8192"},
+		{"[fetch]\nsolver_url = \"\"\n", ""}, // turned off
+	} {
+		write(tc.file)
+		if got := SolverURL(); got != tc.want {
+			t.Fatalf("%q: %q, want %q", tc.file, got, tc.want)
+		}
+	}
+	write("")
+	t.Setenv("W5F_HERMETIC_SOLVER_URL", "http://localhost:8194")
+	if got := SolverURL(); got != "http://localhost:8194" {
+		t.Fatal(got)
+	}
+	t.Setenv("W5F_SOLVER_URL", "")
+	if got := SolverURL(); got != "" {
+		t.Fatal("an empty W5F_SOLVER_URL did not turn the helper off:", got)
+	}
+}
+
 func TestUserDirs(t *testing.T) {
 	home := t.TempDir()
 	p := filepath.Join(t.TempDir(), "user-dirs.dirs")

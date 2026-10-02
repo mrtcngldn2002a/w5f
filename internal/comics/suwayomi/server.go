@@ -25,6 +25,9 @@ type Server struct {
 	Port      int    // 0 = 4567
 	Downloads string // CBZ downloads
 	Local     string // the Local source folder (the user's own files)
+	// Solver is the bot-check helper set once as the server's FlareSolverr
+	// ("" leaves Suwayomi's own setting alone).
+	Solver string
 }
 
 func (s Server) port() int {
@@ -86,6 +89,34 @@ func (s Server) Running(ctx context.Context) bool {
 // Start launches the server unless one already answers, and waits until it
 // does (up to wait). It reports whether this call started it.
 func (s Server) Start(ctx context.Context, wait time.Duration) (bool, error) {
+	started, err := s.start(ctx, wait)
+	if err == nil && (started || s.ours()) {
+		s.solverDefault(ctx)
+	}
+	return started, err
+}
+
+// solverMark records that W5F has set the solver on this server once.
+func (s Server) solverMark() string { return filepath.Join(s.Dir, "w5f-solver-default") }
+
+// solverDefault turns the server's FlareSolverr on with Solver, once per
+// data folder: after that the setting is the owner's (2026-10-02), and
+// turning it off in Server settings stays off. server.conf writes every
+// default, so only W5F's own mark tells "never set" from "turned off".
+func (s Server) solverDefault(ctx context.Context) {
+	if s.Solver == "" {
+		return
+	}
+	if _, err := os.Stat(s.solverMark()); err == nil {
+		return
+	}
+	if err := s.Client().SetServerSettings(ctx, map[string]any{"flareSolverrEnabled": true, "flareSolverrUrl": s.Solver}); err != nil {
+		return // signed out or still starting: tried again next start
+	}
+	_ = os.WriteFile(s.solverMark(), []byte(s.Solver+"\n"), 0o644)
+}
+
+func (s Server) start(ctx context.Context, wait time.Duration) (bool, error) {
 	if s.Running(ctx) {
 		return false, nil
 	}

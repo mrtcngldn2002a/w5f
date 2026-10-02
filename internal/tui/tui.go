@@ -21,6 +21,7 @@ import (
 	"w5f/internal/crom"
 	"w5f/internal/dict"
 	"w5f/internal/doc"
+	"w5f/internal/fetch"
 	"w5f/internal/fiction"
 	"w5f/internal/index"
 	"w5f/internal/personal"
@@ -1388,6 +1389,9 @@ func (m Model) bottomBar() string {
 	case m.loading != "":
 		text = " loading " + m.loading + " …"
 		if p, _ := sitecat.CurrentProgress.Load().(string); p != "" {
+			text = " " + p + " …   esc cancels"
+		}
+		if p, _ := fetch.SolverProgress.Load().(string); p != "" {
 			text = " " + p + " …   esc cancels"
 		}
 	case m.mode == modeDict:

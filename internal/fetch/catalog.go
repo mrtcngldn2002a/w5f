@@ -26,6 +26,7 @@ func (f *Fetcher) ForCatalog() (*Fetcher, error) {
 		client := *f.Client
 		client.Transport = transport
 		f.catalog = &Fetcher{Client: &client, UserAgent: CatalogUserAgent, CacheDir: f.CacheDir, Offline: f.Offline, Fresh: f.Fresh, HostGap: f.HostGap, HostGaps: f.HostGaps, last: map[string]time.Time{}}
+		f.catalog.SolverURL = f.SolverURL
 		f.catalog.catalog = f.catalog
 		f.catalog.catalogOnce.Do(func() {})
 	})

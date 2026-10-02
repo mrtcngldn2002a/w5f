@@ -52,11 +52,17 @@ var Version = "0.0.0-dev"
 
 // Fetcher is the shared HTTP client. Init replaces it with a cached one; the
 // default (no disk cache) keeps tests and `dump` self-contained.
-var Fetcher = fetch.New("", Version)
+var Fetcher = newFetcher("", Version)
+
+func newFetcher(cacheDir, version string) *fetch.Fetcher {
+	f := fetch.New(cacheDir, version)
+	f.SolverURL = config.SolverURL()
+	return f
+}
 
 // Init configures the shared fetcher.
 func Init(cacheDir string, offline bool) {
-	Fetcher = fetch.New(cacheDir, Version)
+	Fetcher = newFetcher(cacheDir, Version)
 	Fetcher.Offline = offline
 }
 
@@ -434,7 +440,7 @@ func FictionEnv() (fiction.Env, error) {
 // folder so the library sees them.
 func ComicsServer() suwayomi.Server {
 	root := comics.Root()
-	return suwayomi.Server{Dir: filepath.Join(store.DataDir(), "suwayomi"), Java: config.Load().Comics.Java,
+	return suwayomi.Server{Dir: filepath.Join(store.DataDir(), "suwayomi"), Java: config.Load().Comics.Java, Solver: config.SolverURL(),
 		Downloads: filepath.Join(root, "Suwayomi"), Local: filepath.Join(root, "Local")}
 }
 

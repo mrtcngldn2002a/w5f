@@ -87,6 +87,9 @@ func nextFamily(db *store.DB) (Family, error) {
 // Next draws a page: up to three families are tried, a failing one is
 // skipped. The page opens with its "why you are here" line.
 func Next(ctx context.Context, env Env) (Draw, *doc.Document, error) {
+	// One bot-check helper request per draw (up to a minute); the other
+	// shelves are tried without it.
+	ctx = fetch.SolverOnce(ctx)
 	var errs []string
 	for try := 0; try < 3; try++ {
 		f, err := nextFamily(env.DB)

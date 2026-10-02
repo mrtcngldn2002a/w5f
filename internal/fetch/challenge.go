@@ -9,9 +9,15 @@ import (
 )
 
 // ChallengeError is a verification page, never usable or cacheable content.
-type ChallengeError struct{ URL, Reason string }
+type ChallengeError struct {
+	URL, Reason string
+	Helper      string // why the bot-check helper did not help, if it was asked
+}
 
 func (e *ChallengeError) Error() string {
+	if e.Helper != "" {
+		return fmt.Sprintf("%s: %s; %s", e.URL, e.Reason, e.Helper)
+	}
 	return fmt.Sprintf("%s: %s; the site still requires JavaScript or human verification, which this HTTP client cannot complete", e.URL, e.Reason)
 }
 

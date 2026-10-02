@@ -56,6 +56,7 @@ var fields = []field{
 	{name: "extensionRepos", kind: "SCALAR", typ: "String", list: true, settable: true},
 	{name: "downloadConversions", kind: "OBJECT", typ: "SettingsDownloadConversionType", list: true, settable: true},
 	{name: "flareSolverrEnabled", kind: "SCALAR", typ: "Boolean", settable: true},
+	{name: "flareSolverrUrl", kind: "SCALAR", typ: "String", settable: true},
 	{name: "kcefEnabled", kind: "SCALAR", typ: "Boolean", settable: true},
 	{name: "aboutOnly", kind: "SCALAR", typ: "String"}, // shown, not settable
 }
@@ -71,7 +72,7 @@ func New(t *testing.T) *Server {
 		"ip": "127.0.0.1", "port": 4567, "socksProxyEnabled": false, "socksProxyHost": "", "socksProxyPassword": "",
 		"downloadsPath": "/c", "autoDownloadNewChapters": false, "globalUpdateInterval": 12.0, "opdsItemsPerPage": 50,
 		"webUIFlavor": "WEBUI", "authMode": "NONE", "authUsername": "", "authPassword": "",
-		"extensionRepos": []any{}, "flareSolverrEnabled": false, "kcefEnabled": true, "aboutOnly": "x",
+		"extensionRepos": []any{}, "flareSolverrEnabled": false, "flareSolverrUrl": "http://localhost:8191", "kcefEnabled": true, "aboutOnly": "x",
 		"downloadConversions": []any{map[string]any{"mimeType": "image/webp", "target": "image/jpeg"}},
 	}, Stores: []string{"https://example.org/repo/index.min.json"}, Prefs: []map[string]any{
 		{"__typename": "SwitchPreference", "key": "show_notes", "title": "Show author's notes", "visible": true, "enabled": true, "currentValue": nil, "default": true},

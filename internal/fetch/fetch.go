@@ -57,7 +57,8 @@ type Response struct {
 
 // Options tune a single request.
 type Options struct {
-	ddgRetried bool
+	ddgRetried  bool
+	anubisTried bool
 	// Revalidate skips the freshness window and asks the server (reload).
 	Revalidate bool
 	// NoStore disables caching for this request.
@@ -79,6 +80,9 @@ type Fetcher struct {
 	// HostGaps overrides HostGap for hosts ending in the given suffix; sites
 	// like Reddit rate-limit anonymous readers aggressively.
 	HostGaps map[string]time.Duration
+	// SolverURL is a local bot-check helper (FlareSolverr-style /v1) asked
+	// when a page is a verification wall. Empty keeps ordinary HTTP behaviour.
+	SolverURL string
 
 	mu   sync.Mutex
 	last map[string]time.Time
@@ -243,15 +247,40 @@ func (f *Fetcher) Get(ctx context.Context, u *url.URL, opts Options) (*Response,
 		return nil, err
 	}
 	if reason := ChallengeReason(body); reason != "" {
+		// Anubis asks every visitor for a small proof of work; doing it is
+		// what the page is for, and the pass cookie stays in the jar.
+		if !opts.anubisTried && isAnubis(body) {
+			resp.Body.Close()
+			if err := f.solveAnubis(ctx, client, userAgent, resp.Request.URL, body); err == nil {
+				opts.anubisTried = true
+				opts.Revalidate = true
+				return f.Get(ctx, u, opts)
+			}
+		}
 		if f.catalog == f && !opts.ddgRetried && strings.Contains(reason, "DDoS-Guard") && f.bootstrapDDG(ctx, resp.Request.URL) {
 			resp.Body.Close()
 			opts.ddgRetried = true
 			opts.Revalidate = true
 			return f.Get(ctx, u, opts)
 		}
-		return nil, &ChallengeError{URL: resp.Request.URL.String(), Reason: reason}
+		ce := &ChallengeError{URL: resp.Request.URL.String(), Reason: reason}
+		if f.solverFor(u) {
+			resp.Body.Close()
+			solved, err := f.solved(ctx, key, u, opts)
+			if err == nil {
+				return solved, nil
+			}
+			ce.Helper = err.Error()
+		}
+		return nil, ce
 	}
 	if resp.StatusCode >= 400 {
+		if blockedStatus(resp) && f.solverFor(u) {
+			resp.Body.Close()
+			if solved, err := f.solved(ctx, key, u, opts); err == nil {
+				return solved, nil
+			}
+		}
 		if cm != nil && (resp.StatusCode >= 500 || resp.StatusCode == http.StatusTooManyRequests) {
 			return cm.response(cbody, true), nil
 		}
@@ -270,6 +299,19 @@ func (f *Fetcher) Get(ctx context.Context, u *url.URL, opts Options) (*Response,
 		f.store(m, body)
 	}
 	return &Response{Body: body, URL: resp.Request.URL, ContentType: m.ContentType, Fetched: m.Fetched}, nil
+}
+
+// solved is the helper's page for u, cached like any other (offline reading
+// works afterwards).
+func (f *Fetcher) solved(ctx context.Context, key string, u *url.URL, opts Options) (*Response, error) {
+	r, err := f.solve(ctx, u)
+	if err != nil {
+		return nil, err
+	}
+	if !opts.NoStore {
+		f.store(&meta{URL: key, FinalURL: r.URL.String(), ContentType: r.ContentType, Fetched: r.Fetched}, r.Body)
+	}
+	return r, nil
 }
 
 // PostJSON sends a JSON body and decodes a JSON reply into out. Not cached.

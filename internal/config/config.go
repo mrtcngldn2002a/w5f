@@ -43,6 +43,37 @@ type File struct {
 	Cache struct {
 		LimitMB *int `toml:"limit_mb"` // W5F's page cache; unset: 500, 0: no limit
 	} `toml:"cache"`
+	Fetch struct {
+		// SolverURL is the local bot-check helper (a FlareSolverr-style
+		// /v1 API); unset: DefaultSolverURL, "": none.
+		SolverURL *string `toml:"solver_url"`
+	} `toml:"fetch"`
+	Discovery struct {
+		HermeticSolverURL string `toml:"hermetic_solver_url"` // the older place of [fetch] solver_url
+	} `toml:"discovery"`
+}
+
+// DefaultSolverURL is where Byparr and FlareSolverr listen by default.
+const DefaultSolverURL = "http://127.0.0.1:8191"
+
+// SolverURL is the local helper W5F (and the Suwayomi it starts) asks when a
+// site answers with a verification page: W5F_SOLVER_URL, the older
+// W5F_HERMETIC_SOLVER_URL, [fetch] solver_url, [discovery]
+// hermetic_solver_url, else DefaultSolverURL. An empty value turns it off.
+func SolverURL() string {
+	for _, env := range []string{"W5F_SOLVER_URL", "W5F_HERMETIC_SOLVER_URL"} {
+		if value, set := os.LookupEnv(env); set {
+			return strings.TrimSpace(value)
+		}
+	}
+	f := Load()
+	if f.Fetch.SolverURL != nil {
+		return strings.TrimSpace(*f.Fetch.SolverURL)
+	}
+	if u := strings.TrimSpace(f.Discovery.HermeticSolverURL); u != "" {
+		return u
+	}
+	return DefaultSolverURL
 }
 
 // CacheLimit is the most W5F's own page cache may hold, in bytes (0: no

@@ -200,7 +200,7 @@ func settingsGroup(ctx context.Context, env Env, group, notice string) (*doc.Doc
 		p.heading("Settings")
 	}
 	if group == "cloudflare" {
-		p.note("warn", "FlareSolverr is a separate service that answers bot checks for Suwayomi's sources. W5F itself never bypasses such checks; using it here is your choice.")
+		p.note("warn", "FlareSolverr is a separate service that answers bot checks for Suwayomi's sources. W5F turns it on once, pointed at its local helper (solver_url in config.toml); keeping it on is your choice.")
 	}
 	var items []doc.Inline
 	for _, s := range st.List {

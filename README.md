@@ -201,7 +201,7 @@ Nothing is filtered by content: what a source holds may come up.
 
 **The small web.** `g → smallweb` lists Gemini capsules and Gopher holes; any `gemini://` or `gopher://` address opens like a page (Gemini certificates are trusted on first use and a changed one is refused; pages that ask for input are answered with `g → ? <text>`). The Small Web page also searches Wiby and Marginalia and opens Marginalia's random small sites, each with a "similar" link to steer (its text-friendly interface; when Marginalia is busy with bots it asks for a few seconds' wait, then the reader presses its continue link). `g → worlds` lists the Obscure & Archived Worlds.
 
-**Site access.** Sacred Texts uses its official archive.sacred-texts.com religion index and stays inside a selected religion to find a text. Britannica selects readable articles from its category index. These hosts use the shared browser-compatible connection for discovery and reading, preserving the usual cache and offline behaviour. Hermetic Library is registered, but its Cloudflare challenge still refused live requests on 2026-09-29; failed requests fall through to another esoteric source. Library of Congress (Chronicling America) refuses W5F (HTTP 403) and is not used. Existing Daily Packets remain fixed until reshuffled.
+**Site access.** Sacred Texts uses its official archive.sacred-texts.com religion index and stays inside a selected religion to find a text. Britannica selects readable articles from its category index. These hosts use the shared browser-compatible connection for discovery and reading, preserving the usual cache and offline behaviour. When a page is a verification wall, W5F first does what the wall asks of every visitor where it can (Anubis's small proof of work, as on Scaife; DDoS-Guard's cookie check), then asks a local bot-check helper (see *Bot-check helper* under Settings). Without one, failed requests fall through to another source. Library of Congress (Chronicling America) refuses W5F (HTTP 403) and is not used. Existing Daily Packets remain fixed until reshuffled.
 
 </details>
 
@@ -218,7 +218,7 @@ Nothing is filtered by content: what a source holds may come up.
 - **Reddit** posts that belong to a series (same author, same subreddit, "Part N" titles or next/previous links) get a "Series · part i of n" line and `]`/`[` through the parts. Through Redlib, NSFW posts are shown, unblurred.
 - **FanFicFare bridge:** with `fanficfare` installed (`pip install FanFicFare`), `g → ffr <address>` or "save as EPUB" on a serial page puts the story into the Library.
 
-Logins, captchas and bot checks are never bypassed.
+Site logins stay with the owner.
 
 </details>
 
@@ -277,7 +277,7 @@ Notes live in `~/Archive/Notes` (change with `W5F_NOTES` or `notes = "…"` in `
   - Install: `w5f comics server install` downloads the official release and checks it against the release's checksums. Suwayomi needs Java 21.
   - W5F starts it when Comics opens and stops it when W5F closes. On the W5F laptop: about 13 s to start, 352 MB while idle.
   - Settings: headless, local only (`127.0.0.1:4567`); downloads are CBZ into `Comics/Suwayomi`; its Local source is `Comics/Local`.
-  - WebView (KCEF) is Suwayomi's own setting (Server settings → Webview; on by default). The first start with it on downloads a Chromium build of 244 MB (529 MB on disk); on the W5F laptop it adds about 170 MB of memory while the server runs. Some extensions use it to get past their sites' bot checks — that is Suwayomi's feature and your choice; W5F itself never does.
+  - WebView (KCEF) is Suwayomi's own setting (Server settings → Webview; on by default). The first start with it on downloads a Chromium build of 244 MB (529 MB on disk); on the W5F laptop it adds about 170 MB of memory while the server runs. Some extensions use it to get past their sites' bot checks — that is Suwayomi's feature and your choice.
   - Pages: followed series, series pages (follow, refresh, download), sources and search, downloads, extensions.
   - CLI: `w5f comics list|update|server start|stop|restart|status|update`, `w5f comics settings [group]`, `w5f comics set <setting> <value>`, `w5f comics login`.
 - **Server settings** (`Comics → Server settings`): Suwayomi's own settings, grouped as its launcher's tabs (SOCKS proxy, Downloader, Conversions, Library updates, Authentication, Backup, Cloudflare, OPDS, KOReader, Sync, Database, Misc, …).
@@ -347,9 +347,13 @@ repo = "owner/w5f"
 
 [cache]
 limit_mb = 500                   # W5F's page cache; 0 keeps everything
+
+[fetch]
+solver_url = "http://127.0.0.1:8191"  # W5F_SOLVER_URL; "" turns the helper off
 ```
 
 - **Folders.** Without a setting, books and comics are under `~/Archive`. The download folder is the desktop's own: on Linux the one named in `~/.config/user-dirs.dirs` (a Turkish desktop's `~/İndirilenler`), else `~/Downloads`. The older `downloads` under `[fiction]` still counts.
+- **Bot-check helper** (`[fetch] solver_url`, on by default at `http://127.0.0.1:8191`): a local service with FlareSolverr's `/v1` API — Byparr or FlareSolverr — that opens a page in a real browser when a site shows W5F a verification wall (Cloudflare's "Just a moment…", or its 403 challenge). It is asked only then, for pages (not files), one page at a time, and a site it cannot open is left alone for a day; a Deep random draw asks it once at most. The status line says when it is working (it can take up to a minute; `esc` cancels). Its cookies and browser stay with it; W5F keeps only the page, cached for offline reading. Nothing listening there costs nothing. Only a helper on this computer (localhost) is used. HathiTrust is never sent to it. When W5F first starts Suwayomi it also sets Suwayomi's FlareSolverr to this address, once; after that the setting is yours in *Server settings → Cloudflare*.
 - **Browser** (`B`, `g → browser <address>`, Suwayomi's WebView page): the configured command, else Chromium or Chrome when installed, else the system's default browser (`xdg-open`, `open`, Windows' own). `g → chromium` still works.
 - **Sessions from a browser** (`g → reddit-login browser`, `g → ao3-login browser`): signed in to Reddit or AO3 in a browser, W5F takes that session from its profile — Chromium's or Chrome's on Linux, Firefox's on Linux, Windows and macOS (`… chromium` or `… firefox` picks one; `W5F_CHROMIUM_PROFILE`, `W5F_FIREFOX_PROFILE` point at another profile). Chrome and Edge on Windows lock their cookies; there, use Firefox or paste the cookie.
 - **Java** for Suwayomi: `[comics] java`, else `JAVA_HOME`, else `java` on the `PATH`.
