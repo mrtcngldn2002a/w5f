@@ -9,10 +9,12 @@ package ultan
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
 	"w5f/internal/doc"
+	"w5f/internal/feeds"
 	"w5f/internal/personal"
 	"w5f/internal/store"
 )
@@ -208,15 +210,22 @@ func deskFacts(db *store.DB, now time.Time, seed int) []fact {
 			out = append(out, fact{Note{Text: capital(t), Subject: oldest.title, Href: oldest.href}, false})
 		}
 	}
-	// The periodicals.
+	// The periodicals: those of the catalog's feeds, as the Periodical
+	// Gallery counts them.
 	if cs, err := db.Counts(); err == nil {
+		var ids []string
+		if cat, err := feeds.LoadCatalog(); err == nil {
+			ids = cat.IDs()
+		}
 		unread := 0
-		for _, c := range cs {
-			unread += c[0]
+		for id, c := range cs {
+			if ids == nil || slices.Contains(ids, id) {
+				unread += c[0]
+			}
 		}
 		if unread >= 15 {
 			when := "some time ago"
-			if its, err := db.Items(store.Query{Unread: true, Limit: 2000}); err == nil && len(its) > 0 {
+			if its, err := db.Items(store.Query{Unread: true, Feeds: ids, Limit: 2000}); err == nil && len(its) > 0 {
 				if p := its[len(its)-1].Published; !p.IsZero() {
 					when = p.Format("2 January")
 				}
@@ -311,15 +320,20 @@ func Shelf(db *store.DB, family string, now time.Time) Note {
 // --- the Daily Packet ---
 
 var kindWords = map[string][2]string{
-	"periodical": {"a periodical", "%s periodicals"},
-	"weird":      {"a world that never was", "%s worlds that never were"},
-	"esoteric":   {"an esoteric text", "%s esoteric texts"},
-	"public":     {"a public-domain find", "%s public-domain finds"},
-	"archive":    {"a relic of the old internet", "%s relics of the old internet"},
-	"queue":      {"a page from your queue", "%s pages from your queue"},
+	"periodical":   {"a periodical", "%s periodicals"},
+	"weird":        {"a world that never was", "%s worlds that never were"},
+	"esoteric":     {"an esoteric text", "%s esoteric texts"},
+	"fiction":      {"a story still being written", "%s stories still being written"},
+	"folklore":     {"a tale", "%s tales"},
+	"knowledge":    {"an essay from the essayists' desks", "%s essays"},
+	"encyclopedic": {"a page of the reference stacks", "%s pages of the reference stacks"},
+	"public":       {"a public-domain find", "%s public-domain finds"},
+	"archive":      {"a relic of the old internet", "%s relics of the old internet"},
+	"smallweb":     {"a room of the small web", "%s rooms of the small web"},
+	"queue":        {"a page from your queue", "%s pages from your queue"},
 }
 
-var kindOrder = []string{"periodical", "weird", "esoteric", "public", "archive", "queue"}
+var kindOrder = []string{"periodical", "weird", "fiction", "esoteric", "folklore", "knowledge", "encyclopedic", "public", "archive", "smallweb", "queue"}
 
 // Cover is the note on the Daily Packet's cover: what the issue holds,
 // and the oracle's draw.

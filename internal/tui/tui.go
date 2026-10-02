@@ -1030,6 +1030,9 @@ func (m Model) gotoKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, func() tea.Msg { return loadedMsg{target: target, doc: d} }
 		}
 		m.loading = target
+		if target == "w5f:feeds/sync" {
+			m.loading = "syncing feeds (this can take a minute)"
+		}
 		if t := catalogLoading(target); t != "" {
 			m.loading = t
 		}

@@ -1,6 +1,8 @@
 # W5F built-in periodicals shelf.
 # Selected together in the v1 conversations (Sept 2026); game-dev sources were
-# removed by the owner. `url` lists candidate feed addresses tried in order;
+# removed by the owner, and on 2026-10-02 Atlas Obscura, Project Gutenberg's
+# and Standard Ebooks' new-release lists (short entries; books are in the
+# Library). `url` lists candidate feed addresses tried in order;
 # `site` is used for feed autodiscovery when none of them works.
 
 [[shelf]]
@@ -53,7 +55,7 @@ id = "tech"
 label = "Linux & Tech"
 [[shelf]]
 id = "new"
-label = "New Arrivals (books & archives)"
+label = "Archives & Collections"
 
 # ---------------------------------------------------------------- Turkish
 [[feed]]
@@ -220,13 +222,6 @@ name = "Smithsonian Folklife"
 shelf = "weird"
 url = ["https://folklife.si.edu/magazine/rss", "https://folklife.si.edu/rss"]
 site = "https://folklife.si.edu/magazine"
-
-[[feed]]
-id = "atlasobscura"
-name = "Atlas Obscura"
-shelf = "weird"
-url = ["https://www.atlasobscura.com/feeds/latest"]
-site = "https://www.atlasobscura.com/articles"
 
 [[feed]]
 id = "skeptical"
@@ -504,6 +499,7 @@ url = ["https://www.creepypastastories.com/feed/"]
 
 [[feed]]
 id = "hungryshedgerow"
+disabled = true  # new parts are password-protected (checked 2026-10-02)
 name = "Hungry's Hedgerow"
 shelf = "horror"
 url = ["https://hungryshedgerow.net/feed/"]
@@ -523,12 +519,14 @@ url = ["https://short-story.me/stories/horror-stories?format=feed&type=rss"]
 # ---------------------------------------------------------------- Linux & tech
 [[feed]]
 id = "lwn"
+disabled = true  # most articles are subscriber-only, HTTP 403 (checked 2026-10-02)
 name = "LWN.net"
 shelf = "tech"
 url = ["https://lwn.net/headlines/rss"]
 
 [[feed]]
 id = "arstechnica"
+disabled = true  # articles answer HTTP 405, the feed has excerpts only (checked 2026-10-02)
 name = "Ars Technica"
 shelf = "tech"
 url = ["https://feeds.arstechnica.com/arstechnica/index"]
@@ -558,18 +556,6 @@ shelf = "tech"
 url = ["https://planet.debian.org/rss20.xml"]
 
 # ---------------------------------------------------------------- New arrivals
-[[feed]]
-id = "gutenberg"
-name = "Project Gutenberg — today"
-shelf = "new"
-url = ["https://www.gutenberg.org/cache/epub/feeds/today.rss"]
-
-[[feed]]
-id = "standardebooks"
-name = "Standard Ebooks — new releases"
-shelf = "new"
-url = ["https://standardebooks.org/feeds/rss/new-releases"]
-
 [[feed]]
 id = "iablog"
 name = "Internet Archive Blogs"
@@ -698,3 +684,45 @@ name = "Açık Bilim"
 shelf = "science-tr"
 lang = "tr"
 url = ["https://www.acikbilim.com/feed"]
+
+# ---------------------------------------------------------------- Added 2026-10-02
+# In place of the short and unreadable feeds taken off that day, chosen by the
+# owner; each checked live: recent posts, articles open in full in W5F
+# (median words of the last three: Haunted Palace ~1700, PseudoPod ~5300,
+# Wormwoodiana ~1000, Cambridge ~1000, Digital Antiquarian ~4300, Shirriff ~7500).
+
+[[feed]]
+id = "hauntedpalace"
+name = "The Haunted Palace"
+shelf = "weird"
+url = ["https://hauntedpalaceblog.wordpress.com/feed/"]
+
+[[feed]]
+id = "pseudopod"
+name = "PseudoPod"
+shelf = "horror"
+url = ["https://pseudopod.org/feed/"]
+
+[[feed]]
+id = "wormwoodiana"
+name = "Wormwoodiana"
+shelf = "horror"
+url = ["https://wormwoodiana.blogspot.com/feeds/posts/default?alt=rss"]
+
+[[feed]]
+id = "cambridgesc"
+name = "Cambridge University Library — Special Collections"
+shelf = "new"
+url = ["https://specialcollections-blog.lib.cam.ac.uk/?feed=rss2"]
+
+[[feed]]
+id = "filfre"
+name = "The Digital Antiquarian"
+shelf = "tech"
+url = ["https://www.filfre.net/feed/"]
+
+[[feed]]
+id = "righto"
+name = "Ken Shirriff's blog"
+shelf = "tech"
+url = ["https://www.righto.com/feeds/posts/default?alt=rss"]

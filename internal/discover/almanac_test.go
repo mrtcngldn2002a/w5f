@@ -88,6 +88,40 @@ func TestBookOfDaysParts(t *testing.T) {
 	}
 }
 
+// Britannica's On This Day as it serves it (2026-10-02): a year box before
+// each headline, text or birthday name, and the featured event in a card.
+const britannicaPage = `<html><body><main>
+<div class="tw:flex"><div class="tw:basis-1/2">
+  <div class="tw:mb-2 font-oswald tw:text-lg">1791</div>
+  <div class="font-lora tw:text-3xl">The Magic Flute premieres</div>
+  <div class="font-newsreader">On this day in 1791, <a href="https://www.britannica.com/topic/The-Magic-Flute">The Magic Flute</a> was first performed in Vienna.</div>
+  <a href="/today-in-history/September-30-1791-Magic-Flute">READ&nbsp;MORE</a>
+</div></div>
+<div class="tw:basis-1/3"><div class="font-oswald tw:uppercase!">Featured Event</div>
+<div class="day-in-history-card tw:flex"><div class="tw:w-89"><img src="x.jpg"></div>
+  <div class="tw:text-xs tw:italic">© A photographer</div>
+  <div class="font-lora">The Munich Agreement</div>
+  <div class="font-newsreader">Britain and France agreed to the Nazi annexation this day in 1938.</div></div></div>
+<div><div class="font-oswald tw:uppercase">Famous Birthdays</div>
+  <div class="tw:flex"><div class="tw:mb-2 font-oswald tw:text-sm">1207</div><a href="https://www.britannica.com/biography/Rumi">Rumi</a><div class="font-lora">Persian poet</div></div></div>
+<h2>More on September&nbsp;30</h2>
+<div><div class="tw:text-xs tw:italic">Credit</div>
+  <div class="tw:flex"><div class="font-oswald tw:text-sm">1955</div><div class="font-newsreader">American actor <a href="https://www.britannica.com/biography/James-Dean">James Dean</a> died in a car crash. <em>[<a href="/quiz/x">Take our quiz</a>.]</em></div></div></div>
+</main></body></html>`
+
+// Today in Science History as it serves it: section anchors, a name
+// heading per person or event, and the text in an indented box.
+const sciencePage = `<html><body>
+<div class="daysubheading"><a NAME="birth"></a>SEPTEMBER 30 – BIRTHS</div>
+<div class="daynameheading"><a NAME="GeigerHans"></a>&nbsp; Hans Geiger</div><div><div class="dayleftcell100"><img src="g.jpg"></div>
+<div style="margin-left:100px;padding:3px;"><span class="sprite icon-baby"></span> &nbsp;Born 30 Sep 1882; died 24 Sep 1945 at age 62. <span class="footnote">quotes</span><br>German physicist who introduced the Geiger counter.<div class="bookline"></div></div></div>
+<div class="daysubheading"><a NAME="death"></a>SEPTEMBER 30 – DEATHS</div>
+<div class="daynameheading"><a NAME="X"></a>&nbsp; A Chemist</div><div><div style="margin-left:100px;padding:3px;">Died 30 Sep 1950 at age 70 (born 1 Jan 1880).<br>Chemist of note.</div></div>
+<div class="daysubheading"><a NAME="event"></a>SEPTEMBER 30 – EVENTS</div>
+<div class="daynameheading"><a NAME="{09-30-1954}"></a>&nbsp; Nautilus</div><div><div style="margin-left:100px;padding:3px;">&nbsp;
+In 1954, the first nuclear submarine was commissioned.<div class="bookline"></div></div></div>
+</body></html>`
+
 func TestAlmanacColumnAndPage(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -95,19 +129,18 @@ func TestAlmanacColumnAndPage(t *testing.T) {
 			fmt.Fprint(w, bookOfDaysPage)
 		case "/months/sept/30a.htm":
 			fmt.Fprint(w, `<html><body><p><b>THE SECOND PART</b></p><p>More of the day.</p></body></html>`)
-		case "/en/selected/09/30":
-			fmt.Fprint(w, `{"selected":[{"text":"The Magic Flute (poster pictured) premieres.","year":1791,"pages":[{"content_urls":{"desktop":{"page":"https://en.wikipedia.org/wiki/The_Magic_Flute"}}}]},
-				{"text":"A second event.","year":1938,"pages":[{"content_urls":{"desktop":{"page":"https://en.wikipedia.org/wiki/B"}}}]},
-				{"text":"No page.","year":2000,"pages":[]}]}`)
-		case "/tr/events/09/30":
-			fmt.Fprint(w, `{"events":[{"text":"Bir olay.","year":1453,"pages":[{"content_urls":{"desktop":{"page":"https://tr.wikipedia.org/wiki/X"}}}]}]}`)
+		case "/otd/September-30":
+			fmt.Fprint(w, britannicaPage)
+		case "/tis/9/9_30.htm":
+			fmt.Fprint(w, sciencePage)
 		default:
 			http.NotFound(w, r)
 		}
 	}))
 	defer srv.Close()
 	swap(t, &bookOfDaysBase, srv.URL+"/months/")
-	swap(t, &wikiOnThisDay, srv.URL+"/%s/%s/%02d/%02d")
+	swap(t, &britannicaOTD, srv.URL+"/otd/%s-%d")
+	swap(t, &todayInSci, srv.URL+"/tis/%d/%d_%02d.htm")
 	a, err := buildAlmanac(context.Background(), testFetcher(), time.September, 30)
 	if err != nil {
 		t.Fatal(err)
@@ -115,12 +148,28 @@ func TestAlmanacColumnAndPage(t *testing.T) {
 	if strings.Join(a.Headlines, "|") != "William Hutton|A Contest for Precedence" || !strings.HasPrefix(a.Born, "Euripides") || a.Day != "09-30" {
 		t.Errorf("almanac: %+v", a)
 	}
-	var years []int
+	var events []string
 	for _, e := range a.Events {
-		years = append(years, e.Year)
+		events = append(events, fmt.Sprintf("%d %s|%s", e.Year, e.Title, e.Text))
 	}
-	if fmt.Sprint(years) != "[1453 1791 1938]" {
-		t.Errorf("events in year order, the one without a page left out: %v", years)
+	if want := []string{"1791 The Magic Flute premieres|On this day in 1791, The Magic Flute was first performed in Vienna.",
+		"1938 The Munich Agreement|Britain and France agreed to the Nazi annexation this day in 1938.",
+		"1955 |American actor James Dean died in a car crash."}; strings.Join(events, "\n") != strings.Join(want, "\n") {
+		t.Errorf("Britannica's events in year order, the quiz aside left out:\n%s", strings.Join(events, "\n"))
+	}
+	if !strings.HasSuffix(a.Events[0].Target, "/today-in-history/September-30-1791-Magic-Flute") || len(a.Birthdays) != 1 || a.Birthdays[0].Title != "Rumi" || a.Birthdays[0].Year != 1207 {
+		t.Errorf("story link and birthdays: %+v %+v", a.Events[0], a.Birthdays)
+	}
+	var science []string
+	for _, s := range a.Science {
+		science = append(science, fmt.Sprintf("%s %d %s: %s", s.Kind, s.Year, s.Title, s.Text))
+	}
+	if want := []string{"born 1882 Hans Geiger: German physicist who introduced the Geiger counter.", "died 1950 A Chemist: Chemist of note.",
+		"event 1954 Nautilus: In 1954, the first nuclear submarine was commissioned."}; strings.Join(science, "\n") != strings.Join(want, "\n") {
+		t.Errorf("science:\n%s", strings.Join(science, "\n"))
+	}
+	if !strings.HasSuffix(a.Science[0].Target, "/tis/9/9_30.htm#GeigerHans") {
+		t.Errorf("science link: %s", a.Science[0].Target)
 	}
 
 	env := Env{Fetcher: testFetcher()}
@@ -143,7 +192,10 @@ func TestAlmanacColumnAndPage(t *testing.T) {
 
 	p := Packet{Date: "2026-09-30", Number: 3, Almanac: a, Oracle: &Oracle{Kind: "iching", Title: "Hexagram 1, Khien", Target: "https://x/ic01.htm", Detail: "no moving lines", Lines: []int{7, 7, 7, 7, 7, 7}}}
 	text := flatText(coverDoc(p))
-	for _, want := range []string{"On this day · 30 September", "The Book of Days (1864): William Hutton · A Contest for Precedence", "1791 — The Magic Flute premieres.", "(tr)", "The oracle", "I Ching · James Legge", "Hexagram 1, Khien — no moving lines"} {
+	for _, want := range []string{"On this day · 30 September", "The Book of Days (1864): William Hutton · A Contest for Precedence",
+		"Britannica, On This Day", "1791 — The Magic Flute premieres", "1955 — American actor James Dean died", "Birthdays: Rumi, Persian poet (1207)",
+		"Today in Science History", "born 1882 — Hans Geiger: German physicist", "1954 — Nautilus: In 1954",
+		"The oracle", "I Ching · James Legge", "Hexagram 1, Khien — no moving lines"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("cover lacks %q:\n%s", want, text)
 		}

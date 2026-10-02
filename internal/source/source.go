@@ -321,6 +321,8 @@ func Resolve(input string) string {
 		return "w5f:almanac"
 	case strings.HasPrefix(lower, "opml-import ") && len(strings.Fields(s)) > 1:
 		return "w5f:feeds/import?" + url.Values{"f": {userPath(s[len("opml-import "):])}}.Encode()
+	case lower == "sync", lower == "feeds sync", lower == "sync feeds":
+		return "w5f:feeds/sync"
 	case lower == "opml-export":
 		return "w5f:feeds/export"
 	case strings.HasPrefix(lower, "opml-export "):
@@ -548,6 +550,12 @@ func DiscoverEnv() (discover.Env, error) {
 			return crom.Random(ctx, Fetcher, p)
 		},
 		Smallweb: SmallwebEnv(),
+	}
+	if cat, err := feeds.LoadCatalog(); err == nil {
+		env.Shelves = map[string]string{}
+		for _, f := range cat.Feeds {
+			env.Shelves[f.ID] = f.Shelf
+		}
 	}
 	if reddit.LoadSession() != "" {
 		env.RedditTop = func(ctx context.Context, sub string) ([]string, error) {

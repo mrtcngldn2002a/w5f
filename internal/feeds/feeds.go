@@ -129,6 +129,16 @@ func (c *Catalog) FeedsOn(shelf string) []string {
 	return ids
 }
 
+// IDs lists every feed id. The lists show only these: the items of a feed
+// taken off the catalog stay in the database but out of sight.
+func (c *Catalog) IDs() []string {
+	ids := make([]string, len(c.Feeds))
+	for i, f := range c.Feeds {
+		ids[i] = f.ID
+	}
+	return ids
+}
+
 // Result is the outcome of syncing one feed.
 type Result struct {
 	Feed  string

@@ -14,7 +14,7 @@ import (
 var sampleOPML = "<?xml version=\"1.0\" encoding=\"ISO-8859-9\"?>\n" +
 	`<opml version="1.0"><head><title>my feeds</title></head><body>
   <outline text="Weird &amp; Folklore">
-    <outline text="Atlas Obscura" type="rss" xmlUrl="http://atlasobscura.com/feeds/latest/"/>
+    <outline text="Aeon" type="rss" xmlUrl="http://www.aeon.co/feed.rss/"/>
     <outline text="Strange Stuff" type="rss" xmlUrl="https://strange.example/rss" htmlUrl="https://strange.example/"/>
   </outline>
   <outline text="Blogs">
@@ -73,7 +73,7 @@ func TestImportAppendsAndSkipsWhatIsThere(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rep.Added) != 5 || len(rep.Duplicate) != 1 || rep.Duplicate[0] != "Atlas Obscura" {
+	if len(rep.Added) != 5 || len(rep.Duplicate) != 1 || rep.Duplicate[0] != "Aeon" {
 		t.Fatalf("added %d, duplicates %v", len(rep.Added), rep.Duplicate)
 	}
 	b, _ := os.ReadFile(UserCatalogPath())

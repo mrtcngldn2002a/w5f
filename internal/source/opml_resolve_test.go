@@ -23,6 +23,7 @@ func TestOPMLCommands(t *testing.T) {
 		}
 	}
 	for in, want := range map[string]string{"tarot": "w5f:discover/tarot", "I Ching": "w5f:discover/iching", "iching": "w5f:discover/iching", "almanac": "w5f:almanac",
+		"sync": "w5f:feeds/sync", "Sync": "w5f:feeds/sync", "feeds sync": "w5f:feeds/sync",
 		"usenet": "w5f:usenet", "usenet folklore": "w5f:usenet/find?q=folklore", "news:alt.magick": "w5f:usenet/g/alt.magick"} {
 		if got := Resolve(in); got != want {
 			t.Errorf("%s → %s, want %s", in, got, want)

@@ -45,6 +45,9 @@ type Env struct {
 	RedditTop func(ctx context.Context, sub string) ([]string, error)
 	// Smallweb reads Gemini and Gopher.
 	Smallweb smallweb.Env
+	// Shelves maps the Periodicals catalog's feeds to their shelves; the
+	// Daily Packet takes only these feeds' items (nil: any unread item).
+	Shelves map[string]string
 }
 
 // families are the Deep Random sources; each family file adds its own.

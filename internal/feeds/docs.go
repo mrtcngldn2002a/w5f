@@ -76,7 +76,7 @@ func Route(ctx context.Context, target string, env Env) (*doc.Document, error) {
 	case path == "feeds/export":
 		return exportDoc(env, u.Query().Get("f"))
 	case path == "feeds/unread":
-		return listDoc(env, "All unread", "w5f:feeds/unread", store.Query{Unread: true}, page, ""), nil
+		return listDoc(env, "All unread", "w5f:feeds/unread", store.Query{Unread: true, Feeds: env.Catalog.IDs()}, page, ""), nil
 	case path == "feeds/starred":
 		return listDoc(env, "Starred", "w5f:feeds/starred", store.Query{Starred: true}, page, ""), nil
 	case strings.HasPrefix(path, "feeds/read/"):
@@ -118,8 +118,8 @@ func shelvesDoc(env Env, notice *doc.Notice) *doc.Document {
 	d := &doc.Document{Title: "The Periodical Gallery", URL: "w5f:feeds", Origin: "local", Lang: "en"}
 	counts, _ := env.DB.Counts()
 	totalUnread := 0
-	for _, c := range counts {
-		totalUnread += c[0]
+	for _, id := range env.Catalog.IDs() {
+		totalUnread += counts[id][0]
 	}
 	last := "never"
 	if t, err := time.Parse(time.RFC3339, env.DB.Get("last_sync")); err == nil {
@@ -166,7 +166,7 @@ func shelvesDoc(env Env, notice *doc.Notice) *doc.Document {
 		{doc.Paragraph{Text: doc.Inline{{Text: fmt.Sprintf("* starred (%d)", env.DB.StarredCount()), Link: link(d, "w5f:feeds/starred", "starred")}}}},
 		{doc.Paragraph{Text: doc.Inline{{Text: "feed status", Link: link(d, "w5f:feeds/status", "status")}}}},
 	}}}
-	if newest, err := env.DB.Items(store.Query{Unread: true, Limit: 6}); err == nil && len(newest) > 0 {
+	if newest, err := env.DB.Items(store.Query{Unread: true, Feeds: env.Catalog.IDs(), Limit: 6}); err == nil && len(newest) > 0 {
 		var items [][]doc.Block
 		for _, it := range newest {
 			title := it.Title

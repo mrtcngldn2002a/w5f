@@ -72,6 +72,32 @@ func TestSyncFallbackURLAndFirstSyncRules(t *testing.T) {
 	}
 }
 
+// A feed taken off the catalog keeps its items in the database, out of the
+// unread lists.
+func TestRemovedFeedIsOutOfSight(t *testing.T) {
+	e := env(t, nil, Feed{ID: "kept", Name: "Kept", Shelf: "s"})
+	now := time.Now()
+	for _, id := range []string{"kept", "gone"} {
+		if _, err := e.DB.UpsertItem(store.Item{FeedID: id, GUID: id, URL: "http://example.invalid/" + id, Title: id, Published: now}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	d, err := Route(context.Background(), "w5f:feeds/unread", e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var titles []string
+	for _, l := range d.Links {
+		titles = append(titles, l.Text)
+	}
+	if got := strings.Join(titles, " "); !strings.Contains(got, "kept") || strings.Contains(got, "gone") {
+		t.Errorf("unread list: %s", got)
+	}
+	if all, _ := e.DB.Items(store.Query{}); len(all) != 2 {
+		t.Errorf("the removed feed's item was deleted: %d left", len(all))
+	}
+}
+
 func TestShelvesAndItemDocs(t *testing.T) {
 	recent := time.Now().Add(-time.Hour).Format(time.RFC1123Z)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

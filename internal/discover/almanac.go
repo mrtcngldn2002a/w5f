@@ -3,14 +3,13 @@ package discover
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"math/rand/v2"
 	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -20,29 +19,34 @@ import (
 	"w5f/internal/fetch"
 )
 
-// The almanac (chosen with the owner, 2026-09-30): the day's chapter of
-// Chambers's Book of Days (1864) and a few of Wikipedia's events for the
-// date, shown as a column on the Daily Packet's cover.
+// The almanac (chosen with the owner, 2026-09-30; its sources changed
+// 2026-10-02): the day's chapter of Chambers's Book of Days (1864),
+// Britannica's On This Day and Today in Science History (almanacsources.go),
+// shown as a column on the Daily Packet's cover.
 
 // Almanac is one day's column.
 type Almanac struct {
-	Day       string        `json:"day"`       // "09-30"
-	Headlines []string      `json:"headlines"` // the Book of Days' articles that day
-	Born      string        `json:"born"`      // its "Born:" line, shortened
+	Day       string   `json:"day"`       // "09-30"
+	Headlines []string `json:"headlines"` // the Book of Days' articles that day
+	Born      string   `json:"born"`      // its "Born:" line, shortened
+	// Britannica's events (Wikipedia's in issues before 2026-10-02).
 	Events    []AlmanacItem `json:"events"`
+	Birthdays []AlmanacItem `json:"birthdays,omitempty"` // Britannica's famous birthdays
+	Science   []AlmanacItem `json:"science,omitempty"`   // Today in Science History
 }
 
-// AlmanacItem is one of Wikipedia's events.
+// AlmanacItem is an event, a birthday or a scientist of the day.
 type AlmanacItem struct {
-	Year   int    `json:"year"`
+	Year   int    `json:"year"` // 0: not known
+	Title  string `json:"title,omitempty"`
 	Text   string `json:"text"`
 	Target string `json:"target"`
 	Lang   string `json:"lang"`
+	Kind   string `json:"kind,omitempty"` // science: born, died, event
 }
 
 var (
 	bookOfDaysBase = "https://www.thebookofdays.com/months/"
-	wikiOnThisDay  = "https://%s.wikipedia.org/api/rest_v1/feed/onthisday/%s/%02d/%02d"
 	bodMonths      = []string{"jan", "feb", "march", "april", "may", "june", "july", "aug", "sept", "oct", "nov", "dec"}
 )
 
@@ -154,15 +158,42 @@ func shorten(s string, n int) string {
 	return strings.TrimSpace(cut) + " …"
 }
 
-// buildAlmanac gathers a day's column; either half may be missing.
+// buildAlmanac gathers a day's column from its three sources, side by
+// side; any of them may be missing.
 func buildAlmanac(ctx context.Context, f *fetch.Fetcher, m time.Month, d int) (*Almanac, error) {
 	a := &Almanac{Day: fmt.Sprintf("%02d-%02d", int(m), d)}
 	var errs []string
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	fail := func(err error) {
+		mu.Lock()
+		defer mu.Unlock()
+		errs = append(errs, err.Error())
+	}
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		events, births, err := britannicaDay(ctx, f, m, d)
+		if err != nil {
+			fail(err)
+			return
+		}
+		a.Events, a.Birthdays = pickBritannica(events), births[:min(3, len(births))]
+	}()
+	go func() {
+		defer wg.Done()
+		items, err := scienceDay(ctx, f, m, d)
+		if err != nil {
+			fail(err)
+			return
+		}
+		a.Science = pickScience(items)
+	}()
 	if u, err := url.Parse(bookOfDaysURL(m, d)); err == nil {
 		if resp, err := f.Get(ctx, u, fetch.Options{}); err != nil {
-			errs = append(errs, err.Error())
+			fail(err)
 		} else if parts, err := bookOfDaysParts(resp.Body); err != nil {
-			errs = append(errs, err.Error())
+			fail(err)
 		} else {
 			for _, p := range parts {
 				switch {
@@ -174,28 +205,10 @@ func buildAlmanac(ctx context.Context, f *fetch.Fetcher, m time.Month, d int) (*
 			}
 		}
 	}
-	// Each Wikipedia's own selection for the day; its full list of events
-	// (crimes and disasters among them) only when there is no selection.
-	for _, lang := range []struct {
-		code string
-		n    int
-	}{{"en", 3}, {"tr", 2}} {
-		items, err := wikiEvents(ctx, f, lang.code, "selected", m, d)
-		if err != nil {
-			items, err = wikiEvents(ctx, f, lang.code, "events", m, d)
-		}
-		if err != nil {
-			errs = append(errs, "Wikipedia "+lang.code+": "+err.Error())
-			continue
-		}
-		for _, i := range rand.Perm(len(items))[:min(lang.n, len(items))] {
-			a.Events = append(a.Events, items[i])
-		}
-	}
-	if len(a.Headlines) == 0 && a.Born == "" && len(a.Events) == 0 {
+	wg.Wait()
+	if len(a.Headlines) == 0 && a.Born == "" && len(a.Events) == 0 && len(a.Science) == 0 {
 		return nil, errors.New(strings.Join(errs, "; "))
 	}
-	sortEvents(a.Events)
 	return a, nil
 }
 
@@ -205,44 +218,6 @@ func sortEvents(es []AlmanacItem) {
 			es[j], es[j-1] = es[j-1], es[j]
 		}
 	}
-}
-
-// rePictured drops the notes about the picture on Wikipedia's main page.
-var rePictured = regexp.MustCompile(`(?i)\s*\((?:[^()]*\s)?(?:pictured|resimde|görselde)\)`)
-
-// wikiEvents reads Wikipedia's "on this day" feed (kind: selected, events).
-func wikiEvents(ctx context.Context, f *fetch.Fetcher, lang, kind string, m time.Month, d int) ([]AlmanacItem, error) {
-	u, _ := url.Parse(fmt.Sprintf(wikiOnThisDay, lang, kind, int(m), d))
-	resp, err := f.Get(ctx, u, fetch.Options{})
-	if err != nil {
-		return nil, err
-	}
-	var r map[string][]struct {
-		Text  string `json:"text"`
-		Year  int    `json:"year"`
-		Pages []struct {
-			ContentURLs struct {
-				Desktop struct {
-					Page string `json:"page"`
-				} `json:"desktop"`
-			} `json:"content_urls"`
-		} `json:"pages"`
-	}
-	if err := json.Unmarshal(resp.Body, &r); err != nil {
-		return nil, errors.New("unexpected answer")
-	}
-	var out []AlmanacItem
-	for _, e := range r[kind] {
-		text := strings.Join(strings.Fields(rePictured.ReplaceAllString(e.Text, "")), " ")
-		if text == "" || len(e.Pages) == 0 || e.Pages[0].ContentURLs.Desktop.Page == "" {
-			continue
-		}
-		out = append(out, AlmanacItem{Year: e.Year, Text: text, Target: e.Pages[0].ContentURLs.Desktop.Page, Lang: lang})
-	}
-	if len(out) == 0 {
-		return nil, errors.New("no events")
-	}
-	return out, nil
 }
 
 // almanacDoc is the day's Book of Days chapter in the reader; address
@@ -297,5 +272,12 @@ func almanacDoc(ctx context.Context, env Env, day string) (*doc.Document, error)
 		}
 	}
 	out.Blocks = append(out.Blocks, doc.Rule{}, doc.Paragraph{Text: doc.Inline{{Text: "Source: ", Style: doc.Italic}, {Text: src, Link: 1}}})
+	link := func(href, text string) int {
+		out.Links = append(out.Links, doc.Link{Href: href, Text: text})
+		return len(out.Links)
+	}
+	out.Blocks = append(out.Blocks, doc.Paragraph{Text: doc.Inline{{Text: "More on " + date + ": ", Style: doc.Italic},
+		{Text: "Britannica's On This Day", Link: link(BritannicaURL(m, d), "Britannica")}, {Text: " · "},
+		{Text: "Today in Science History", Link: link(ScienceURL(m, d), "Today in Science History")}}})
 	return out, nil
 }

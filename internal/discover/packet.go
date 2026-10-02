@@ -36,20 +36,18 @@ type Entry struct {
 	Source string `json:"source"` // feed id, family detail
 }
 
-// packetDraws are the random parts of an issue (replaced in tests).
+// packetDraws are the rotating sections of an issue (replaced in tests).
 var packetDraws = map[string]func(context.Context, Env) (Draw, error){
-	"weird": func(ctx context.Context, env Env) (Draw, error) { return weird{}.Draw(ctx, env) },
-	"esoteric": func(ctx context.Context, env Env) (Draw, error) {
-		if pick([]bool{true, false}) {
-			return esoteric{}.Draw(ctx, env)
-		}
-		return folklore{}.Draw(ctx, env)
-	},
-	"public":  publicDomainDraw,
-	"archive": func(ctx context.Context, env Env) (Draw, error) { return textfiles{}.Draw(ctx, env) },
+	"weird":        weird{}.Draw,
+	"fiction":      fiction{}.Draw,
+	"esoteric":     esoteric{}.Draw,
+	"folklore":     folklore{}.Draw,
+	"knowledge":    knowledge{}.Draw,
+	"encyclopedic": encyclopedic{}.Draw,
+	"public":       publicDomainDraw,
+	"archive":      textfiles{}.Draw,
+	"smallweb":     smallwebFamily{}.Draw,
 }
-
-var packetKinds = []string{"weird", "esoteric", "public", "archive"}
 
 var roman = []string{"I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"}
 
@@ -90,8 +88,9 @@ func savePacket(db *store.DB, p Packet) error {
 }
 
 // buildPacket assembles an issue: three unread periodicals from three
-// feeds, one each of weird, esoteric-or-folklore, public domain and archive,
-// and the first open item of the reading queue. A missing part is skipped.
+// shelves, four rotating sections of the Deep Random shelves, and the first
+// open item of the reading queue; none of it shown in the last 30 days (see
+// packetpick.go). A missing part is skipped.
 func buildPacket(ctx context.Context, env Env, date string, number int) Packet {
 	p := Packet{Date: date, Number: number}
 	// The cover's columns are gathered alongside the entries.
@@ -101,27 +100,11 @@ func buildPacket(ctx context.Context, env Env, date string, number int) Packet {
 		addColumns(ctx, env, &c)
 		columns <- c
 	}()
-	if items, err := env.DB.Items(store.Query{Unread: true, Limit: 200}); err == nil {
-		seen := map[string]bool{}
-		for _, it := range items {
-			if seen[it.FeedID] || len(seen) == 3 {
-				continue
-			}
-			seen[it.FeedID] = true
-			p.Entries = append(p.Entries, Entry{Kind: "periodical", Title: it.Title, Target: fmt.Sprintf("w5f:item/%d", it.ID), Source: it.FeedID})
-		}
+	m := loadMemory(env.DB, date)
+	for _, it := range pickPeriodicals(env.DB, env.Shelves, m, 3) {
+		p.Entries = append(p.Entries, Entry{Kind: "periodical", Title: it.Title, Target: itemTarget(it.ID), Source: it.FeedID})
 	}
-	for _, k := range packetKinds {
-		d, err := packetDraws[k](ctx, env)
-		if err != nil {
-			continue
-		}
-		title, source := d.Why, d.Why
-		if i := strings.Index(d.Why, " · "); i >= 0 {
-			title, source = d.Why[i+len(" · "):], d.Why[:i]
-		}
-		p.Entries = append(p.Entries, Entry{Kind: k, Title: title, Target: d.Target, Source: source})
-	}
+	p.Entries = append(p.Entries, drawSections(ctx, env, m)...)
 	if q, err := personal.LoadQueue(); err == nil {
 		for _, e := range q.Entries() {
 			if !e.Done {
@@ -132,6 +115,7 @@ func buildPacket(ctx context.Context, env Env, date string, number int) Packet {
 	}
 	c := <-columns
 	p.Almanac, p.Oracle = c.Almanac, c.Oracle
+	m.remember(env.DB, p, env.Shelves)
 	return p
 }
 
@@ -173,16 +157,29 @@ func columnBlocks(p Packet, link func(href, text string) int) []doc.Block {
 				bs = append(bs, doc.Paragraph{Text: doc.Inline{{Text: "Born: " + a.Born, Style: doc.Italic}}})
 			}
 		}
-		var items [][]doc.Block
-		for _, e := range a.Events {
-			in := doc.Inline{{Text: strconv.Itoa(e.Year), Style: doc.Bold}, {Text: " — "}, {Text: e.Text, Link: link(e.Target, e.Text)}}
-			if e.Lang != "en" {
-				in = append(in, doc.Span{Text: "  (" + e.Lang + ")", Style: doc.Italic})
-			}
-			items = append(items, []doc.Block{doc.Paragraph{Text: in}})
+		m, d, dayErr := dayOf(a.Day)
+		// Issues before 2026-10-02 carry Wikipedia's events, with no heading.
+		if (len(a.Birthdays) > 0 || len(a.Science) > 0) && dayErr == nil && len(a.Events) > 0 {
+			bs = append(bs, doc.Paragraph{Text: doc.Inline{{Text: "Britannica, On This Day", Style: doc.Bold, Link: link(BritannicaURL(m, d), "Britannica")}}})
 		}
-		if len(items) > 0 {
-			bs = append(bs, doc.List{Items: items})
+		if l := almanacList(a.Events, "", link); l != nil {
+			bs = append(bs, *l)
+		}
+		if len(a.Birthdays) > 0 {
+			in := doc.Inline{{Text: "Birthdays: ", Style: doc.Italic}}
+			for i, b := range a.Birthdays {
+				if i > 0 {
+					in = append(in, doc.Span{Text: " · "})
+				}
+				in = append(in, doc.Span{Text: b.Title, Link: link(b.Target, b.Title)}, doc.Span{Text: fmt.Sprintf(", %s (%d)", b.Text, b.Year), Style: doc.Italic})
+			}
+			bs = append(bs, doc.Paragraph{Text: in})
+		}
+		if len(a.Science) > 0 && dayErr == nil {
+			bs = append(bs, doc.Paragraph{Text: doc.Inline{{Text: "Today in Science History", Style: doc.Bold, Link: link(ScienceURL(m, d), "Today in Science History")}}})
+			if l := almanacList(a.Science, "science", link); l != nil {
+				bs = append(bs, *l)
+			}
 		}
 	}
 	if p.Oracle != nil {
@@ -196,8 +193,44 @@ func columnBlocks(p Packet, link func(href, text string) int) []doc.Block {
 	return append(bs, oracle...)
 }
 
-var kindLabel = map[string]string{"periodical": "Periodicals", "weird": "Weird Worlds", "esoteric": "Esoterica & folklore",
-	"public": "Public domain", "archive": "Old internet", "queue": "From your queue"}
+// almanacList is the almanac's events or scientists as a list: the year,
+// then a headline or a name with a shortened text.
+func almanacList(items []AlmanacItem, kind string, link func(href, text string) int) *doc.List {
+	var out [][]doc.Block
+	for _, e := range items {
+		var in doc.Inline
+		when := ""
+		if e.Year > 0 {
+			when = strconv.Itoa(e.Year)
+		}
+		if kind == "science" && e.Kind != "event" {
+			when = strings.TrimSpace(e.Kind + " " + when)
+		}
+		if when != "" {
+			in = append(in, doc.Span{Text: when, Style: doc.Bold}, doc.Span{Text: " — "})
+		}
+		switch {
+		case kind == "science":
+			in = append(in, doc.Span{Text: e.Title, Link: link(e.Target, e.Title)}, doc.Span{Text: ": " + shorten(e.Text, 150)})
+		case e.Title != "":
+			in = append(in, doc.Span{Text: e.Title, Link: link(e.Target, e.Title)})
+		default:
+			in = append(in, doc.Span{Text: shorten(e.Text, 160), Link: link(e.Target, e.Text)})
+		}
+		if e.Lang != "" && e.Lang != "en" {
+			in = append(in, doc.Span{Text: "  (" + e.Lang + ")", Style: doc.Italic})
+		}
+		out = append(out, []doc.Block{doc.Paragraph{Text: in}})
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return &doc.List{Items: out}
+}
+
+var kindLabel = map[string]string{"periodical": "Periodicals", "weird": "Weird Worlds", "fiction": "Fiction", "esoteric": "Esoterica",
+	"folklore": "Folklore", "knowledge": "Essays & classics", "encyclopedic": "Encyclopedias", "public": "Public domain",
+	"archive": "Old internet", "smallweb": "Small web", "queue": "From your queue"}
 
 func packetHref(date string, rest string) string {
 	if rest == "" {
@@ -289,8 +322,15 @@ func saveIssue(ctx context.Context, env Env, p Packet) (*doc.Document, error) {
 		if len(a.Headlines) > 0 {
 			fmt.Fprintf(&b, "*The Book of Days (1864):* %s\n\n", strings.Join(a.Headlines, " · "))
 		}
-		for _, e := range a.Events {
-			fmt.Fprintf(&b, "- **%d** — [%s](%s)\n", e.Year, e.Text, e.Target)
+		for _, e := range append(append([]AlmanacItem{}, a.Events...), a.Science...) {
+			text := e.Text
+			if e.Title != "" {
+				text = e.Title + ": " + e.Text
+			}
+			fmt.Fprintf(&b, "- **%s** — [%s](%s)\n", strings.TrimSpace(e.Kind+" "+strconv.Itoa(e.Year)), text, e.Target)
+		}
+		for _, e := range a.Birthdays {
+			fmt.Fprintf(&b, "- **born %d** — [%s](%s), %s\n", e.Year, e.Title, e.Target, e.Text)
 		}
 		b.WriteString("\n")
 	}
