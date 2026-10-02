@@ -1,0 +1,30 @@
+#!/bin/sh
+# W5F // Archive Node — run the newest Byparr in ~/.local/share/w5f for W5F
+# and Suwayomi: local only (127.0.0.1), port 8191 (W5F_BYPARR_PORT for a
+# test on another port). The s6 service byparr-srv runs this as the user.
+#
+#   w5f-byparr           start Byparr in the foreground
+#   w5f-byparr --check   say which Byparr would start, and exit
+set -eu
+
+: "${HOME:=$(getent passwd "$(id -un)" | cut -d: -f6)}"
+export HOME
+data="${XDG_DATA_HOME:-$HOME/.local/share}/w5f"
+dir=$(ls -d "$data"/byparr-v*/ 2>/dev/null | sort -V | tail -n 1)
+dir=${dir%/}
+if [ -z "$dir" ] || [ ! -x "$dir/.venv/bin/python" ]; then
+	echo "w5f-byparr: no Byparr in $data/byparr-v*" >&2
+	exit 1
+fi
+# The laptop's Xvfb lives beside Byparr (from a .deb, with a wrapper that
+# keeps it off the network); a system Xvfb works as well.
+if [ -d "$data/cloudflare-helper/bin" ]; then
+	PATH="$data/cloudflare-helper/bin:$PATH"
+fi
+export PATH HOST=127.0.0.1 PORT="${W5F_BYPARR_PORT:-8191}" BLOCK_MEDIA=true LOG_LEVEL=INFO VERSION="${dir##*byparr-v}"
+if [ "${1:-}" = --check ]; then
+	echo "Byparr $VERSION in $dir, on $HOST:$PORT"
+	exit 0
+fi
+cd "$dir"
+exec "$dir/.venv/bin/python" "$dir/main.py"

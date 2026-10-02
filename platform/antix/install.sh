@@ -3,6 +3,8 @@
 #
 #   sh install.sh kmscon   tty1 runs kmscon (no X): Terminus, Amber P3
 #   sh install.sh x        tty1 logs in and starts X with one full-screen xterm
+#   sh install.sh byparr   run Byparr as the s6 service byparr-srv (127.0.0.1:8191)
+#   sh install.sh byparr-undo   take that service away again
 #   sh install.sh --undo   put tty1, the display manager, sudoers and the profile back
 #
 # Run it as your own user from this folder, with the w5f-linux-amd64 binary
@@ -31,6 +33,7 @@ USERSESS="$HOME/.user_session.d/s6-rc-user-session.sh"
 MARK="# w5f-session (install.sh)"
 S6TTY=/etc/s6-rc/config/tty1.conf
 INITTAB=/etc/inittab
+SV=/etc/s6-rc/sv
 
 say() { printf '\n== %s\n' "$*"; }
 
@@ -86,7 +89,68 @@ dm_off() {
 	fi
 }
 
+# Byparr as a system service run as this user; its log goes to /var/log/byparr.
+byparr_install() {
+	if ! s6; then
+		echo "s6-rc not found: start $BIN/w5f-byparr from your session instead." >&2
+		exit 1
+	fi
+	mkdir -p "$BIN"
+	install -m 0755 "$HERE/w5f-byparr" "$BIN/w5f-byparr"
+	"$BIN/w5f-byparr" --check
+	say "byparr-srv: started now and at every boot, as $ME"
+	tmp=$(mktemp -d)
+	mkdir -p "$tmp/byparr-srv/dependencies.d" "$tmp/byparr-log"
+	echo longrun >"$tmp/byparr-srv/type"
+	echo byparr-log >"$tmp/byparr-srv/producer-for"
+	cat >"$tmp/byparr-srv/run" <<RUN
+#!/usr/bin/execlineb -P
+
+fdmove -c 2 1
+s6-setuidgid $ME
+$BIN/w5f-byparr
+RUN
+	echo longrun >"$tmp/byparr-log/type"
+	echo byparr-srv >"$tmp/byparr-log/consumer-for"
+	echo byparr >"$tmp/byparr-log/pipeline-name"
+	echo 3 >"$tmp/byparr-log/notification-fd"
+	cat >"$tmp/byparr-log/run" <<'LOG'
+#!/usr/bin/execlineb -P
+
+ifelse { test -w /var/log } {
+	foreground { install -d -o s6log -g s6log /var/log/byparr }
+	s6-setuidgid s6log exec -c s6-log -d3 -b -- n3 s2000000 T /var/log/byparr
+}
+foreground { install -d -o s6log -g s6log /run/log/byparr }
+s6-setuidgid s6log exec -c s6-log -d3 -b -- n3 s2000000 T /run/log/byparr
+LOG
+	chmod 0755 "$tmp/byparr-srv/run" "$tmp/byparr-log/run"
+	sudo rm -rf "$SV/byparr-srv" "$SV/byparr-log"
+	sudo cp -R "$tmp/byparr-srv" "$tmp/byparr-log" "$SV/"
+	sudo chown -R root:root "$SV/byparr-srv" "$SV/byparr-log"
+	rm -rf "$tmp"
+	# A Byparr started by hand holds the port; the service takes over.
+	pkill -u "$ME" -f '/byparr-v[^/]*/main\.py' 2>/dev/null || true
+	sudo s6-service add enabled-services byparr-srv byparr-log
+	sudo s6-db-reload
+	sudo s6-rc -u change byparr-srv
+	echo "Done: 'w5f doctor' shows the bot-check helper. 'sh install.sh byparr-undo' takes it away."
+	echo "If new logins (SSH too) hang after the reload, restart (sudo reboot)."
+}
+
+byparr_undo() {
+	if [ -d "$SV/byparr-srv" ]; then
+		say "byparr-srv: stopped and taken away"
+		sudo s6-rc -d change byparr-srv || true
+		sudo s6-service del enabled-services byparr-srv byparr-log || true
+		sudo rm -rf "$SV/byparr-srv" "$SV/byparr-log"
+		sudo s6-db-reload
+	fi
+	rm -f "$BIN/w5f-byparr"
+}
+
 undo() {
+	byparr_undo
 	say "Restoring tty1"
 	restore "$S6TTY"
 	restore "$INITTAB"
@@ -179,9 +243,17 @@ EOF
 	set_tty1 "$(command -v agetty || command -v getty)" "-L -8 --autologin $ME --noclear tty1 115200"
 	dm_off
 	;;
+byparr)
+	byparr_install
+	exit 0
+	;;
+byparr-undo)
+	byparr_undo
+	exit 0
+	;;
 --undo) undo ;;
 *)
-	sed -n '2,11p' "$0"
+	sed -n '2,13p' "$0"
 	exit 2
 	;;
 esac

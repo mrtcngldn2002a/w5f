@@ -253,3 +253,38 @@ func TestSolverRejectsRemoteEndpointAndRedirect(t *testing.T) {
 		t.Fatalf("helper redirect followed: %v, calls=%d", err, redirected)
 	}
 }
+
+func TestProbeSolver(t *testing.T) {
+	byparr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/openapi.json":
+			w.Write([]byte(`{"info":{"title":"FastAPI"},"paths":{"/health":{},"/v1":{}}}`))
+		case "/health":
+			t.Error("the probe made the helper open a browser")
+		default:
+			http.Redirect(w, r, "/docs", 301)
+		}
+	}))
+	defer byparr.Close()
+	flare := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			w.WriteHeader(404)
+			return
+		}
+		w.Write([]byte(`{"msg":"FlareSolverr is ready!","version":"3.5.2"}`))
+	}))
+	defer flare.Close()
+	other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("hello")) }))
+	defer other.Close()
+	for raw, want := range map[string]string{byparr.URL: "Byparr", flare.URL: "FlareSolverr 3.5.2"} {
+		if got, err := ProbeSolver(context.Background(), raw); err != nil || got != want {
+			t.Fatalf("%s: %q %v", raw, got, err)
+		}
+	}
+	if _, err := ProbeSolver(context.Background(), other.URL); err == nil {
+		t.Fatal("an unknown service passed")
+	}
+	if _, err := ProbeSolver(context.Background(), "http://127.0.0.1:1"); !errors.Is(err, errNoSolver) {
+		t.Fatal(err)
+	}
+}

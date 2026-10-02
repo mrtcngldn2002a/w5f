@@ -34,6 +34,24 @@ Restart right after installing or undoing. On antiX 26 the script reloads the
 s6-rc service list, and that can leave `turnstiled` stuck. New logins, SSH
 included, then hang until the restart (seen on 2026-09-29).
 
+## Byparr (the bot-check helper)
+
+W5F and the Suwayomi it starts ask a local helper at `127.0.0.1:8191` when a
+site answers with a verification wall (see *Bot-check helper* in the main
+README). With Byparr in `~/.local/share/w5f/byparr-v*` (the newest one is
+used), this runs it as an s6 service, as your own user, started at boot:
+
+```sh
+sh install.sh byparr        # byparr-srv, its log in /var/log/byparr
+sh install.sh byparr-undo   # takes the service away again (so does --undo)
+```
+
+- `w5f-byparr` goes to `~/.local/bin`; `w5f-byparr --check` says which Byparr would start.
+- It listens on 127.0.0.1 only; Byparr's own default would be every address.
+- A Byparr started by hand is stopped; the service takes the port over.
+- Byparr itself is not installed, changed or removed by this; neither is anything in `~/.cache/w5f`.
+- On the laptop (2026-10-02): about 100 MB while idle, about 560 MB more while it opens a page; it starts in about 4 s.
+
 ## The session
 
 `w5f-session` runs W5F. When W5F closes it offers one key:

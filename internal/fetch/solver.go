@@ -198,3 +198,55 @@ func (f *Fetcher) askSolver(ctx context.Context, base, target *url.URL) (*Respon
 	}
 	return &Response{Body: body, URL: final, ContentType: "text/html; charset=utf-8", Fetched: time.Now()}, nil
 }
+
+// ProbeSolver names what answers at the helper's address, without making
+// it open a browser (Byparr's /health would): a FlareSolverr-style /v1 in
+// its API description (Byparr), or FlareSolverr's own greeting.
+func ProbeSolver(ctx context.Context, raw string) (string, error) {
+	v1, err := solverEndpoint(raw)
+	if err != nil {
+		return "", err
+	}
+	base := *v1
+	base.Path = strings.TrimSuffix(base.Path, "/v1")
+	client := &http.Client{Timeout: 5 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	read := func(p string, out any) error {
+		u := base
+		u.Path += p
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+		if err != nil {
+			return err
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			var op *net.OpError
+			if errors.As(err, &op) && op.Op == "dial" {
+				return fmt.Errorf("%w at %s", errNoSolver, base.Host)
+			}
+			return err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("HTTP %d", resp.StatusCode)
+		}
+		return json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(out)
+	}
+	var api struct {
+		Paths map[string]any `json:"paths"`
+	}
+	errAPI := read("/openapi.json", &api)
+	if errors.Is(errAPI, errNoSolver) {
+		return "", errAPI
+	}
+	if _, ok := api.Paths["/v1"]; ok {
+		return "Byparr", nil
+	}
+	var hello struct {
+		Msg     string `json:"msg"`
+		Version string `json:"version"`
+	}
+	if err := read("/", &hello); err == nil && strings.Contains(hello.Msg, "FlareSolverr") {
+		return strings.TrimSpace("FlareSolverr " + hello.Version), nil
+	}
+	return "", fmt.Errorf("something at %s answers, but not as Byparr or FlareSolverr", base.Host)
+}

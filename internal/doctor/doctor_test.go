@@ -88,3 +88,26 @@ func TestBench(t *testing.T) {
 		t.Errorf("bench: %+v", rs)
 	}
 }
+
+func TestSolverCheck(t *testing.T) {
+	probe := func(name string, err error) func(string) (string, error) {
+		return func(string) (string, error) { return name, err }
+	}
+	for _, tc := range []struct {
+		e      Env
+		status Status
+		want   string
+	}{
+		{Env{Solver: "", ProbeSolver: probe("", nil)}, OK, "off"},
+		{Env{Solver: "http://127.0.0.1:8191", ProbeSolver: probe("Byparr", nil)}, OK, "Byparr answers at http://127.0.0.1:8191"},
+		{Env{Solver: "http://127.0.0.1:8191", ProbeSolver: probe("", errors.New("no bot-check helper is running"))}, Warn, ByparrURL},
+	} {
+		r, ok := solverCheck(tc.e)
+		if !ok || r.Status != tc.status || !strings.Contains(r.Detail, tc.want) {
+			t.Fatalf("%+v", r)
+		}
+	}
+	if _, ok := solverCheck(Env{}); ok {
+		t.Fatal("reported without a probe")
+	}
+}

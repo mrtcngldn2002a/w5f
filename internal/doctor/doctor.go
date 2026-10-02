@@ -56,6 +56,9 @@ type Env struct {
 	ComicsDir   string
 	SuwayomiJar string                 // "" = not installed
 	JavaPath    func() (string, error) // java on PATH
+	// The bot-check helper ([fetch] solver_url; "" = off) and its probe.
+	Solver      string
+	ProbeSolver func(string) (string, error)
 }
 
 // Check runs the offline checks.
@@ -97,6 +100,9 @@ func Check(e Env) []Result {
 	}
 
 	out = append(out, comicsChecks(e)...)
+	if r, ok := solverCheck(e); ok {
+		out = append(out, r)
+	}
 
 	switch {
 	case !e.HasKey:
@@ -238,6 +244,28 @@ func Print(w io.Writer, rs []Result) int {
 }
 
 // comicsChecks: the comics folder, Suwayomi and Java, and X for the viewer.
+// Where the bot-check helpers say how to install them.
+const (
+	ByparrURL       = "https://github.com/ThePhaseless/Byparr"
+	FlareSolverrURL = "https://github.com/FlareSolverr/FlareSolverr"
+)
+
+// solverCheck reports the bot-check helper at [fetch] solver_url.
+func solverCheck(e Env) (Result, bool) {
+	if e.ProbeSolver == nil {
+		return Result{}, false
+	}
+	if e.Solver == "" {
+		return Result{OK, "bot-check helper", "off ([fetch] solver_url is empty)"}, true
+	}
+	name, err := e.ProbeSolver(e.Solver)
+	if err != nil {
+		return Result{Warn, "bot-check helper", err.Error() + ": pages behind a bot check stay closed. W5F does not install one; run Byparr (" +
+			ByparrURL + ") or FlareSolverr (" + FlareSolverrURL + ") there, as their pages describe"}, true
+	}
+	return Result{OK, "bot-check helper", name + " answers at " + e.Solver}, true
+}
+
 func comicsChecks(e Env) []Result {
 	if e.ComicsDir == "" {
 		return nil
