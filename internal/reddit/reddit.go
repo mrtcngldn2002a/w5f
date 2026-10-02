@@ -19,15 +19,36 @@ import (
 
 const site = "https://www.reddit.com"
 
-// IsReddit reports whether u is a Reddit address.
+// IsReddit reports whether u is a Reddit address, a redd.it short link to a
+// post included.
 func IsReddit(u *url.URL) bool {
 	h := strings.ToLower(u.Hostname())
-	return h == "reddit.com" || strings.HasSuffix(h, ".reddit.com")
+	return h == "reddit.com" || strings.HasSuffix(h, ".reddit.com") || shortID(u) != ""
 }
 
-// Canonical rewrites old./m./np. Reddit hosts to www.reddit.com.
+// shortID is the post id of a redd.it short link ("https://redd.it/brsj8v",
+// the "Part Two" link at the end of many r/nosleep parts), else "". The
+// media hosts (i.redd.it, v.redd.it, …) are not short links.
+func shortID(u *url.URL) string {
+	if h := strings.ToLower(u.Hostname()); h != "redd.it" && h != "www.redd.it" {
+		return ""
+	}
+	id := strings.Trim(u.Path, "/")
+	if id == "" || strings.ContainsFunc(id, func(r rune) bool { return !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9') }) {
+		return ""
+	}
+	return id
+}
+
+// Canonical rewrites old./m./np. Reddit hosts to www.reddit.com, and a
+// redd.it short link to its post's address, so the post is read like any
+// other (through old.reddit with the owner's session; the short link
+// itself leads to Reddit's 403 for readers that are not browsers).
 func Canonical(u *url.URL) *url.URL {
 	n := *u
+	if id := shortID(u); id != "" {
+		n.Path, n.RawPath, n.RawQuery = "/comments/"+id+"/", "", ""
+	}
 	n.Scheme, n.Host = "https", "www.reddit.com"
 	return &n
 }
@@ -452,7 +473,7 @@ func fixLinks(d *doc.Document, base string) {
 			continue
 		}
 		if (bu != nil && lu.Host == bu.Host) || (lu.Host != "www.reddit.com" && IsReddit(lu)) {
-			lu.Scheme, lu.Host = "https", "www.reddit.com"
+			lu = Canonical(lu)
 		}
 		if lu.Host == "www.reddit.com" {
 			switch {
