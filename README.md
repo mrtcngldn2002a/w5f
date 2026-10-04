@@ -4,6 +4,7 @@
 Built for a 2006 ASUS W5F laptop · one Go binary · portable to any OS</p>
 
 <p align="center">
+  <a href="https://github.com/mrtcngldn2002a/w5f/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/mrtcngldn2002a/w5f/ci.yml?branch=master&style=flat-square&label=tests&color=ffb000&labelColor=120c02"></a>
   <a href="https://github.com/mrtcngldn2002a/w5f/releases/latest"><img alt="latest release" src="https://img.shields.io/github/v/release/mrtcngldn2002a/w5f?style=flat-square&color=ffb000&labelColor=120c02"></a>
   <img alt="Go 1.26" src="https://img.shields.io/badge/go-1.26-ffb000?style=flat-square&labelColor=120c02">
   <img alt="platforms" src="https://img.shields.io/badge/runs_on-linux_%C2%B7_windows_%C2%B7_macOS-ffb000?style=flat-square&labelColor=120c02">
@@ -489,6 +490,8 @@ solver_url = "http://127.0.0.1:8191"  # W5F_SOLVER_URL; "" turns the helper off
 
 <details>
 <summary><b>Build and layout</b></summary>
+
+Every push to master and every pull request runs [CI](.github/workflows/ci.yml): the tests (with the race detector) on Linux, macOS and Windows, `gofmt`, `staticcheck`, `govulncheck`, the secret scan, and the five binaries built — unsigned, kept for a week as the run's artifact to try a change with. Locally:
 
 ```sh
 go test ./...                       # every package

@@ -1,0 +1,84 @@
+# Every push to master and every pull request: the tests on Linux, macOS and
+# Windows (the systems W5F ships for), the checks a change should pass, and
+# the five release binaries built. Releases themselves are still made and
+# signed on the owner's computer (go run ./cmd/w5f-release); this only checks.
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: vet
+        run: go vet ./...
+      - name: test (race detector)
+        if: runner.os != 'Windows'
+        run: go test -race ./...
+      - name: test
+        if: runner.os == 'Windows'
+        run: go test ./...
+
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: gofmt
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then echo "not gofmt'd:"; echo "$out"; exit 1; fi
+      - name: staticcheck
+        run: go run honnef.co/go/tools/cmd/staticcheck@v0.8.1 ./...
+      - name: govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+      - name: secrets
+        run: sh scripts/secret-scan.sh
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      # The same targets and flags as cmd/w5f-release, unsigned: a binary
+      # to try a change with, not a release.
+      - name: build the five binaries
+        run: |
+          set -e
+          mkdir -p dist
+          build() { CGO_ENABLED=0 GOOS=$1 GOARCH=$2 GOAMD64=$3 go build -trimpath -ldflags "-s -w -X main.version=0.0.0-ci.${GITHUB_SHA::7}" -o dist/$4 ./cmd/w5f; }
+          build linux amd64 v1 w5f-linux-amd64
+          build linux 386 "" w5f-linux-386
+          build windows amd64 v1 w5f-windows-amd64.exe
+          build darwin arm64 "" w5f-darwin-arm64
+          build darwin amd64 v1 w5f-darwin-amd64
+          ls -l dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: w5f-unsigned-${{ github.sha }}
+          path: dist/
+          retention-days: 7
