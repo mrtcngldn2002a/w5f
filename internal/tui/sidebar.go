@@ -252,6 +252,7 @@ func cabinetDoc() *doc.Document {
 	for _, e := range []struct{ key, label, href, what string }{
 		{"p", "The Daily Packet", "w5f:packet", "today's issue: periodicals, a weird world, an esoteric text, an old-internet relic, your queue"},
 		{"x", "Deep random", "w5f:discover/random", "a page from one of eight families of sources, with Ultan's note on its shelf"},
+		{"", "Your sites in Deep random", "w5f:discover/sites", "any site you add (g → random-add <address>), on a shelf of yours or a family's"},
 		{"T", "A tarot card", "w5f:discover/tarot", "Waite's Pictorial Key, the card drawn upright or reversed"},
 		{"I", "An I Ching cast", "w5f:discover/iching", "three coins six times, Legge's translation"},
 		{"", "On this day", "w5f:almanac", "Chambers's Book of Days (1864) and the day's events"},
@@ -319,7 +320,7 @@ func (m Model) roomHints() []hint {
 		case "2":
 			return []hint{{"enter", "open"}, {"f", "jump"}, {"*", "star"}, {"m", "read / unread"}, {"g → sync", "fetch new"}, {"g → opml-import", "add feeds"}}
 		case "3":
-			return []hint{{"enter", "open"}, {"f", "jump"}, {"g → gut", "Gutenberg"}, {"g → se", "Standard Ebooks"}, {"g → catalog-add", "a book site"}, {"/", "search"}}
+			return []hint{{"enter", "open"}, {"f", "jump"}, {"g → gut", "Gutenberg"}, {"g → se", "Standard Ebooks"}, {"g → ia", "Internet Archive"}, {"g → catalog-add", "a book site"}, {"/", "search"}}
 		case "4":
 			return []hint{{"enter", "open"}, {"f", "jump"}, {"F", "follow"}, {"g → following", "followed"}, {"g → fiction", "this hall"}}
 		case "5":

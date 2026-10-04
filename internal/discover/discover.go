@@ -48,6 +48,8 @@ type Env struct {
 	// Shelves maps the Periodicals catalog's feeds to their shelves; the
 	// Daily Packet takes only these feeds' items (nil: any unread item).
 	Shelves map[string]string
+	// SitesPath is the owner's sites file (random.toml); "": none.
+	SitesPath string
 }
 
 // families are the Deep Random sources; each family file adds its own.
@@ -57,7 +59,7 @@ const bagKey, lastKey = "discover:bag", "discover:last"
 
 // nextFamily takes the next family from the shuffle bag: every family once
 // per bag, never the same one twice in a row.
-func nextFamily(db *store.DB) (Family, error) {
+func nextFamily(db *store.DB, families []Family) (Family, error) {
 	if len(families) == 0 {
 		return nil, errors.New("no discovery sources")
 	}
@@ -93,9 +95,10 @@ func Next(ctx context.Context, env Env) (Draw, *doc.Document, error) {
 	// One bot-check helper request per draw (up to a minute); the other
 	// shelves are tried without it.
 	ctx = fetch.SolverOnce(ctx)
+	fams := allFamilies(env)
 	var errs []string
 	for try := 0; try < 3; try++ {
-		f, err := nextFamily(env.DB)
+		f, err := nextFamily(env.DB, fams)
 		if err != nil {
 			return Draw{}, nil, err
 		}
@@ -137,6 +140,8 @@ func Route(ctx context.Context, target string, env Env) (*doc.Document, error) {
 		return almanacDoc(ctx, env, time.Now().Format("01-02"))
 	case strings.HasPrefix(target, "w5f:almanac/"):
 		return almanacDoc(ctx, env, strings.TrimPrefix(target, "w5f:almanac/"))
+	case target == "w5f:discover/sites" || strings.HasPrefix(target, "w5f:discover/sites/") || strings.HasPrefix(target, "w5f:discover/sites?"):
+		return sitesRoute(ctx, env, target)
 	case target == "w5f:discover/random":
 		_, page, err := Next(ctx, env)
 		return page, err

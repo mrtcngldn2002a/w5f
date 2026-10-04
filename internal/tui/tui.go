@@ -1037,6 +1037,21 @@ func (m Model) gotoKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				target = t
 			}
 		}
+		if strings.EqualFold(strings.TrimSpace(m.gotoBuf), "random-add") {
+			// g → random-add alone: this page's site into Deep random.
+			addr := ""
+			if m.cur != nil {
+				addr = m.cur.target
+				if !strings.Contains(addr, "://") && m.cur.doc != nil {
+					addr = m.cur.doc.URL
+				}
+			}
+			if !strings.Contains(addr, "://") {
+				m.status = "random-add: this page is not on the web · g → random-add <address>"
+				return m, nil
+			}
+			target = source.RandomAddTarget(addr, "")
+		}
 		if target == "" {
 			return m, nil
 		}
@@ -1376,7 +1391,9 @@ func (m Model) helpLines() []string {
 		{"d", "dictionary (English → Turkish) over the page · esc closes"},
 		{"* / m", "star · mark read/unread (feed items)"},
 		{"F", "follow / unfollow this serial or Reddit series (g → fiction, g → following)"},
-		{"x / p", "deep random (eight families of sources) · today's Daily Packet"},
+		{"x / p", "deep random (eight families of sources, and your sites) · today's Daily Packet"},
+		{"g → random-add", "add a site to deep random (alone: this page's site; g → random-add <address> [shelf]) · g → random-sites lists them"},
+		{"g → ia", "the Internet Archive's texts by collection (ia <words>, ia @collection <words>, subject:alchemy)"},
 		{"enter / g → ? text", "answer a page that asks for input (g → smallweb, g → worlds)"},
 		{"+ / -", "expand / fold all sections"}, {"o", "show link address"}, {"ctrl+r", "reload"},
 		{"B", "open this page (or the selected link) in the browser · g → browser <address>"},

@@ -33,7 +33,7 @@ reading.
 |---|---|
 | **Reads** | HTML, Wikidot, RSS/Atom, EPUB, MOBI/AZW3, FB2, PDF text, Gemini, Gopher, Usenet, Reddit, AO3, Royal Road and forum threadmarks; CBZ/CBR/CB7 comics in its own viewer |
 | **Keeps** | a queue, notes, clippings and saved pages as Obsidian-friendly Markdown; searches everything you have read (SQLite FTS5) |
-| **Wanders** | deep random across eight families of sources, a Daily Packet, a tarot card or an I Ching cast, the day in a book of 1864 |
+| **Wanders** | deep random across eight families of sources and any site you add, a Daily Packet, a tarot card or an I Ching cast, the day in a book of 1864 |
 | **Plays** | a solo RPG table with an oracle, your own dice, sparks, characters, threads and clocks |
 | **Updates itself** | signed, with rollback; runs offline from its cache |
 
@@ -174,12 +174,12 @@ On a window of 110 columns or more the rooms stay in a side menu on the left (`\
 |:---:|---|---|
 | `1` | **The Reading Room** | what is half-read (*On the desk*), what has come in, today's draws, Ultan's note |
 | `2` | **The Periodical Gallery** | shelves of feeds, unread and starred, the newest unread |
-| `3` | **The Stacks** | your books, continue reading, Gutenberg, Standard Ebooks, LibGen, any site you add |
+| `3` | **The Stacks** | your books, continue reading, the Internet Archive's texts, Gutenberg, Standard Ebooks, LibGen, any site you add |
 | `4` | **The Serial Hall** | web serials, forum stories, AO3, weird worlds, what you follow |
 | `5` | **The Picture Vault** | comics: local CBZ and folders, Suwayomi for following |
 | `6` | **The Gaming Table** | the solo RPG table |
 | `7` | **The Newsroom** | Usenet, read only |
-| `8` | **Curiosity Cabinet** | every door of discovery: packet, deep random, tarot, I Ching, almanac, small web |
+| `8` | **Curiosity Cabinet** | every door of discovery: packet, deep random and your sites in it, tarot, I Ching, almanac, small web |
 | `9` | **The Lectern** | the reading queue: this week, someday |
 | `0` | **The Scriptorium** | notes, clippings, saved pages |
 | `H` | **The Register** | the reading history |
@@ -241,6 +241,7 @@ w5f w5f:usenet           Usenet, read only: your groups with new posts; g → us
 
 # books and catalogs
 w5f w5f:books            The Stacks: continue reading, your books, catalogs
+w5f ia                   the Internet Archive's texts, by collection (ia <words>, ia @<collection> [words])
 w5f "gut lovecraft"      search Project Gutenberg (also: se <words> for Standard Ebooks)
 w5f "libgen dracula"     search Library Genesis (also: lg <words>)
 w5f "libgen dracula ext:epub lang:english year:1897 sort:title"
@@ -253,6 +254,12 @@ w5f "catalog-add <address> [test word]"  add any book website to the Library (ch
                                          "Index of /" file listings (indexed locally), and falls back to DuckDuckGo
 w5f "cat <id> dracula"                   full search across all its result pages (author:… / title:…)
 w5f catalogs                             manage site catalogs (re-check, remove)
+
+# discovery
+w5f x                    deep random (also: packet, tarot, iching, almanac)
+w5f "random-add <address> [shelf]"  add any site to deep random (checks it first; in the reader,
+                                    g → random-add alone adds the page's site)
+w5f random-sites         your sites in deep random (try, check again, remove)
 
 # your archive
 w5f "find <words>"       search everything you have read (also: press / in the reader)
@@ -294,8 +301,21 @@ The web reader extracts articles (Readability), keeps an on-disk cache for offli
 - **Weird worlds:** SCP / Wanderers' Library / Backrooms and 25 archived worlds.
 - **The small web:** Wiby, ooh.directory, Kagi Small Web, the GeoCities archive (OoCities), Gemini via Cosmos, Gopher via Floodgap.
 - **Internet fiction.**
+- **Your own sites** — any you add.
 
 Nothing is filtered by content: what a source holds may come up.
+
+**Your own sites.** `g → random-add <address>` (alone: the site of the page you are on) tries the address once and finds how to draw a page from it — its RSS or Atom feed, its own random-page address, a walk down its links to a page of real text, or one of its links as it is — then shows the page it landed on and offers to add it; another way or another shelf is one link away. A site goes on your own shelf, *yours*, which takes its turn in the shuffle bag like a family; or joins a family (`g → random-add <address> esoteric`), where it comes up as often as each of that family's sources; or makes a shelf of any other name. `g → random-sites` lists them with *try one*, *check again* and *remove*. They are kept in `random.toml` in the data folder, which can be edited by hand:
+
+```toml
+[[site]]
+name = "Hermetic notes"
+url = "https://example.org/library/"
+how = "walk"        # walk, feed, random or links
+scope = "/library/" # walk and links: stay under this path (unset: the address's folder)
+depth = 4           # walk: levels down at most
+family = "occult"   # unset: yours; a family's name joins it
+```
 
 `p` opens today's **Daily Packet**: three unread periodicals from three different shelves (shelves and feeds not in a recent issue first), four sections that take turns through a shuffle bag — weird worlds, fiction, esoterica, folklore, essays and classics, encyclopedias, a public-domain discovery (Public Domain Review, Project Gutenberg or an old curious book of the Biodiversity Heritage Library, whose own site refuses W5F, through its Internet Archive copy), an old-internet text, the small web — and the next item of your queue. Nothing an issue showed in the last 30 days comes back, a reshuffled one's pages included — the same issue all day, `]`/`[` through it, "reshuffle", "save this issue" (Markdown in `Saved/`). Its cover carries two columns: *On this day* (the day's chapter of Chambers's *Book of Days*, 1864, opened in a clean reader page with `g → almanac`; Britannica's *On This Day*: the day's story, the featured event, two more and three birthdays; and *Today in Science History*: a scientist born that day, one who died, an event in science) and *The oracle*.
 
@@ -325,9 +345,11 @@ Site logins stay with the owner.
 </details>
 
 <details>
-<summary><b>Books, Library Genesis and custom catalogs</b></summary>
+<summary><b>Books, the Internet Archive, Library Genesis and custom catalogs</b></summary>
 
 W5F reads EPUB, MOBI/AZW/AZW3 (Kindle, including KF8 and combo files), FB2 and `.fb2.zip`, PDF text (10 pages per chapter; uses `pdftotext` from Poppler when installed — `poppler-utils` on Debian and Fedora, `poppler` on Arch and Homebrew — otherwise a built-in reader; every PDF keeps an "external viewer" link), TXT/HTML/Markdown. A PDF linked from the web opens as text too (its first 80 pages, the file kept in the cache's `pdf` folder); a DergiPark journal's item in Periodicals opens the article's full-text PDF instead of its abstract page. DJVU, CBZ and CBR open in the external viewer. DRM-protected and KFX books are listed but not opened — W5F never removes DRM.
+
+**The Internet Archive's texts** (`g → ia`, or *Internet Archive* in The Stacks) are browsed collection by collection: each page shows the collection's description and the collections it belongs to, its sub-collections, then its texts, 50 a page (`]` `[` through them). Above them: the order (most read, read this week, newly added, oldest, newest, title A–Z), a language (English, Turkish, Ottoman Turkish, French, German, Latin, Greek, Arabic, Persian and more), a period (before 1600 to the present), the collections inside it, and *a random text from here*. Lending-library texts, which can only be borrowed on the Archive's site, are left out until asked for. `g → ia <words>` searches all texts, `g → ia @<collection> <words>` one collection; words in the Archive's own syntax pass as written (`ia subject:alchemy AND year:[1600 TO 1700]`, `ia creator:"Blake, William"`). An item's page shows its description, its subjects, collections and author as links to more, and its public files — EPUB first, then PDFs, other ebooks and the full text read from the scans; opening one keeps it in your library and reads it at once, its place remembered.
 
 **Library Genesis** is integrated through a native adapter of the [halfurness/libgen-cli](https://github.com/halfurness/libgen-cli) libgen.li protocol: search tables, file/edition metadata, fresh mirror-specific download keys, Referer, mirror fallback and MD5-verified downloads. EPUBs open in the reader; other supported formats follow the existing external-viewer flow. Search accepts `ext:epub,pdf`, `lang:english`, `year:1897`, `author:"Bram Stoker"`, `title:Dracula`, `publisher:Penguin`, `sort:title`, `sort:-year`, and page sizes `limit:25`, `limit:50`, `limit:100`. Filters apply to each page; follow the next-page link for more matches. The library keeps the canonical `libgen:<md5>` source, avoiding duplicate downloads across mirrors.
 
@@ -537,7 +559,7 @@ getting pages
 
 the rooms
   internal/feeds           periodicals: built-in catalog (catalog.toml), sync, shelf/item pages
-  internal/books           book readers (EPUB, MOBI/AZW3, FB2, PDF), ~/Archive/Books, Gutenberg & Standard Ebooks, progress
+  internal/books           book readers (EPUB, MOBI/AZW3, FB2, PDF), ~/Archive/Books, Internet Archive, Gutenberg & Standard Ebooks, progress
   internal/libgen          Library Genesis protocol, metadata, mirrors, MD5-verified downloads
   internal/sitecat         site catalogs: search discovery, result-list learning, full search, downloads
   internal/fiction         internet fiction: Royal Road, XenForo, AO3, WordPress, Reddit series, following, FanFicFare bridge
@@ -546,7 +568,7 @@ the rooms
   internal/comics/view     the comics viewer (an X11 window or a browser tab, layout, spreads, RTL)
   internal/solo            the Gaming Table: oracle, dice, sparks, characters, threads, counters, log
   internal/usenet          NNTP reader, read state, kill file
-  internal/discover        deep random families, Daily Packet, almanac, tarot and I Ching, Obscure & Archived Worlds
+  internal/discover        deep random families and your own sites, Daily Packet, almanac, tarot and I Ching, Obscure & Archived Worlds
   internal/ultan           Ultan's notes and ledger
   internal/weeding         The Weeding Room: what is kept on disk, the page cache limit, removal one thing at a time
 

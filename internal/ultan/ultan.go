@@ -270,6 +270,7 @@ var shelves = map[string]string{
 	"smallweb":     "From the small rooms at the edge of the web, each lit by a single lamp.",
 	"weird":        "From the wing of invented worlds. Its doors open inward only.",
 	"fiction":      "From the serial hall, where the stories are still being written.",
+	"yours":        "From your own shelf. You chose these; I only dust them.",
 }
 
 const drawsKey = "ultan:draws"

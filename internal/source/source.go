@@ -268,6 +268,8 @@ var (
 //	scp <words>                search the SCP Wiki, Wanderers' Library, Backrooms
 //	r/name, reddit <words>     a subreddit, or a Reddit search
 //	gut <words>, se <words>    search Project Gutenberg / Standard Ebooks
+//	ia [@collection] [words]   the Internet Archive's texts
+//	random-add <address> [shelf], random-sites   your sites in Deep random
 //	books, feeds               the Library / Periodicals
 //	?<words> or several words  web search
 //	a path to a file           open the file
@@ -286,6 +288,9 @@ func Resolve(input string) string {
 		return "w5f:catalog/check?" + v.Encode()
 	case lower == "catalogs":
 		return "w5f:catalogs"
+	case strings.HasPrefix(lower, "random-add ") && len(strings.Fields(s)) > 1:
+		fields := strings.Fields(s[len("random-add "):])
+		return RandomAddTarget(fields[0], strings.Join(fields[1:], " "))
 	case lower == "solo", lower == "solo rpg", lower == "oracle":
 		return "w5f:solo"
 	case strings.HasPrefix(lower, "roll ") && isDice(s[len("roll "):]):
@@ -346,6 +351,10 @@ func Resolve(input string) string {
 		return "w5f:books/gutenberg?" + url.Values{"q": {strings.TrimSpace(s[strings.Index(s, " "):])}}.Encode()
 	case strings.HasPrefix(lower, "se "):
 		return "w5f:books/se?" + url.Values{"q": {strings.TrimSpace(s[3:])}}.Encode()
+	case lower == "ia" || lower == "archive":
+		return "w5f:books/ia"
+	case strings.HasPrefix(lower, "ia ") && len(strings.Fields(s)) > 1:
+		return iaTarget(strings.TrimSpace(s[3:]))
 	case lower == "libgen" || lower == "lg":
 		return "w5f:books/libgen"
 	case lower == "libgen-status":
@@ -370,6 +379,8 @@ func Resolve(input string) string {
 		return "w5f:worlds"
 	case lower == "packet" || lower == "daily" || lower == "daily packet":
 		return "w5f:packet"
+	case lower == "random-sites" || lower == "my sites":
+		return "w5f:discover/sites"
 	case lower == "x" || lower == "deep random":
 		return "w5f:discover/random"
 	case strings.HasPrefix(lower, "serial ") && len(strings.Fields(s)) > 1:
@@ -549,7 +560,8 @@ func DiscoverEnv() (discover.Env, error) {
 			}
 			return crom.Random(ctx, Fetcher, p)
 		},
-		Smallweb: SmallwebEnv(),
+		Smallweb:  SmallwebEnv(),
+		SitesPath: discover.SitesPath(),
 	}
 	if cat, err := feeds.LoadCatalog(); err == nil {
 		env.Shelves = map[string]string{}
@@ -1091,4 +1103,29 @@ func booksEnv(db *store.DB) books.Env {
 func isCatalogID(id string) bool {
 	ps, _ := sitecat.LoadAll(sitecat.Path())
 	return sitecat.Find(ps, id) >= 0
+}
+
+// iaTarget is g → ia: "@collection words" searches inside a collection
+// ("@collection" alone opens it); other words search all the Archive's texts.
+func iaTarget(s string) string {
+	v := url.Values{}
+	if strings.HasPrefix(s, "@") {
+		coll, rest, _ := strings.Cut(s[1:], " ")
+		v.Set("c", coll)
+		s = strings.TrimSpace(rest)
+	}
+	if s != "" {
+		v.Set("q", s)
+	}
+	return "w5f:books/ia?" + v.Encode()
+}
+
+// RandomAddTarget is the check of a site before it joins Deep random, on
+// the shelf named (unset: "yours").
+func RandomAddTarget(addr, shelf string) string {
+	v := url.Values{"url": {addr}}
+	if shelf = strings.TrimSpace(shelf); shelf != "" {
+		v.Set("family", shelf)
+	}
+	return "w5f:discover/sites/check?" + v.Encode()
 }
