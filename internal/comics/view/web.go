@@ -37,6 +37,7 @@ type Web struct {
 	mu      sync.Mutex
 	title   string
 	size    image.Point
+	scale   int // device pixels to a CSS pixel, as the page says (1 or 2)
 	frame   []byte
 	seq     int
 	changed chan struct{} // closed and replaced on every new frame
@@ -62,7 +63,7 @@ func OpenWeb(title string) (*Web, error) {
 	w := &Web{
 		host: ln.Addr().String(), base: "/" + hex.EncodeToString(tok) + "/",
 		keys: make(chan Key, 32), ready: make(chan struct{}), changed: make(chan struct{}),
-		title: title, size: image.Pt(1280, 800),
+		title: title, size: image.Pt(1280, 800), scale: 1,
 	}
 	w.URL = "http://" + w.host + w.base
 	w.srv = &http.Server{Handler: w, ReadHeaderTimeout: 10 * time.Second}
@@ -87,6 +88,14 @@ func (w *Web) Size() image.Point {
 }
 
 func (w *Web) Keys() <-chan Key { return w.keys }
+
+// Scale is how many frame pixels the screen has to the page's pixel: the
+// viewer writes its notes that much larger, so they read the same.
+func (w *Web) Scale() int {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.scale
+}
 
 // Show keeps the frame as a JPEG for the page and tells it there is one.
 func (w *Web) Show(frame *image.RGBA) error {
@@ -178,18 +187,23 @@ func (w *Web) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	case path == "size" && r.Method == http.MethodPost:
 		b, _ := io.ReadAll(io.LimitReader(r.Body, 32))
 		f := strings.Fields(string(b))
-		if len(f) != 2 {
-			http.Error(rw, "size: width height", http.StatusBadRequest)
+		if len(f) == 2 {
+			f = append(f, "1") // a page from before the scale was sent
+		}
+		if len(f) != 3 {
+			http.Error(rw, "size: width height scale", http.StatusBadRequest)
 			return
 		}
 		x, e1 := strconv.Atoi(f[0])
 		y, e2 := strconv.Atoi(f[1])
-		if e1 != nil || e2 != nil {
-			http.Error(rw, "size: width height", http.StatusBadRequest)
+		k, e3 := strconv.Atoi(f[2])
+		if e1 != nil || e2 != nil || e3 != nil {
+			http.Error(rw, "size: width height scale", http.StatusBadRequest)
 			return
 		}
 		w.mu.Lock()
 		w.size = image.Pt(min(max(x, 200), 5120), min(max(y, 200), 3200))
+		w.scale = min(max(k, 1), 2)
 		w.mu.Unlock()
 		w.once.Do(func() { close(w.ready) })
 		w.key("expose") // draw again at the new size
@@ -279,7 +293,7 @@ const base = location.pathname, page = document.getElementById('page');
 const post = (path, body) => fetch(base + path, {method: 'POST', body}).catch(() => {});
 function size() {
   const r = Math.min(window.devicePixelRatio || 1, 2);
-  post('size', Math.round(innerWidth * r) + ' ' + Math.round(innerHeight * r));
+  post('size', Math.round(innerWidth * r) + ' ' + Math.round(innerHeight * r) + ' ' + Math.round(r));
 }
 let resizing;
 addEventListener('resize', () => { clearTimeout(resizing); resizing = setTimeout(size, 150); });

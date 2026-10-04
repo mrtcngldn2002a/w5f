@@ -49,12 +49,20 @@ func TestWebViewerInTheBrowser(t *testing.T) {
 	if c := post("size", "640 400"); c != http.StatusNoContent {
 		t.Fatalf("size: %d", c)
 	}
-	if err := w.WaitReady(time.Second); err != nil || w.Size() != image.Pt(640, 400) {
-		t.Fatalf("ready: %v, size %v", err, w.Size())
+	if err := w.WaitReady(time.Second); err != nil || w.Size() != image.Pt(640, 400) || w.Scale() != 1 {
+		t.Fatalf("ready: %v, size %v, scale %d", err, w.Size(), w.Scale())
 	}
 	if k := <-w.Keys(); k != "expose" {
 		t.Fatalf("a new size redraws: %q", k)
 	}
+	// A Retina screen: twice the pixels, and the notes twice as large.
+	post("size", "1280 800 2")
+	if w.Size() != image.Pt(1280, 800) || w.Scale() != 2 {
+		t.Errorf("retina: size %v scale %d", w.Size(), w.Scale())
+	}
+	<-w.Keys()
+	post("size", "640 400 1")
+	<-w.Keys()
 
 	events := get("events")
 	lines := bufio.NewReader(events.Body)
