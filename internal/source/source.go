@@ -17,12 +17,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
 	"w5f/internal/books"
+	"w5f/internal/browser"
 	"w5f/internal/comics"
 	"w5f/internal/comics/suwayomi"
 	"w5f/internal/config"
@@ -509,24 +509,24 @@ func OpenComic(v comics.ViewRequest) error {
 	default:
 		args = append(args, v.Path)
 	}
-	if runtime.GOOS == "linux" && os.Getenv("DISPLAY") == "" {
+	if browser.NoDisplay() {
 		if v.Path != "" {
 			return books.OpenExternal(v.Path)
 		}
-		return errors.New("the comics viewer needs X (it runs in the W5F session, not over SSH or on the console)")
+		return errors.New("the comics viewer needs a desktop (it runs in the W5F session, not over SSH or on the console)")
 	}
-	if runtime.GOOS != "linux" {
-		if v.Path != "" {
-			return books.OpenExternal(v.Path)
-		}
-		return errors.New("reading Suwayomi chapters needs the W5F viewer, which runs on Linux with X")
-	}
+	// An X11 window on Linux; elsewhere (a Mac, Windows, Wayland) w5f view
+	// shows the same viewer in a browser tab.
 	exe, err := os.Executable()
 	if err != nil {
 		return err
 	}
 	cmd := exec.Command(exe, args...)
-	return cmd.Start()
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	go cmd.Wait() // reap it when the viewer closes
+	return nil
 }
 
 // SmallwebEnv is where Gemini's known hosts and the small web cache live.
