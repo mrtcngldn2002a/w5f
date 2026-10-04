@@ -450,10 +450,10 @@ func (m Model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		pr := crom.PresetForHost(host)
 		m.loading = pr.Label
 		return m, load("w5f:random/"+pr.Name, false)
-	case "home":
+	case "home", "<": // < and >, as in less: Mac keyboards have no home and end
 		m.jumpEnd(-1)
 		return m, nil
-	case "G", "end":
+	case "G", "end", ">":
 		m.jumpEnd(1)
 		return m, nil
 	case "tab":
@@ -1362,7 +1362,7 @@ func (m Model) helpLines() []string {
 		{"enter", "open the link · fold / unfold the section"},
 		{"backspace", "back (also alt+←) · l: forward again (also alt+→)"},
 		{"space / b", "a screen down / up, the selection along · pgdn / pgup too"},
-		{"home / end", "the first / last line of the page"},
+		{"home / end", "the first / last line of the page (also < and >)"},
 		{"shift+↑ / ↓", "the previous / next heading"},
 		{"f", "link hints: every link on screen gets a number, type it to open"},
 		{"q", "close this page, back to the room it was opened from (a room: back to the Reading Room)"},

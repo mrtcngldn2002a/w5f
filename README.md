@@ -6,7 +6,7 @@ Built for a 2006 ASUS W5F laptop · one Go binary · portable to any OS</p>
 <p align="center">
   <a href="https://github.com/mrtcngldn2002a/w5f/releases/latest"><img alt="latest release" src="https://img.shields.io/github/v/release/mrtcngldn2002a/w5f?style=flat-square&color=ffb000&labelColor=120c02"></a>
   <img alt="Go 1.26" src="https://img.shields.io/badge/go-1.26-ffb000?style=flat-square&labelColor=120c02">
-  <img alt="platforms" src="https://img.shields.io/badge/runs_on-linux_%C2%B7_windows-ffb000?style=flat-square&labelColor=120c02">
+  <img alt="platforms" src="https://img.shields.io/badge/runs_on-linux_%C2%B7_windows_%C2%B7_macOS-ffb000?style=flat-square&labelColor=120c02">
 </p>
 
 <p align="center">
@@ -58,9 +58,18 @@ reading.
 </table>
 
 <p align="center"><sub>All five themes, taken on the W5F itself: X and xterm at 1280×800, Terminus 16, 160 × 50 cells, with sample data.</sub></p>
+
 ## Quick start
 
-Download the binary for your system from the [latest release](https://github.com/mrtcngldn2002a/w5f/releases/latest) (`w5f-linux-amd64`, `w5f-linux-386`, `w5f-windows-amd64.exe`), put it on your `PATH` as `w5f`, and run it:
+Download the binary for your system from the [latest release](https://github.com/mrtcngldn2002a/w5f/releases/latest), put it on your `PATH` as `w5f`, and run it:
+
+| System | Binary |
+|---|---|
+| Linux, 64-bit (the W5F laptop too) | `w5f-linux-amd64` |
+| Linux, 32-bit | `w5f-linux-386` |
+| Windows | `w5f-windows-amd64.exe` |
+| macOS, Apple silicon (M1 and later) | `w5f-darwin-arm64` |
+| macOS, Intel | `w5f-darwin-amd64` |
 
 ```sh
 w5f                 # the Reading Room
@@ -68,6 +77,25 @@ w5f scp-173         # any page: an address, a shorthand, a file
 w5f doctor          # checks this computer, and says how to install what is missing
 w5f update          # later: the next signed release (--rollback goes back)
 ```
+
+<details>
+<summary><b>On a Mac</b></summary>
+
+In Terminal (or iTerm2), for Apple silicon — on an Intel Mac, `amd64` in place of `arm64`:
+
+```sh
+mkdir -p ~/.local/bin
+curl -L -o ~/.local/bin/w5f https://github.com/mrtcngldn2002a/w5f/releases/latest/download/w5f-darwin-arm64
+chmod +x ~/.local/bin/w5f
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zprofile    # once; then open a new window
+w5f
+```
+
+W5F is not notarized by Apple. Fetched with `curl` as above it simply runs; a copy downloaded in a browser is stopped by Gatekeeper ("Apple could not verify…") until you clear it with `xattr -d com.apple.quarantine ~/.local/bin/w5f` (or *System Settings → Privacy & Security → Open Anyway*). A folder you can write to, as `~/.local/bin` is, lets `w5f update` replace the binary without `sudo`.
+
+What works differently on a Mac: comics open in the app macOS keeps for the file — a comic reader such as Simple Comic or YACReader for CBZ and CBR, Preview for pictures and PDFs (the W5F viewer is an X11 window, so Suwayomi chapters are read on Linux); sessions are taken from Firefox only (Chrome keeps its cookies in the keychain); `w5f solver install` is for Linux and Windows, but a Byparr or FlareSolverr you run yourself (in Docker, say) at `127.0.0.1:8191` is used all the same. A Mac keyboard has no home and end: `<` and `>` do the same, and its `delete` key is backspace.
+
+</details>
 
 Inside, the arrows move, `enter` opens, `backspace` goes back, `q` closes a page, `g` goes anywhere and `?` lists every key; `esc` twice quits. On the W5F laptop, [`platform/antix/`](platform/antix/README.md) makes the machine boot straight into W5F.
 
@@ -77,10 +105,10 @@ Inside, the arrows move, `enter` opens, `backspace` goes back, `q` closes a page
 |---|---|
 | PDFs read faster and better | Poppler's `pdftotext` (a built-in reader is used without it) |
 | following comics | Java 21, for Suwayomi-Server (`w5f comics server install` fetches the server itself) |
-| sites behind a bot check | Byparr or FlareSolverr on this computer (`w5f solver install`; Linux needs Xvfb) |
+| sites behind a bot check | Byparr or FlareSolverr on this computer (`w5f solver install` on Linux and Windows; Linux needs Xvfb) |
 | stories from 100+ fiction sites as EPUB | FanFicFare (`pipx install FanFicFare`) |
 | Reddit or AO3 sessions taken from a browser | Chromium, Chrome or Firefox, signed in |
-| the comics viewer | X11 (Linux with a desktop); elsewhere comics open in the system viewer |
+| the comics viewer | X11 (Linux with a desktop); elsewhere comics open in the system's own app for the file |
 
 Folders, the browser and Java can be set in `config.toml` (see *Settings* under [In detail](#in-detail)).
 
@@ -95,7 +123,7 @@ The arrows only move; `enter` alone opens. The bottom bar follows the room and s
 | `↑` `↓` | previous / next link or section — the page scrolls first when the next one is off screen, so no text is skipped |
 | `←` `→` | the column to the left / right, to the nearest line (rooms are two columns wide); on a page of one column, the previous / next heading |
 | `space` `b` · `pgdn` `pgup` | a screen down / up, the selection along |
-| `home` `end` | the first / last line of the page |
+| `home` `end` · `<` `>` | the first / last line of the page (`<` `>` for keyboards without home and end, as on a Mac) |
 | `shift+↑` `shift+↓` | the previous / next heading |
 | `f` | link hints: every link on screen gets a number; type it to open — the quick way down a long list |
 | `t` · `]` `[` | contents (a book's chapters) · next / previous chapter |
@@ -447,7 +475,7 @@ solver_url = "http://127.0.0.1:8191"  # W5F_SOLVER_URL; "" turns the helper off
 
 - **Release** (developer machine):
   - Once: `go run ./cmd/w5f-release keygen`. The private key goes to `%APPDATA%\w5f-release\release.key` (Linux: `~/.config/w5f-release/`). Keep it out of the repo and back it up: without it, installed copies cannot be updated.
-  - Each release: `go run ./cmd/w5f-release build -version X.Y.Z -repo owner/w5f`. Always give `-repo`, so the new binary can find the next release. This builds and signs `dist/vX.Y.Z/`; upload every file in it as the assets of release `vX.Y.Z`.
+  - Each release: `go run ./cmd/w5f-release build -version X.Y.Z -repo owner/w5f`. Always give `-repo`, so the new binary can find the next release. This builds the five binaries (Linux amd64 and 386, Windows, macOS arm64 and amd64) and signs `dist/vX.Y.Z/`; upload every file in it as the assets of release `vX.Y.Z`. The macOS binaries cross-build from any system: Go's linker gives the arm64 one the ad hoc signature Apple silicon requires; neither is notarized.
   - Before a push: `sh scripts/secret-scan.sh`.
 - **Doctor.** `w5f doctor` checks folders and config, the database and FTS5, the dictionary, the terminal, locale and font, Suwayomi's Java, and the update setup; what is missing comes with this system's install command (apt, dnf, pacman, Homebrew or winget). `--live` fetches one source of each kind; `--bench` times a 12k-word page against the 150 ms budget. Doctor only reads.
 - **Laptop.** `platform/antix/` makes the W5F boot into W5F (kmscon or X); see its README.
@@ -468,6 +496,12 @@ For the W5F itself (the T7200 has no SSE4.2, so the amd64 level must stay at v1)
 
 ```sh
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v1 go build -trimpath -ldflags "-s -w" -o bin/w5f-linux-amd64 ./cmd/w5f
+```
+
+For a Mac, from any system:
+
+```sh
+CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags "-s -w" -o bin/w5f-darwin-arm64 ./cmd/w5f
 ```
 
 Golden files: `go test ./internal/render -update` rewrites `testdata/golden/` after an intended rendering change — review the diff.

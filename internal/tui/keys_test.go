@@ -137,6 +137,13 @@ func TestPageKeysCarryTheSelection(t *testing.T) {
 	if m.cur.focus != 1 || m.cur.offset != 0 {
 		t.Errorf("home: selection %d offset %d", m.cur.focus, m.cur.offset)
 	}
+	// < and >, for keyboards without home and end (a Mac's).
+	if m = press(m, ">"); m.cur.focus != n {
+		t.Errorf(">: selection %d of %d", m.cur.focus, n)
+	}
+	if m = press(m, "<"); m.cur.focus != 1 || m.cur.offset != 0 {
+		t.Errorf("<: selection %d offset %d", m.cur.focus, m.cur.offset)
+	}
 }
 
 // q closes the page and what was opened from it, back to its room; a room

@@ -46,3 +46,23 @@ func TestKeygenSignVerify(t *testing.T) {
 		t.Error("a mismatched public key must be refused")
 	}
 }
+
+// Each binary is found by the platform a running W5F reports
+// (update.Platform: GOOS-GOARCH), macOS included.
+func TestTargetsMatchPlatforms(t *testing.T) {
+	seen := map[string]bool{}
+	for _, tg := range targets {
+		if tg.platform != tg.goos+"-"+tg.goarch {
+			t.Errorf("%s: platform %q, a running W5F asks for %q", tg.name, tg.platform, tg.goos+"-"+tg.goarch)
+		}
+		if seen[tg.name] || seen[tg.platform] {
+			t.Errorf("%s twice", tg.name)
+		}
+		seen[tg.name], seen[tg.platform] = true, true
+	}
+	for _, p := range []string{"linux-amd64", "linux-386", "windows-amd64", "darwin-arm64", "darwin-amd64"} {
+		if !seen[p] {
+			t.Errorf("no binary for %s", p)
+		}
+	}
+}
