@@ -256,3 +256,47 @@ func TestPopupsLeaveThePageBesideThem(t *testing.T) {
 		}
 	}
 }
+
+// The help is longer than a window of 24 rows: it scrolls, and any other
+// key goes back to the page.
+func TestHelpScrolls(t *testing.T) {
+	m := sized(New("", "test"))
+	small, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = small.(Model)
+	m = press(m, "?")
+	if m.mode != modeHelp || m.helpTop != 0 {
+		t.Fatalf("? opens the help at its top: mode %v top %d", m.mode, m.helpTop)
+	}
+	all := len(m.helpLines())
+	if all <= m.bodyHeight() {
+		t.Skipf("the help fits (%d lines)", all)
+	}
+	if !strings.Contains(ansi.Strip(m.bottomBar()), "scroll") {
+		t.Errorf("the bar does not say the help scrolls: %q", ansi.Strip(m.bottomBar()))
+	}
+	m = press(m, "down", "down")
+	if m.helpTop != 2 || m.mode != modeHelp {
+		t.Errorf("↓↓: top %d mode %v", m.helpTop, m.mode)
+	}
+	m = press(m, "end")
+	view := strings.Join(plainView(m), "\n")
+	if !strings.Contains(view, "any other key returns") || !strings.Contains(view, "this help") {
+		t.Errorf("end does not show the last keys:\n%s", view)
+	}
+	m = press(m, "down")
+	if m.helpTop != all-m.bodyHeight() {
+		t.Errorf("scrolled past the end: top %d of %d", m.helpTop, all-m.bodyHeight())
+	}
+	m = press(m, "home", "up")
+	if m.helpTop != 0 {
+		t.Errorf("home, up: top %d", m.helpTop)
+	}
+	m = press(m, "x")
+	if m.mode != modeRead || m.loading != "" {
+		t.Errorf("x closes the help without drawing a page: mode %v loading %q", m.mode, m.loading)
+	}
+	m = press(m, "?", "esc")
+	if m.mode != modeRead {
+		t.Errorf("esc closes the help: mode %v", m.mode)
+	}
+}

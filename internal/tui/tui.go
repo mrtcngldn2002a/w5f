@@ -94,6 +94,7 @@ type Model struct {
 	clip      clipState
 	hints     map[int]int // label -> focus index
 	tocCursor int
+	helpTop   int // the first line of the help shown
 
 	loading string
 	status  string
@@ -371,8 +372,7 @@ func (m Model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case modeTOC:
 		return m.tocKey(s)
 	case modeHelp:
-		m.mode = modeRead
-		return m, nil
+		return m.helpKey(s)
 	case modeGoto:
 		return m.gotoKey(k)
 	case modeSecret:
@@ -496,7 +496,7 @@ func (m Model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.mode, m.tocCursor = modeTOC, 0
 		return m, nil
 	case "?":
-		m.mode = modeHelp
+		m.mode, m.helpTop = modeHelp, 0
 		return m, nil
 	case "ctrl+r":
 		if strings.HasPrefix(p.target, "w5f:") {
@@ -1253,7 +1253,8 @@ func (m Model) bodyLines() []string {
 	case modeTOC:
 		return m.tocLines()
 	case modeHelp:
-		return m.helpLines()
+		lines := m.helpLines()
+		return lines[min(m.helpTop, len(lines)):]
 	case modeSecret:
 		return m.secretLines()
 	case modeDict:
@@ -1397,8 +1398,33 @@ func (m Model) helpLines() []string {
 		out = append(out, margin+m.theme.Seg(render.Seg{Role: render.Fold}, false).Render(key)+
 			m.theme.Seg(render.Seg{Role: render.Body}, false).Render(k[1]))
 	}
-	out = append(out, "", margin+m.theme.Seg(render.Seg{Role: render.Dim}, false).Render("press any key to return"))
+	out = append(out, "", margin+m.theme.Seg(render.Seg{Role: render.Dim}, false).Render("↑↓ space b scroll · any other key returns to the page"))
 	return out
+}
+
+// helpKey scrolls the help, which is longer than a small window; any other
+// key closes it.
+func (m Model) helpKey(s string) (tea.Model, tea.Cmd) {
+	last := max(0, len(m.helpLines())-m.bodyHeight())
+	switch s {
+	case "down", "j":
+		m.helpTop++
+	case "up", "k":
+		m.helpTop--
+	case " ", "space", "pgdown", "ctrl+d":
+		m.helpTop += m.bodyHeight() - 2
+	case "b", "pgup", "ctrl+u":
+		m.helpTop -= m.bodyHeight() - 2
+	case "home", "<":
+		m.helpTop = 0
+	case "end", ">", "G":
+		m.helpTop = last
+	default:
+		m.mode = modeRead
+		return m, nil
+	}
+	m.helpTop = max(0, min(m.helpTop, last))
+	return m, nil
 }
 
 func (m Model) topBar() string {
@@ -1440,6 +1466,11 @@ func (m Model) bottomBar() string {
 		}
 		if p, _ := solver.Progress.Load().(string); p != "" {
 			text = " " + p + " …   esc cancels"
+		}
+	case m.mode == modeHelp:
+		text = " keys · ↑↓ space b scroll · esc or any other key: back to the page"
+		if last := len(m.helpLines()) - m.bodyHeight(); last > 0 {
+			text += fmt.Sprintf("   %d%%", m.helpTop*100/last)
 		}
 	case m.mode == modeQuit:
 		text = " Quit W5F?   esc: quit · any other key: stay"
