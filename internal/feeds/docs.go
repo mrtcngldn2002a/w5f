@@ -430,7 +430,7 @@ func itemDoc(ctx context.Context, id int64, env Env) (*doc.Document, error) {
 	if it.URL != "" {
 		foot = append(foot, doc.Span{Text: "→ original page", Link: link(d, it.URL, "original")}, doc.Span{Text: "   "})
 	}
-	foot = append(foot, doc.Span{Text: "* star · m mark unread · ← back to the list", Style: doc.Italic})
+	foot = append(foot, doc.Span{Text: "* star · m mark unread · backspace: back to the list", Style: doc.Italic})
 	d.Blocks = append(d.Blocks, doc.Rule{}, doc.Paragraph{Text: foot})
 	d.Renumber()
 	return d, nil

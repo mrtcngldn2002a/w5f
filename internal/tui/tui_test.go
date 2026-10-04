@@ -33,6 +33,24 @@ func press(m Model, keys ...string) Model {
 			msg = tea.KeyPressMsg{Code: tea.KeyRight}
 		case "space":
 			msg = tea.KeyPressMsg{Code: tea.KeySpace, Text: " "}
+		case "backspace":
+			msg = tea.KeyPressMsg{Code: tea.KeyBackspace}
+		case "pgdown":
+			msg = tea.KeyPressMsg{Code: tea.KeyPgDown}
+		case "pgup":
+			msg = tea.KeyPressMsg{Code: tea.KeyPgUp}
+		case "home":
+			msg = tea.KeyPressMsg{Code: tea.KeyHome}
+		case "end":
+			msg = tea.KeyPressMsg{Code: tea.KeyEnd}
+		case "shift+down":
+			msg = tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift}
+		case "shift+up":
+			msg = tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModShift}
+		case "alt+left":
+			msg = tea.KeyPressMsg{Code: tea.KeyLeft, Mod: tea.ModAlt}
+		case "ctrl+q":
+			msg = tea.KeyPressMsg{Code: 'q', Mod: tea.ModCtrl}
 		default:
 			r := []rune(k)[0]
 			msg = tea.KeyPressMsg{Code: r, Text: k}
@@ -79,6 +97,10 @@ func TestWelcomeFoldToggle(t *testing.T) {
 		t.Fatalf("focus = %+v", f)
 	}
 	m = press(m, "right")
+	if strings.Contains(m.View().Content, "of which you hold the only card") {
+		t.Error("→ opened the section: only enter opens")
+	}
+	m = press(m, "enter")
 	if !strings.Contains(m.View().Content, "of which you hold the only card") {
 		t.Error("collapsible did not open")
 	}
@@ -97,7 +119,7 @@ func TestHistoryBackAndForwardRepeatedly(t *testing.T) {
 	m = next.(Model)
 	// v1's ELinks setup could only go forward once; W5F must survive loops.
 	for i := 0; i < 3; i++ {
-		m = press(m, "left")
+		m = press(m, "backspace")
 		if m.cur.doc != a {
 			t.Fatalf("round %d: back did not reach A", i)
 		}
@@ -178,9 +200,13 @@ func TestLynxArrowsScrollBeforeSkippingText(t *testing.T) {
 	if m.cur.focus == 1 && m.cur.offset == 0 {
 		t.Fatal("up jumped straight to the top link")
 	}
-	m = press(m, "left") // back to the welcome page
+	m = press(m, "left")
+	if m.cur.target != "long" {
+		t.Fatalf("← left the page, at %q: only backspace goes back", m.cur.target)
+	}
+	m = press(m, "backspace") // back to the welcome page
 	if m.cur.target != "w5f:welcome" {
-		t.Errorf("left did not go back, at %q", m.cur.target)
+		t.Errorf("backspace did not go back, at %q", m.cur.target)
 	}
 }
 

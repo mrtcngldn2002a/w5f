@@ -35,9 +35,9 @@ func ProfileDir() string {
 	return filepath.Join(home, ".config", "chromium", "Default")
 }
 
-// ErrNoCookie means Chromium has no such (unexpired) cookie: not signed in
-// there, or Chromium has not written it to disk yet.
-var ErrNoCookie = errors.New("no such cookie in Chromium")
+// ErrNoCookie means the browser has no such (unexpired) cookie: not signed
+// in there, or the browser has not written it to disk yet.
+var ErrNoCookie = errors.New("no such cookie")
 
 // Cookies reads the named cookies a site set in Chromium (the domain and
 // its subdomains), newest first wins; expired ones are skipped. Only what

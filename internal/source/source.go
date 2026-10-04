@@ -224,7 +224,7 @@ func Load(ctx context.Context, target string, opts Options) (*doc.Document, erro
 		return nil, err
 	}
 	if doc.TextLength(d.Blocks) == 0 && d.Collapsibles == 0 && !hasNotice(d.Blocks) {
-		d.Blocks = append(d.Blocks, doc.Notice{Kind: "info", Text: "No readable text was found on this page. Press ← to go back."})
+		d.Blocks = append(d.Blocks, doc.Notice{Kind: "info", Text: "No readable text was found on this page. Press backspace to go back."})
 	}
 	return d, nil
 }

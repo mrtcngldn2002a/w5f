@@ -111,7 +111,7 @@ func Route(ctx context.Context, target string, env Env) (*doc.Document, error) {
 			d.Blocks = []doc.Block{doc.Notice{Kind: "warn", Text: err.Error()}}
 		} else {
 			_ = env.DB.SaveProgress(b.ID, 0, 0)
-			d.Blocks = []doc.Block{doc.Notice{Kind: "info", Text: "Opened in the external viewer. Press ← to come back."}}
+			d.Blocks = []doc.Block{doc.Notice{Kind: "info", Text: "Opened in the external viewer. Press backspace to come back."}}
 		}
 		return d, nil
 	case strings.HasPrefix(p, "book/"):

@@ -50,6 +50,7 @@ const (
 	modeFind   // "/" search prompt
 	modeNote   // pop-up note box
 	modeClip   // paragraph selection for a clipping
+	modeQuit   // "Quit W5F?" after esc with nothing left to close
 )
 
 // Session storage hooks (replaced in tests so they never touch real config).
@@ -345,23 +346,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	s := k.String()
-	if s == "ctrl+c" {
+	if s == "ctrl+c" || s == "ctrl+q" {
 		cancelLoad()
 		m.leavePage()
 		return m, tea.Quit
 	}
-	if s == "esc" && m.loading != "" && m.cur != nil && m.mode != modeGoto && m.mode != modeSecret && m.mode != modeDict && m.mode != modeFind && m.mode != modeNote && m.mode != modeClip {
+	if s == "esc" && m.loading != "" && m.cur != nil && m.mode != modeGoto && m.mode != modeSecret && m.mode != modeDict && m.mode != modeFind && m.mode != modeNote && m.mode != modeClip && m.mode != modeQuit {
 		cancelLoad()
 		m.loading, m.status = "", "cancelled"
 		return m, nil
 	}
 	if m.cur == nil {
-		if s == "q" {
+		if s == "q" || s == "esc" {
+			cancelLoad()
 			return m, tea.Quit
 		}
 		return m, nil
 	}
 	switch m.mode {
+	case modeQuit:
+		return m.quitKey(s)
 	case modeHints:
 		return m.hintKey(s)
 	case modeTOC:
@@ -394,9 +398,7 @@ func (m Model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	switch s {
 	case "q":
-		m.leavePage()
-		cancelLoad()
-		return m, tea.Quit
+		return m.closePage()
 	case "]":
 		if p.doc.Next != "" {
 			return m.follow(p.doc.Next)
@@ -415,16 +417,28 @@ func (m Model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "up":
 		m.lynxMove(-1)
 		return m, nil
-	case "right":
-		return m.activate(p.focus)
+	case "right", "left":
+		dir := map[string]int{"right": 1, "left": -1}[s]
+		if !m.columnMove(dir) {
+			m.headingMove(dir)
+		}
+		return m, nil
+	case "shift+down":
+		m.headingMove(1)
+		return m, nil
+	case "shift+up":
+		m.headingMove(-1)
+		return m, nil
 	case "j":
 		p.offset++
 	case "k":
 		p.offset--
 	case " ", "space", "pgdown", "ctrl+d":
-		p.offset += m.bodyHeight() - 2
+		m.pageMove(1)
+		return m, nil
 	case "b", "pgup", "ctrl+u":
-		p.offset -= m.bodyHeight() - 2
+		m.pageMove(-1)
+		return m, nil
 	case "g":
 		m.mode, m.gotoBuf = modeGoto, ""
 		return m, nil
@@ -437,9 +451,11 @@ func (m Model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.loading = pr.Label
 		return m, load("w5f:random/"+pr.Name, false)
 	case "home":
-		p.offset = 0
+		m.jumpEnd(-1)
+		return m, nil
 	case "G", "end":
-		p.offset = len(p.layout.Lines)
+		m.jumpEnd(1)
+		return m, nil
 	case "tab":
 		m.moveFocus(1)
 		return m, nil
@@ -453,14 +469,16 @@ func (m Model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		return m.activate(p.focus)
 	case "esc":
-		p.focus = 0
+		// Nothing left to close: ask before quitting.
+		m.mode = modeQuit
+		return m, nil
 	case "f":
 		m.startHints()
 		return m, nil
-	case "h", "left", "backspace":
+	case "backspace", "alt+left", "h":
 		m.goBack()
 		return m, m.refreshLocal()
-	case "l", "shift+right":
+	case "l", "alt+right":
 		m.goForward()
 		return m, m.refreshLocal()
 	case "t":
@@ -1340,13 +1358,20 @@ func (m Model) helpLines() []string {
 	margin := m.margin()
 	keys := [][2]string{
 		{"↑ / ↓", "previous / next link or section (scrolls when needed)"},
-		{"→ / enter", "open link · fold/unfold section"},
-		{"←", "back"}, {"l", "forward again"},
-		{"space / b", "page down / up"}, {"home / end", "top / bottom"},
+		{"← / →", "the column to the left / right · on a page of one column: the previous / next heading"},
+		{"enter", "open the link · fold / unfold the section"},
+		{"backspace", "back (also alt+←) · l: forward again (also alt+→)"},
+		{"space / b", "a screen down / up, the selection along · pgdn / pgup too"},
+		{"home / end", "the first / last line of the page"},
+		{"shift+↑ / ↓", "the previous / next heading"},
+		{"f", "link hints: every link on screen gets a number, type it to open"},
+		{"q", "close this page, back to the room it was opened from (a room: back to the Reading Room)"},
+		{"esc", "close the innermost thing (a pop-up, a prompt, a load); with nothing open, asks before quitting"},
+		{"ctrl+q", "quit at once"},
 		{"g", "go to: address, scp-173, w <wikipedia>, scp <wiki search>, or any words to search the web"},
 		{"r", "random page from this wiki (SCP by default)"},
 		{"t", "table of contents (in a book: the book's chapters)"},
-		{"] / [", "next / previous chapter (books) or page"}, {"f", "link hints: type the number"},
+		{"] / [", "next / previous chapter (books) or page"},
 		{"d", "dictionary (English → Turkish) over the page · esc closes"},
 		{"* / m", "star · mark read/unread (feed items)"},
 		{"F", "follow / unfollow this serial or Reddit series (g → fiction, g → following)"},
@@ -1363,12 +1388,13 @@ func (m Model) helpLines() []string {
 		{"/", "search everything you have read (feeds, wikis, web pages, books, notes)"},
 		{"a / A", "add this page / the selected link to the reading queue (g → queue)"},
 		{"n", "write a note about this page"}, {"y", "clip paragraphs (↑↓ choose, shift+↑↓ extend, enter save)"},
-		{"s", "save a Markdown copy of this page"}, {"H", "history (also g → history, g → notes)"},
-		{"j / k", "scroll one line (vim style)"}, {"?", "this help"}, {"q", "quit"},
+		{"s", "save a Markdown copy of this page"},
+		{"j / k", "scroll one line (vim style)"}, {"?", "this help"},
 	}
 	out := []string{margin + m.theme.Seg(render.Seg{Role: render.Title}, false).Render("KEYS"), ""}
 	for _, k := range keys {
-		out = append(out, margin+m.theme.Seg(render.Seg{Role: render.Fold}, false).Render(fmt.Sprintf("%-18s", k[0]))+
+		key := k[0] + strings.Repeat(" ", max(2, 18-ansi.StringWidth(k[0]))) // a long key keeps a gap
+		out = append(out, margin+m.theme.Seg(render.Seg{Role: render.Fold}, false).Render(key)+
 			m.theme.Seg(render.Seg{Role: render.Body}, false).Render(k[1]))
 	}
 	out = append(out, "", margin+m.theme.Seg(render.Seg{Role: render.Dim}, false).Render("press any key to return"))
@@ -1415,6 +1441,8 @@ func (m Model) bottomBar() string {
 		if p, _ := solver.Progress.Load().(string); p != "" {
 			text = " " + p + " …   esc cancels"
 		}
+	case m.mode == modeQuit:
+		text = " Quit W5F?   esc: quit · any other key: stay"
 	case m.mode == modeDict:
 		text = " dictionary · type a word · enter: meaning · esc: back to reading"
 	case m.mode == modeSecret:
@@ -1424,7 +1452,7 @@ func (m Model) bottomBar() string {
 	case m.mode == modeHints:
 		text = " link › " + m.hintBuf + "_   (enter: open · esc: cancel)"
 	case m.mode == modeTOC:
-		text = " contents · j/k move · enter jump · esc close"
+		text = " contents · ↑↓ move · enter jump · esc close"
 	case m.mode == modeClip:
 		text = " clip · ↑↓ paragraph · shift+↑↓ extend · enter save · esc cancel"
 	case m.mode == modeNote:

@@ -300,9 +300,9 @@ func (m Model) roomHints() []hint {
 	}
 	switch {
 	case strings.HasPrefix(t, "w5f:discover/tarot"):
-		return []hint{{"T", "another card"}, {"I", "an I Ching cast"}, {"←", "back"}}
+		return []hint{{"T", "another card"}, {"I", "an I Ching cast"}, {"bksp", "back"}}
 	case strings.HasPrefix(t, "w5f:discover/iching"):
-		return []hint{{"I", "another cast"}, {"T", "a tarot card"}, {"←", "back"}}
+		return []hint{{"I", "another cast"}, {"T", "a tarot card"}, {"bksp", "back"}}
 	case strings.HasPrefix(t, "w5f:item/"):
 		return append([]hint{{"*", "star"}, {"m", "read / unread"}}, reading...)
 	case strings.HasPrefix(t, "w5f:book/"):
@@ -310,43 +310,47 @@ func (m Model) roomHints() []hint {
 	case strings.HasPrefix(t, "w5f:serial/"):
 		return append([]hint{{"t", "chapters"}, {"] [", "chapter"}, {"F", "follow"}}, reading...)
 	case strings.HasPrefix(t, "w5f:packet"):
-		return []hint{{"] [", "through the issue"}, {"→", "open"}, {"x", "deep random"}, {"T", "tarot"}, {"I", "I Ching"}}
+		return []hint{{"] [", "through the issue"}, {"enter", "open"}, {"x", "deep random"}, {"T", "tarot"}, {"I", "I Ching"}}
 	}
 	if r := roomFor(t); r != nil {
 		switch r.key {
 		case "1":
-			return []hint{{"↑↓", "select"}, {"→", "open"}, {"1…0", "rooms"}, {"p", "packet"}, {"x", "random"}, {"T", "tarot"}, {"I", "I Ching"}, {`\`, "menu"}, {"g", "go"}}
+			return []hint{{"↑↓ ←→", "select"}, {"enter", "open"}, {"1…0", "rooms"}, {"p", "packet"}, {"x", "random"}, {"T", "tarot"}, {"I", "I Ching"}, {`\`, "menu"}, {"g", "go"}}
 		case "2":
-			return []hint{{"→", "open"}, {"*", "star"}, {"m", "read / unread"}, {"g → sync", "fetch new"}, {"g → opml-import", "add feeds"}}
+			return []hint{{"enter", "open"}, {"f", "jump"}, {"*", "star"}, {"m", "read / unread"}, {"g → sync", "fetch new"}, {"g → opml-import", "add feeds"}}
 		case "3":
-			return []hint{{"→", "open"}, {"g → gut", "Gutenberg"}, {"g → se", "Standard Ebooks"}, {"g → catalog-add", "a book site"}, {"/", "search"}}
+			return []hint{{"enter", "open"}, {"f", "jump"}, {"g → gut", "Gutenberg"}, {"g → se", "Standard Ebooks"}, {"g → catalog-add", "a book site"}, {"/", "search"}}
 		case "4":
-			return []hint{{"→", "open"}, {"F", "follow"}, {"g → following", "followed"}, {"g → fiction", "this hall"}}
+			return []hint{{"enter", "open"}, {"f", "jump"}, {"F", "follow"}, {"g → following", "followed"}, {"g → fiction", "this hall"}}
 		case "5":
-			return []hint{{"→", "open"}, {"B", "in the browser"}, {"g → comics", "this vault"}}
+			return []hint{{"enter", "open"}, {"f", "jump"}, {"B", "in the browser"}, {"g → comics", "this vault"}}
 		case "6":
 			return []hint{{"g → roll", "2d6+1"}, {"g → ask", "likely <question>"}, {"g → spark", "words · tarot"}, {"g → npc / thread / counter", "keep"}, {"g → pick", "npc · thread"}}
 		case "7":
-			return []hint{{"→", "open"}, {"g → usenet", "<word> finds groups"}}
+			return []hint{{"enter", "open"}, {"f", "jump"}, {"g → usenet", "<word> finds groups"}}
 		case "8":
-			return []hint{{"p", "packet"}, {"x", "deep random"}, {"T", "tarot"}, {"I", "I Ching"}, {"→", "open"}}
+			return []hint{{"p", "packet"}, {"x", "deep random"}, {"T", "tarot"}, {"I", "I Ching"}, {"enter", "open"}}
 		case "9":
-			return []hint{{"→", "open"}, {"a", "queue a page anywhere"}, {"A", "queue the selected link"}}
+			return []hint{{"enter", "open"}, {"f", "jump"}, {"a", "queue a page anywhere"}, {"A", "queue the selected link"}}
 		case "0":
-			return []hint{{"→", "open"}, {"n", "write a note"}, {"y", "clip paragraphs"}}
+			return []hint{{"enter", "open"}, {"f", "jump"}, {"n", "write a note"}, {"y", "clip paragraphs"}}
 		case "H":
-			return []hint{{"→", "open"}, {"/", "search everything you read"}, {"L", "the ledger"}}
+			return []hint{{"enter", "open"}, {"f", "jump"}, {"/", "search everything you read"}, {"L", "the ledger"}}
 		case "L":
-			return []hint{{"→", "open"}, {"H", "the register"}}
+			return []hint{{"enter", "open"}, {"f", "jump"}, {"H", "the register"}}
 		}
 	}
-	return append([]hint{{"→", "open"}, {"←", "back"}}, reading...)
+	return append([]hint{{"enter", "open"}, {"bksp", "back"}, {"f", "jump"}}, reading...)
 }
 
 // hintBar draws the hints, keys bright and what they do dim, as many as
-// fit in the width, ? help always last.
+// fit in the width, help, close and quit always last.
 func (m Model) hintBar() string {
-	hs := append(m.roomHints(), hint{"?", "help"}, hint{"q", "quit"})
+	tail := []hint{{"?", "help"}, {"q", "close"}, {"esc", "quit"}}
+	if m.cur == nil || isRoomPage(m.cur.target) {
+		tail = []hint{{"?", "help"}, {"esc", "quit"}} // q closes pages, not rooms
+	}
+	hs := append(m.roomHints(), tail...)
 	plain := func(hs []hint) int {
 		w := 1
 		for i, h := range hs {
@@ -357,8 +361,9 @@ func (m Model) hintBar() string {
 		}
 		return w
 	}
-	for len(hs) > 2 && plain(hs) > m.width {
-		hs = append(hs[:len(hs)-3], hs[len(hs)-2:]...) // drop the last room hint
+	for len(hs) > len(tail) && plain(hs) > m.width {
+		n := len(hs) - len(tail)
+		hs = append(hs[:n-1], hs[n:]...) // drop the last room hint
 	}
 	key, dim := m.theme.Bar().Bold(true), m.theme.BarDim()
 	var b strings.Builder

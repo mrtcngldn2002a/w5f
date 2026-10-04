@@ -151,7 +151,7 @@ func TestBottomBarFollowsTheRoom(t *testing.T) {
 		}
 	}
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 60, Height: 20})
-	if b := bar(next.(Model)); !strings.HasSuffix(strings.TrimSpace(b), "? help · q quit") || ansi.StringWidth(b) > 60 {
+	if b := bar(next.(Model)); !strings.HasSuffix(strings.TrimSpace(b), "? help · esc quit") || ansi.StringWidth(b) > 60 {
 		t.Errorf("narrow: %q", b)
 	}
 }

@@ -114,6 +114,9 @@ func profileIn(root string) string {
 	return first
 }
 
+// clock is the time cookies expire by (fixed in tests).
+var clock = time.Now
+
 // FirefoxCookies reads the named cookies a site set in a Firefox profile
 // (the domain and its subdomains), most recently used first; expired ones
 // are skipped. Firefox may be running: a copy of the database (and of its
@@ -136,7 +139,7 @@ func FirefoxCookies(profile, domain string, names []string) (map[string]string, 
 			return nil, err
 		}
 	}
-	return readFirefoxCookies(dst, domain, names, time.Now())
+	return readFirefoxCookies(dst, domain, names, clock())
 }
 
 func readFirefoxCookies(path, domain string, names []string, now time.Time) (map[string]string, error) {
@@ -214,7 +217,7 @@ func SessionCookies(from, domain string, names []string) (map[string]string, str
 	if from != "" && from != "chromium" && from != "firefox" {
 		return nil, "", fmt.Errorf("sessions are taken from chromium or firefox, not %q", from)
 	}
-	if len(tried) > 1 {
+	if len(tried) > 1 || errors.Is(firstErr, ErrNoCookie) {
 		return nil, "", fmt.Errorf("%w (looked in %s)", ErrNoCookie, strings.Join(tried, " and "))
 	}
 	return nil, "", firstErr
