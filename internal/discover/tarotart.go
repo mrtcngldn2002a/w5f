@@ -245,11 +245,4 @@ func centerFill(s string, n int, fill rune) string {
 	return strings.Repeat(string(fill), left) + s + strings.Repeat(string(fill), n-k-left)
 }
 
-func pad(s string, n int) string {
-	if k := len([]rune(s)); k < n {
-		return s + strings.Repeat(" ", n-k)
-	}
-	return s
-}
-
 func center(s string, n int) string { return centerFill(s, n, ' ') }

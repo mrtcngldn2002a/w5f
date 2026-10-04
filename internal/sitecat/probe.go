@@ -283,16 +283,6 @@ func botWall(body []byte) string {
 	return ""
 }
 
-// visibleTextLen is the amount of readable text on a page.
-func visibleTextLen(body []byte) int {
-	gq, err := goquery.NewDocumentFromReader(bytes.NewReader(body))
-	if err != nil {
-		return 0
-	}
-	gq.Find("script, style, noscript").Remove()
-	return len([]rune(collapse(gq.Find("body").Text())))
-}
-
 func needsJS(body []byte) bool {
 	l := strings.ToLower(string(body))
 	return strings.Contains(l, "<noscript") || strings.Count(l, "<script") >= 3

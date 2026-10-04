@@ -14,13 +14,9 @@ import (
 	"time"
 )
 
-// encrypt does what Chromium does on Linux without a keyring (v10), with
-// the host's hash in front from database version 24 on.
-func encrypt(value, host string, version int) []byte {
-	return encryptWith(linuxKey(), value, host, version)
-}
-
-// encryptWith is the same with another key (a Mac's, from its keychain).
+// encryptWith does what Chromium does on Linux without a keyring (v10,
+// linuxKey) or on a Mac (its keychain's key), with the host's hash in front
+// from database version 24 on.
 func encryptWith(key []byte, value, host string, version int) []byte {
 	plain := []byte(value)
 	if version >= 24 {

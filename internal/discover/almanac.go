@@ -68,7 +68,7 @@ func AlmanacHref(day string) string { return "w5f:almanac/" + day }
 
 // The site's pages lost their dashes and pound signs to U+FFFD long ago:
 // before a digit it was a pound sign, elsewhere a dash.
-var reLostPound = regexp.MustCompile("�(\\d)")
+var reLostPound = regexp.MustCompile(`�(\d)`)
 
 func mendText(s string) string {
 	s = reLostPound.ReplaceAllString(s, "£$1")
