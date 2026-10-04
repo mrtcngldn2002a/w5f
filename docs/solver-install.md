@@ -1,10 +1,16 @@
 # The optional Byparr helper
 
 `w5f solver install` downloads Byparr on the computer where it will run. It is
-not bundled with a W5F release. Linux amd64 and Windows amd64 are supported;
-Linux 386 and macOS keep the reader and external-helper support, but cannot use
-this installer. Windows installation, BHL page opening and a fresh Suwayomi's
-helper settings were tested on 2026-10-02.
+not bundled with a W5F release. Linux amd64, Windows amd64 and macOS (Apple
+silicon and Intel) are supported; Linux 386 keeps the reader and
+external-helper support, but cannot use this installer. Windows installation,
+BHL page opening and a fresh Suwayomi's helper settings were tested on
+2026-10-02. macOS was added on 2026-10-04 before a live test on a Mac: the
+same steps with uv's own macOS build (pinned by SHA-256 like the others), no
+Xvfb (Byparr runs headless and its browser, which ships macOS builds, hides
+its own window), and the kernel's process table in place of /proc for owning
+and stopping the helper. `DarwinEnabled = "no"` in `internal/solver` turns it
+off if a Mac shows otherwise.
 
 W5F asks once on first launch if neither a helper nor an installation exists.
 `n` only keeps the question quiet. Installation remains available from the

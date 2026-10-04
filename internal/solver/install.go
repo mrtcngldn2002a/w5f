@@ -33,6 +33,11 @@ const manifestName = "w5f-install.json"
 
 // Set to yes only after the isolated Windows installation and live test pass.
 var WindowsEnabled = "yes"
+
+// macOS (Apple silicon and Intel) runs the same Byparr headless: no Xvfb,
+// its browser hides its own window. Turned on at the owner's request
+// (2026-10-04) before a live test on a Mac; "no" turns it off again.
+var DarwinEnabled = "yes"
 var Progress atomic.Value
 var installationMu sync.Mutex
 var installationCond = sync.NewCond(&installationMu)
@@ -96,6 +101,9 @@ func Supported(goos, goarch string) error {
 	if goarch == "amd64" && (goos == "linux" || goos == "windows" && WindowsEnabled == "yes") {
 		return nil
 	}
+	if goos == "darwin" && (goarch == "arm64" || goarch == "amd64") && DarwinEnabled == "yes" {
+		return nil
+	}
 	if goos == "windows" && goarch == "amd64" {
 		return errors.New("Byparr is not offered on Windows yet")
 	}
@@ -114,8 +122,13 @@ func (i Installer) defaults() Installer {
 	}
 	if i.UV.URL == "" {
 		asset, hash := "uv-x86_64-unknown-linux-gnu.tar.gz", "b9980552309f09c15172b8be828555e375097f16deb459795ce7bfd200380f0b"
-		if i.GOOS == "windows" {
+		switch {
+		case i.GOOS == "windows":
 			asset, hash = "uv-x86_64-pc-windows-msvc.zip", "ea1397797a0ca15f63516dd0f49c2dde9776db9be5861cab152ebe8ad199894d"
+		case i.GOOS == "darwin" && i.GOARCH == "arm64":
+			asset, hash = "uv-aarch64-apple-darwin.tar.gz", "5d714de09501a59393ceca78f4bc232a50478729640d251907160299b2a93ddd"
+		case i.GOOS == "darwin":
+			asset, hash = "uv-x86_64-apple-darwin.tar.gz", "1b8a5b316883df2daf20fb9a446e5b230e01d947d57aba2694977c5ac5a7e98c"
 		}
 		i.UV = Artifact{"https://github.com/astral-sh/uv/releases/download/" + UVVersion + "/" + asset, hash}
 	}
