@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"w5f/internal/doc"
+	"w5f/internal/store"
 )
 
 func useDir(t *testing.T) string {
@@ -26,9 +27,10 @@ func TestDirFromEnvConfigDefault(t *testing.T) {
 	}
 	t.Setenv("W5F_NOTES", "")
 	data := t.TempDir()
-	t.Setenv("APPDATA", data)
-	t.Setenv("XDG_DATA_HOME", data)
-	cfgDir := filepath.Join(data, "w5f")
+	t.Setenv("APPDATA", data)       // Windows
+	t.Setenv("XDG_DATA_HOME", data) // Linux
+	t.Setenv("HOME", data)          // a Mac: ~/Library/Application Support
+	cfgDir := store.DataDir()
 	os.MkdirAll(cfgDir, 0o755)
 	os.WriteFile(filepath.Join(cfgDir, "config.toml"), []byte(`notes = "/vault/W5F"`), 0o644)
 	if Dir() != "/vault/W5F" {

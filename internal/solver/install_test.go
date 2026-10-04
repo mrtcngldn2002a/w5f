@@ -50,7 +50,14 @@ func fakeInstaller(t *testing.T) (Installer, *int) {
 		}
 	}))
 	t.Cleanup(s.Close)
-	i := Installer{DataDir: t.TempDir(), GOOS: "linux", GOARCH: "amd64", UV: Artifact{s.URL + "/uv", hashOf(uv)}, Byparr: Artifact{s.URL + "/byparr", hashOf(byparr)}, Free: func(string) (uint64, error) { return MinFreeBytes + 1, nil }}
+	// The data folder as W5F resolves it (cleanData): a Mac's temporary
+	// folder is behind /var -> /private/var, a Windows runner's is a short
+	// name (RUNNER~1), and the paths the tests compare must be the same.
+	data, e := filepath.EvalSymlinks(t.TempDir())
+	if e != nil {
+		t.Fatal(e)
+	}
+	i := Installer{DataDir: data, GOOS: "linux", GOARCH: "amd64", UV: Artifact{s.URL + "/uv", hashOf(uv)}, Byparr: Artifact{s.URL + "/byparr", hashOf(byparr)}, Free: func(string) (uint64, error) { return MinFreeBytes + 1, nil }}
 	i.Run = func(ctx context.Context, exe string, args, env []string, dir string, out io.Writer) error {
 		if e := ctx.Err(); e != nil {
 			return e
