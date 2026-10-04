@@ -93,7 +93,12 @@ w5f
 
 W5F is not notarized by Apple. Fetched with `curl` as above it simply runs; a copy downloaded in a browser is stopped by Gatekeeper ("Apple could not verify…") until you clear it with `xattr -d com.apple.quarantine ~/.local/bin/w5f` (or *System Settings → Privacy & Security → Open Anyway*). A folder you can write to, as `~/.local/bin` is, lets `w5f update` replace the binary without `sudo`.
 
-What works differently on a Mac: comics open in the app macOS keeps for the file — a comic reader such as Simple Comic or YACReader for CBZ and CBR, Preview for pictures and PDFs (the W5F viewer is an X11 window, so Suwayomi chapters are read on Linux); sessions are taken from Firefox only (Chrome keeps its cookies in the keychain); `w5f solver install` is for Linux and Windows, but a Byparr or FlareSolverr you run yourself (in Docker, say) at `127.0.0.1:8191` is used all the same. A Mac keyboard has no home and end: `<` and `>` do the same, and its `delete` key is backspace.
+What is different on a Mac:
+
+- **Comics** open in a browser tab: the same viewer (fit, two-page spreads, right to left, progress, Suwayomi chapters), drawn at the screen's own pixels; the same keys, and a click on the left or right half turns the page. Close the tab or press `q`; the page you were on is kept.
+- **Sessions** come from Firefox, or from Chrome, Chromium, Brave or Edge: their cookie key is in the keychain, and macOS asks once whether W5F may read it (*Always Allow* spares the question). Firefox is asked first, so no question comes when it has the session.
+- **The bot-check helper**: `w5f solver install` sets up Byparr as on Linux, without Xvfb (its browser runs hidden). It was added before a test on a real Mac; if it fails there, a Byparr or FlareSolverr run in Docker at `127.0.0.1:8191` is used all the same.
+- **Keys**: a Mac keyboard has no home and end: `<` and `>` do the same, and its `delete` key is backspace.
 
 </details>
 
@@ -105,10 +110,10 @@ Inside, the arrows move, `enter` opens, `backspace` goes back, `q` closes a page
 |---|---|
 | PDFs read faster and better | Poppler's `pdftotext` (a built-in reader is used without it) |
 | following comics | Java 21, for Suwayomi-Server (`w5f comics server install` fetches the server itself) |
-| sites behind a bot check | Byparr or FlareSolverr on this computer (`w5f solver install` on Linux and Windows; Linux needs Xvfb) |
+| sites behind a bot check | Byparr or FlareSolverr on this computer (`w5f solver install` on Linux, Windows and macOS; Linux needs Xvfb) |
 | stories from 100+ fiction sites as EPUB | FanFicFare (`pipx install FanFicFare`) |
-| Reddit or AO3 sessions taken from a browser | Chromium, Chrome or Firefox, signed in |
-| the comics viewer | X11 (Linux with a desktop); elsewhere comics open in the system's own app for the file |
+| Reddit or AO3 sessions taken from a browser | Firefox, or Chromium, Chrome, Brave or Edge (Linux and macOS), signed in |
+| the comics viewer | X11 on Linux; on a Mac, Windows or a Wayland desktop it opens in a browser tab |
 
 Folders, the browser and Java can be set in `config.toml` (see *Settings* under [In detail](#in-detail)).
 
@@ -261,7 +266,7 @@ w5f reddit-logout | ao3-logout
 
 # comics
 w5f comics list|update   the local library and followed series (w5f comics for more)
-w5f view [file]          the comics viewer (X11)
+w5f view [file]          the comics viewer (an X11 window on Linux, a browser tab elsewhere; --browser: the tab anywhere)
 
 # this install
 w5f doctor [--live] [--bench]   check the setup (--live: one source of each kind, --bench: speed)
@@ -387,7 +392,7 @@ Notes live in `~/Archive/Notes` (change with `W5F_NOTES` or `notes = "…"` in `
 - **Settings sync**: `w5f comics sync <another server.conf>` compares another Suwayomi's settings (the PC launcher's `%LOCALAPPDATA%\Tachidesk\server.conf`, say) with this server's and lists the differences; `--apply` copies them and adds missing extension stores. What belongs to one computer is kept (addresses, folders, WebUI, database, accounts, the SOCKS proxy) and so are bot-check solver settings (FlareSolverr). Installed extensions and sources' own settings are not copied.
 - **Update**: `check for an update` compares the installed jar with the newest release; updating downloads it, checks it against the release's checksums, stops a server W5F started and starts it again. A server W5F did not start (the launcher) is left alone.
 - **Extensions.** W5F ships and pre-configures no extension repositories. You add a repository by its address and choose what to install; the rights of what a source offers are yours to mind.
-- **Viewer.** `w5f view` is a full-screen X11 window, pure Go with no OpenGL.
+- **Viewer.** `w5f view` is a full-screen X11 window, pure Go with no OpenGL. Where there is no X — a Mac, Windows, a Wayland desktop — or with `--browser`, the same viewer draws into a browser tab instead: a page served only to this computer (127.0.0.1, behind a random address) that shows each frame at the screen's own pixels and sends the keys back; a click on the left or right half turns the page. Closing the tab closes the viewer, its page kept.
 
   | Key | Action |
   |---|---|
@@ -449,11 +454,11 @@ solver_url = "http://127.0.0.1:8191"  # W5F_SOLVER_URL; "" turns the helper off
 ```
 
 - **Folders.** Without a setting, books and comics are under `~/Archive`. The download folder is the desktop's own: on Linux the one named in `~/.config/user-dirs.dirs` (a Turkish desktop's `~/İndirilenler`), else `~/Downloads`. The older `downloads` under `[fiction]` still counts.
-- **Bot-check helper** (`[fetch] solver_url`, on by default at `http://127.0.0.1:8191`): a local service with FlareSolverr's `/v1` API — Byparr or FlareSolverr — that opens a page in a real browser when a site shows W5F a verification wall (Cloudflare's "Just a moment…", or its 403 challenge). It is asked only then, for pages (not files), one page at a time, and a site it cannot open is left alone for a day; a Deep random draw asks it once at most. The status line says when it is working (it can take up to a minute; `esc` cancels). Its cookies and browser stay with it; W5F keeps only the page, cached for offline reading. W5F asks once whether to install [Byparr](https://github.com/ThePhaseless/Byparr) (~1.1 GB); declining only silences the question. Install it any time with `w5f solver install` (`--yes` for scripts), or `g → solver`. Linux amd64 and Windows amd64 are supported; Linux needs Xvfb (`doctor` gives the package-manager command). W5F starts its installed helper when a page needs it or before starting Suwayomi, and stops only its own process when W5F closes. External Byparr/FlareSolverr services are reused and kept running. `w5f solver status | start | stop | update | remove` manages the helper separately; `w5f update` changes only W5F. See [solver installation](docs/solver-install.md) for verification, disk space and ownership. Nothing listening there costs nothing; `w5f doctor` says what answers. Only a helper on this computer (localhost) is used; on the W5F laptop, `platform/antix/install.sh byparr` runs Byparr as a service. HathiTrust is never sent to it. When W5F first starts Suwayomi it also sets Suwayomi's FlareSolverr to this address, once; after that the setting is yours in *Server settings → Cloudflare*.
+- **Bot-check helper** (`[fetch] solver_url`, on by default at `http://127.0.0.1:8191`): a local service with FlareSolverr's `/v1` API — Byparr or FlareSolverr — that opens a page in a real browser when a site shows W5F a verification wall (Cloudflare's "Just a moment…", or its 403 challenge). It is asked only then, for pages (not files), one page at a time, and a site it cannot open is left alone for a day; a Deep random draw asks it once at most. The status line says when it is working (it can take up to a minute; `esc` cancels). Its cookies and browser stay with it; W5F keeps only the page, cached for offline reading. W5F asks once whether to install [Byparr](https://github.com/ThePhaseless/Byparr) (~1.1 GB); declining only silences the question. Install it any time with `w5f solver install` (`--yes` for scripts), or `g → solver`. Linux amd64, Windows amd64 and macOS (Apple silicon and Intel) are supported; Linux needs Xvfb (`doctor` gives the package-manager command). W5F starts its installed helper when a page needs it or before starting Suwayomi, and stops only its own process when W5F closes. External Byparr/FlareSolverr services are reused and kept running. `w5f solver status | start | stop | update | remove` manages the helper separately; `w5f update` changes only W5F. See [solver installation](docs/solver-install.md) for verification, disk space and ownership. Nothing listening there costs nothing; `w5f doctor` says what answers. Only a helper on this computer (localhost) is used; on the W5F laptop, `platform/antix/install.sh byparr` runs Byparr as a service. HathiTrust is never sent to it. When W5F first starts Suwayomi it also sets Suwayomi's FlareSolverr to this address, once; after that the setting is yours in *Server settings → Cloudflare*.
 - **Browser** (`B`, `g → browser <address>`, Suwayomi's WebView page): the configured command, else Chromium or Chrome when installed, else the system's default browser (`xdg-open`, `open`, Windows' own). `g → chromium` still works.
-- **Sessions from a browser** (`g → reddit-login browser`, `g → ao3-login browser`): signed in to Reddit or AO3 in a browser, W5F takes that session from its profile — Chromium's or Chrome's on Linux, Firefox's on Linux, Windows and macOS (`… chromium` or `… firefox` picks one; `W5F_CHROMIUM_PROFILE`, `W5F_FIREFOX_PROFILE` point at another profile). Chrome and Edge on Windows lock their cookies; there, use Firefox or paste the cookie.
+- **Sessions from a browser** (`g → reddit-login browser`, `g → ao3-login browser`): signed in to Reddit or AO3 in a browser, W5F takes that session from its profile — Firefox's on Linux, Windows and macOS; Chromium's or Chrome's on Linux; Chrome's, Chromium's, Brave's or Edge's on macOS, where macOS asks once whether W5F may read the browser's cookie key from the keychain (`… chromium` or `… firefox` picks one; `W5F_CHROMIUM_PROFILE`, `W5F_FIREFOX_PROFILE` point at another profile). Chrome and Edge on Windows lock their cookies; there, use Firefox or paste the cookie.
 - **Java** for Suwayomi: `[comics] java`, else `JAVA_HOME`, else `java` on the `PATH`.
-- **The comics viewer** (`w5f view`) is an X11 window: on Linux with a desktop. Elsewhere local comics open in the system's viewer, and Suwayomi chapters are read on Linux.
+- **The comics viewer** (`w5f view`) is an X11 window on Linux with a desktop, and a browser tab on a Mac, on Windows and on a Wayland desktop (`--browser` asks for the tab anywhere). Over SSH or on the console, local comics open in the system's viewer.
 
 </details>
 
@@ -535,7 +540,7 @@ the rooms
   internal/fiction         internet fiction: Royal Road, XenForo, AO3, WordPress, Reddit series, following, FanFicFare bridge
   internal/comics          comics library (CBZ, ComicInfo, progress) and the Comics pages
   internal/comics/suwayomi Suwayomi-Server client, start/stop, official install, settings
-  internal/comics/view     the comics viewer (X11, layout, spreads, RTL)
+  internal/comics/view     the comics viewer (an X11 window or a browser tab, layout, spreads, RTL)
   internal/solo            the Gaming Table: oracle, dice, sparks, characters, threads, counters, log
   internal/usenet          NNTP reader, read state, kill file
   internal/discover        deep random families, Daily Packet, almanac, tarot and I Ching, Obscure & Archived Worlds
