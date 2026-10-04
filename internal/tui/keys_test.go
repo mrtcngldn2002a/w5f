@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"w5f/internal/doc"
 )
@@ -212,5 +213,39 @@ func TestBackspaceGoesBack(t *testing.T) {
 	m = press(m, "alt+left")
 	if m.cur.target != "w5f:welcome" {
 		t.Errorf("alt+← did not go back: at %q", m.cur.target)
+	}
+}
+
+// The page stays visible on both sides of the dictionary and the note box;
+// the pop-up covered every row it stood on, from edge to edge. (On a narrow
+// window the box is wider than the page's column, so nothing is beside it.)
+func TestPopupsLeaveThePageBesideThem(t *testing.T) {
+	old := dictDir
+	dictDir = func() string { return t.TempDir() }
+	defer func() { dictDir = old }()
+	var paras []string
+	for i := 0; i < 40; i++ {
+		paras = append(paras, strings.Repeat("ink ", 40))
+	}
+	m := open(wide(New("", "test")), "https://example.org/page", textPage("Page", paras...))
+	for _, k := range []string{"d", "n"} {
+		mm := press(m, k)
+		beside := 0
+		for _, r := range plainView(mm) {
+			if w := ansi.StringWidth(r); w > mm.width {
+				t.Errorf("%s: a row of %d columns on a screen of %d", k, w, mm.width)
+			}
+			// The page's text, the box's left edge, its right edge, the text again.
+			k := strings.Index(r, "ink")
+			if k < 0 {
+				continue
+			}
+			if i := strings.Index(r[k:], "│"); i > 0 && strings.Contains(r[k+i+1:], "│ink") {
+				beside++
+			}
+		}
+		if beside < 5 {
+			t.Errorf("%s: the page shows beside the pop-up on %d rows:\n%s", k, beside, strings.Join(plainView(mm), "\n"))
+		}
 	}
 }
