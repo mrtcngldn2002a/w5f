@@ -346,7 +346,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	s := k.String()
+	s := foldKey(k.String())
 	if s == "ctrl+c" || s == "ctrl+q" {
 		cancelLoad()
 		m.leavePage()
@@ -442,7 +442,7 @@ func (m Model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "g":
 		m.mode, m.gotoBuf = modeGoto, ""
 		return m, nil
-	case "r", "R":
+	case "r":
 		host := ""
 		if u, err := url.Parse(p.doc.URL); err == nil {
 			host = u.Host
@@ -453,7 +453,7 @@ func (m Model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "home", "<": // < and >, as in less: Mac keyboards have no home and end
 		m.jumpEnd(-1)
 		return m, nil
-	case "G", "end", ">":
+	case "end", ">":
 		m.jumpEnd(1)
 		return m, nil
 	case "tab":
@@ -475,10 +475,10 @@ func (m Model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "f":
 		m.startHints()
 		return m, nil
-	case "backspace", "alt+left", "h":
+	case "backspace", "alt+left", "alt+b":
 		m.goBack()
 		return m, m.refreshLocal()
-	case "l", "alt+right":
+	case "alt+right", "alt+f", "shift+backspace":
 		m.goForward()
 		return m, m.refreshLocal()
 	case "t":
@@ -504,20 +504,20 @@ func (m Model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		m.loading = p.target
 		return m, load(p.target, true)
-	case "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "L", "W":
+	case "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "h", "l", "w":
 		return m.openRoom(s)
 	case `\`:
 		return m.toggleSide()
-	case "T", "I":
+	case "c", "i":
 		// A tarot card, or an I Ching hexagram, drawn now.
 		target := "w5f:discover/tarot"
-		if s == "I" {
+		if s == "i" {
 			target = "w5f:discover/iching"
 		}
 		m.loading = target
 		return m, load(target, false)
-	case "B":
-		// This page (or the selected link) in the browser.
+	case "v":
+		// This page (or the selected link) viewed in the browser.
 		target := p.target
 		if f := m.focused(); f != nil && f.Kind == render.FocusLink && strings.HasPrefix(p.doc.Links[f.Link-1].Href, "http") {
 			target = p.doc.Links[f.Link-1].Href
@@ -554,10 +554,11 @@ func (m Model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "a":
 		m.status = queueAdd(pageSource(p))
 		return m, nil
-	case "A":
+	case "e":
+		// Enqueue the selected link.
 		f := m.focused()
 		if f == nil || f.Kind != render.FocusLink {
-			m.status = "select a link first (↑↓), then press A"
+			m.status = "select a link first (↑↓), then press e"
 			return m, nil
 		}
 		l := p.doc.Links[f.Link-1]
@@ -569,9 +570,6 @@ func (m Model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "s":
 		return m, m.savePage()
-	case "H":
-		m.loading = "history"
-		return m, load("w5f:history", false)
 	case "*":
 		if id, ok := itemRef(p.doc); ok {
 			if db, err := store.Default(); err == nil {
@@ -583,13 +581,14 @@ func (m Model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.status = "only feed items can be starred (for now)"
 		}
 		return m, nil
-	case "F":
+	case "u":
+		// Follow a serial's updates.
 		m.status = followKey(p.doc)
 		return m, nil
-	case "x", "X":
+	case "x":
 		m.loading = "deep random"
 		return m, load("w5f:discover/random", false)
-	case "p", "P":
+	case "p":
 		m.loading = "the Daily Packet"
 		return m, load("w5f:packet", false)
 	case "m":
@@ -967,7 +966,7 @@ func (m Model) gotoKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.mode = modeRead
 	case "enter":
 		m.mode = modeRead
-		switch strings.ToLower(strings.TrimSpace(m.gotoBuf)) {
+		switch source.FoldCommand(strings.TrimSpace(m.gotoBuf)) {
 		case "reddit-login", "reddit login":
 			m.mode, m.secretBuf, m.secretAO3 = modeSecret, "", false
 			return m, nil
@@ -1000,17 +999,18 @@ func (m Model) gotoKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
-		if low := strings.ToLower(strings.TrimSpace(m.gotoBuf)); low == "theme" || low == "themes" {
+		if low := source.FoldCommand(strings.TrimSpace(m.gotoBuf)); low == "theme" || low == "themes" {
 			m.mode = modeRead
 			return m.openThemes(false)
 		} else if name, ok := strings.CutPrefix(low, "theme "); ok {
 			m.mode = modeRead
 			return m.setTheme(name)
 		}
-		if word, ok := browserCommand(m.gotoBuf); ok {
+		if _, ok := browserCommand(m.gotoBuf); ok {
 			// g → browser [address] (or the older g → chromium): a page in
 			// the browser (no address: this one).
-			addr := strings.TrimSpace(strings.TrimSpace(m.gotoBuf)[len(word):])
+			_, addr, _ := strings.Cut(strings.TrimSpace(m.gotoBuf), " ") // the word may be typed CHROMİUM
+			addr = strings.TrimSpace(addr)
 			if addr == "" && m.cur != nil {
 				addr = m.cur.target
 				if !strings.HasPrefix(addr, "http") && m.cur.doc != nil {
@@ -1037,7 +1037,7 @@ func (m Model) gotoKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				target = t
 			}
 		}
-		if strings.EqualFold(strings.TrimSpace(m.gotoBuf), "random-add") {
+		if source.FoldCommand(strings.TrimSpace(m.gotoBuf)) == "random-add" {
 			// g → random-add alone: this page's site into Deep random.
 			addr := ""
 			if m.cur != nil {
@@ -1055,7 +1055,7 @@ func (m Model) gotoKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if target == "" {
 			return m, nil
 		}
-		if low := strings.ToLower(strings.TrimSpace(m.gotoBuf)); low == "cabinet" || low == "reading room" || low == "home" {
+		if low := source.FoldCommand(strings.TrimSpace(m.gotoBuf)); low == "cabinet" || low == "reading room" || low == "home" {
 			target = map[string]string{"cabinet": "w5f:cabinet", "reading room": "w5f:welcome", "home": "w5f:welcome"}[low]
 		}
 		if d := m.localDoc(target); d != nil {
@@ -1376,7 +1376,7 @@ func (m Model) helpLines() []string {
 		{"↑ / ↓", "previous / next link or section (scrolls when needed)"},
 		{"← / →", "the column to the left / right · on a page of one column: the previous / next heading"},
 		{"enter", "open the link · fold / unfold the section"},
-		{"backspace", "back (also alt+←) · l: forward again (also alt+→)"},
+		{"backspace", "back (also alt+←) · alt+→: forward again"},
 		{"space / b", "a screen down / up, the selection along · pgdn / pgup too"},
 		{"home / end", "the first / last line of the page (also < and >)"},
 		{"shift+↑ / ↓", "the previous / next heading"},
@@ -1387,35 +1387,37 @@ func (m Model) helpLines() []string {
 		{"g", "go to: address, scp-173, w <wikipedia>, scp <wiki search>, or any words to search the web"},
 		{"r", "random page from this wiki (SCP by default)"},
 		{"t", "table of contents (in a book: the book's chapters)"},
-		{"] / [", "next / previous chapter (books) or page"},
+		{"] / [", "next / previous chapter (books) or page (ü / ğ on a Turkish keyboard)"},
 		{"d", "dictionary (English → Turkish) over the page · esc closes"},
 		{"* / m", "star · mark read/unread (feed items)"},
-		{"F", "follow / unfollow this serial or Reddit series (g → fiction, g → following)"},
+		{"u", "follow / unfollow this serial or Reddit series, for its updates (g → fiction, g → following)"},
 		{"x / p", "deep random (eight families of sources, and your sites) · today's Daily Packet"},
 		{"g → random-add", "add a site to deep random (alone: this page's site; g → random-add <address> [shelf]) · g → random-sites lists them"},
 		{"g → ia", "the Internet Archive's texts by collection (ia <words>, ia @collection <words>, subject:alchemy)"},
 		{"enter / g → ? text", "answer a page that asks for input (g → smallweb, g → worlds)"},
 		{"+ / -", "expand / fold all sections"}, {"o", "show link address"}, {"ctrl+r", "reload"},
-		{"B", "open this page (or the selected link) in the browser · g → browser <address>"},
-		{"T · I", "draw a tarot card · cast an I Ching hexagram (kept: the texts come once from sacred-texts)"},
+		{"v", "view this page (or the selected link) in the browser · g → browser <address>"},
+		{"c · i", "draw a tarot card · cast an I Ching hexagram (kept: the texts come once from sacred-texts)"},
 		{"1 … 9, 0", "the rooms of the library: 1 Reading Room (home) · 2 Periodical Gallery (periodicals) · 3 The Stacks (books) · 4 The Serial Hall (internet fiction) · 5 The Picture Vault (comics) · 6 The Gaming Table (solo RPG) · 7 The Newsroom (Usenet) · 8 Curiosity Cabinet (discovery) · 9 The Lectern (queue) · 0 The Scriptorium (notes)"},
-		{"H · L · W", "The Register (your history) · Ultan's Ledger (your reading, counted) · The Weeding Room (what is kept, and what can go)"},
+		{"h · l · w", "The Register (your history) · Ultan's Ledger (your reading, counted) · The Weeding Room (what is kept, and what can go)"},
 		{`\`, "hide / show the side menu (wide windows)"},
 		{"g → theme", "choose a theme: amber, day, cold, night, green (g → theme day puts one on)"},
 		{"g → reddit-login browser", "take your Reddit (or ao3-login browser: AO3) session from Chromium or Firefox, where you signed in"},
 		{"/", "search everything you have read (feeds, wikis, web pages, books, notes)"},
-		{"a / A", "add this page / the selected link to the reading queue (g → queue)"},
+		{"a / e", "add this page / enqueue the selected link: the reading queue (g → queue)"},
 		{"n", "write a note about this page"}, {"y", "clip paragraphs (↑↓ choose, shift+↑↓ extend, enter save)"},
 		{"s", "save a Markdown copy of this page"},
 		{"j / k", "scroll one line (vim style)"}, {"?", "this help"},
 	}
-	out := []string{margin + m.theme.Seg(render.Seg{Role: render.Title}, false).Render("KEYS"), ""}
+	dim := m.theme.Seg(render.Seg{Role: render.Dim}, false)
+	out := []string{margin + m.theme.Seg(render.Seg{Role: render.Title}, false).Render("KEYS"),
+		margin + dim.Render("read without case: caps lock and shift change nothing · on a Turkish keyboard ı and İ are i, ğ and ü are [ and ]"), ""}
 	for _, k := range keys {
 		key := k[0] + strings.Repeat(" ", max(2, 18-ansi.StringWidth(k[0]))) // a long key keeps a gap
 		out = append(out, margin+m.theme.Seg(render.Seg{Role: render.Fold}, false).Render(key)+
 			m.theme.Seg(render.Seg{Role: render.Body}, false).Render(k[1]))
 	}
-	out = append(out, "", margin+m.theme.Seg(render.Seg{Role: render.Dim}, false).Render("↑↓ space b scroll · any other key returns to the page"))
+	out = append(out, "", margin+dim.Render("↑↓ space b scroll · any other key returns to the page"))
 	return out
 }
 
@@ -1434,7 +1436,7 @@ func (m Model) helpKey(s string) (tea.Model, tea.Cmd) {
 		m.helpTop -= m.bodyHeight() - 2
 	case "home", "<":
 		m.helpTop = 0
-	case "end", ">", "G":
+	case "end", ">":
 		m.helpTop = last
 	default:
 		m.mode = modeRead
@@ -1537,7 +1539,7 @@ func soloEdit(href string) bool {
 // browserCommand reports g → browser [address], or the older chromium;
 // "browser wars" (no address after it) stays a web search.
 func browserCommand(buf string) (string, bool) {
-	low := strings.ToLower(strings.TrimSpace(buf))
+	low := source.FoldCommand(strings.TrimSpace(buf))
 	for _, w := range []string{"browser", "chromium"} {
 		if low == w {
 			return w, true

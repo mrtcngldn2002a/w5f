@@ -129,7 +129,7 @@ func queueDoc(note string) (*doc.Document, error) {
 		d.Blocks = append(d.Blocks, doc.Heading{Level: 2, Text: doc.Inline{{Text: "Done"}}}, doc.List{Items: done})
 	}
 	d.Blocks = append(d.Blocks, doc.Rule{}, doc.Paragraph{Text: doc.Inline{{
-		Text: "Press a on any page (A on a selected link) to add it here. The queue is " + QueuePath() + " — you can edit it in Obsidian too.", Style: doc.Italic}}})
+		Text: "Press a on any page (e on a selected link) to add it here. The queue is " + QueuePath() + " — you can edit it in Obsidian too.", Style: doc.Italic}}})
 	return d, nil
 }
 

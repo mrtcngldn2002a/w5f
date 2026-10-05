@@ -49,6 +49,8 @@ func press(m Model, keys ...string) Model {
 			msg = tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModShift}
 		case "alt+left":
 			msg = tea.KeyPressMsg{Code: tea.KeyLeft, Mod: tea.ModAlt}
+		case "alt+right":
+			msg = tea.KeyPressMsg{Code: tea.KeyRight, Mod: tea.ModAlt}
 		case "ctrl+q":
 			msg = tea.KeyPressMsg{Code: 'q', Mod: tea.ModCtrl}
 		default:
@@ -123,12 +125,12 @@ func TestHistoryBackAndForwardRepeatedly(t *testing.T) {
 		if m.cur.doc != a {
 			t.Fatalf("round %d: back did not reach A", i)
 		}
-		m = press(m, "l")
+		m = press(m, "alt+right")
 		if m.cur.doc != b {
 			t.Fatalf("round %d: forward did not reach B", i)
 		}
 	}
-	m = press(m, "h", "h")
+	m = press(m, "backspace", "alt+left")
 	if m.cur.target != "w5f:welcome" {
 		t.Errorf("expected welcome page, got %q", m.cur.target)
 	}

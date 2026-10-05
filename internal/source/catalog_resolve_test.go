@@ -25,6 +25,7 @@ func TestResolveCatalogShortcuts(t *testing.T) {
 		"cat gutenberg-org":                     "w5f:catalog/gutenberg-org",
 		"cat gutenberg-org author:Bram Stoker":  "w5f:catalog/gutenberg-org?q=author%3ABram+Stoker",
 		"cat fadedpage-com dracula":             "w5f:catalog/fadedpage-com?q=dracula",
+		"CAT Fadedpage-Com dracula":             "w5f:catalog/fadedpage-com?q=dracula",
 	}
 	for in, want := range cases {
 		if got := Resolve(in); got != want {

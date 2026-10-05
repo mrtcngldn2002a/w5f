@@ -61,7 +61,7 @@ func homeDoc(env Env) (*doc.Document, error) {
 	}
 	left = append(left, doc.Heading{Level: 2, Text: doc.Inline{{Text: head}}})
 	if len(followed) == 0 {
-		left = append(left, para(plain("Open a serial or a Reddit series and press F to follow it.", doc.Italic)))
+		left = append(left, para(plain("Open a serial or a Reddit series and press u to follow it.", doc.Italic)))
 	} else {
 		if len(followed) > 6 {
 			followed = followed[:6]

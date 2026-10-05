@@ -41,9 +41,9 @@ var rooms = []room{
 	{"8", "Curiosity Cabinet", "w5f:cabinet", []string{"w5f:packet", "w5f:discover/", "w5f:smallweb", "w5f:worlds", "w5f:random", "w5f:almanac"}},
 	{"9", "The Lectern", "w5f:queue", nil},
 	{"0", "The Scriptorium", "w5f:notes", nil},
-	{"H", "The Register", "w5f:history", nil},
-	{"L", "Ultan's Ledger", "w5f:ledger", nil},
-	{"W", "The Weeding Room", "w5f:weeding", []string{"w5f:weeding/"}}, // what is kept, and what can go (2026-10-02)
+	{"h", "The Register", "w5f:history", nil},
+	{"l", "Ultan's Ledger", "w5f:ledger", nil},
+	{"w", "The Weeding Room", "w5f:weeding", []string{"w5f:weeding/"}}, // what is kept, and what can go (2026-10-02)
 }
 
 // roomList is the rooms in order.
@@ -114,7 +114,7 @@ func (m Model) sideLines(n int) []string {
 	section("THE LIBRARY", rooms[:8])
 	section("YOUR ARCHIVE", rooms[8:])
 	add(pad(" TODAY", head))
-	for _, l := range [][2]string{{"p", "Daily Packet"}, {"x", "Deep random"}, {"T", "A tarot card"}, {"I", "An I Ching cast"}} {
+	for _, l := range [][2]string{{"p", "Daily Packet"}, {"x", "Deep random"}, {"c", "A tarot card"}, {"i", "An I Ching cast"}} {
 		add(row(l[0], l[1]))
 	}
 	for len(out) < n-2 {
@@ -253,8 +253,8 @@ func cabinetDoc() *doc.Document {
 		{"p", "The Daily Packet", "w5f:packet", "today's issue: periodicals, a weird world, an esoteric text, an old-internet relic, your queue"},
 		{"x", "Deep random", "w5f:discover/random", "a page from one of eight families of sources, with Ultan's note on its shelf"},
 		{"", "Your sites in Deep random", "w5f:discover/sites", "any site you add (g → random-add <address>), on a shelf of yours or a family's"},
-		{"T", "A tarot card", "w5f:discover/tarot", "Waite's Pictorial Key, the card drawn upright or reversed"},
-		{"I", "An I Ching cast", "w5f:discover/iching", "three coins six times, Legge's translation"},
+		{"c", "A tarot card", "w5f:discover/tarot", "Waite's Pictorial Key, the card drawn upright or reversed"},
+		{"i", "An I Ching cast", "w5f:discover/iching", "three coins six times, Legge's translation"},
 		{"", "On this day", "w5f:almanac", "Chambers's Book of Days (1864) and the day's events"},
 		{"", "The Small Web", "w5f:smallweb", "Gemini capsules and Gopher holes, Wiby and Marginalia"},
 		{"", "Archived worlds", "w5f:worlds", "invented worlds: SCP, the Backrooms, the Wanderers' Library and more"},
@@ -291,7 +291,7 @@ type hint struct{ key, does string }
 // roomHints are the keys that matter where the reader is (chosen with the
 // owner, 2026-10-01: the bottom bar follows the room).
 func (m Model) roomHints() []hint {
-	reading := []hint{{"/", "search"}, {"a", "queue"}, {"n", "note"}, {"y", "clip"}, {"d", "dictionary"}, {"B", "browser"}}
+	reading := []hint{{"/", "search"}, {"a", "queue"}, {"n", "note"}, {"y", "clip"}, {"d", "dictionary"}, {"v", "browser"}}
 	if m.cur == nil {
 		return nil
 	}
@@ -301,44 +301,44 @@ func (m Model) roomHints() []hint {
 	}
 	switch {
 	case strings.HasPrefix(t, "w5f:discover/tarot"):
-		return []hint{{"T", "another card"}, {"I", "an I Ching cast"}, {"bksp", "back"}}
+		return []hint{{"c", "another card"}, {"i", "an I Ching cast"}, {"bksp", "back"}}
 	case strings.HasPrefix(t, "w5f:discover/iching"):
-		return []hint{{"I", "another cast"}, {"T", "a tarot card"}, {"bksp", "back"}}
+		return []hint{{"i", "another cast"}, {"c", "a tarot card"}, {"bksp", "back"}}
 	case strings.HasPrefix(t, "w5f:item/"):
 		return append([]hint{{"*", "star"}, {"m", "read / unread"}}, reading...)
 	case strings.HasPrefix(t, "w5f:book/"):
 		return append([]hint{{"t", "chapters"}, {"] [", "chapter"}}, reading...)
 	case strings.HasPrefix(t, "w5f:serial/"):
-		return append([]hint{{"t", "chapters"}, {"] [", "chapter"}, {"F", "follow"}}, reading...)
+		return append([]hint{{"t", "chapters"}, {"] [", "chapter"}, {"u", "follow"}}, reading...)
 	case strings.HasPrefix(t, "w5f:packet"):
-		return []hint{{"] [", "through the issue"}, {"enter", "open"}, {"x", "deep random"}, {"T", "tarot"}, {"I", "I Ching"}}
+		return []hint{{"] [", "through the issue"}, {"enter", "open"}, {"x", "deep random"}, {"c", "tarot"}, {"i", "I Ching"}}
 	}
 	if r := roomFor(t); r != nil {
 		switch r.key {
 		case "1":
-			return []hint{{"↑↓ ←→", "select"}, {"enter", "open"}, {"1…0", "rooms"}, {"p", "packet"}, {"x", "random"}, {"T", "tarot"}, {"I", "I Ching"}, {`\`, "menu"}, {"g", "go"}}
+			return []hint{{"↑↓ ←→", "select"}, {"enter", "open"}, {"1…0", "rooms"}, {"p", "packet"}, {"x", "random"}, {"c", "tarot"}, {"i", "I Ching"}, {`\`, "menu"}, {"g", "go"}}
 		case "2":
 			return []hint{{"enter", "open"}, {"f", "jump"}, {"*", "star"}, {"m", "read / unread"}, {"g → sync", "fetch new"}, {"g → opml-import", "add feeds"}}
 		case "3":
 			return []hint{{"enter", "open"}, {"f", "jump"}, {"g → gut", "Gutenberg"}, {"g → se", "Standard Ebooks"}, {"g → ia", "Internet Archive"}, {"g → catalog-add", "a book site"}, {"/", "search"}}
 		case "4":
-			return []hint{{"enter", "open"}, {"f", "jump"}, {"F", "follow"}, {"g → following", "followed"}, {"g → fiction", "this hall"}}
+			return []hint{{"enter", "open"}, {"f", "jump"}, {"u", "follow"}, {"g → following", "followed"}, {"g → fiction", "this hall"}}
 		case "5":
-			return []hint{{"enter", "open"}, {"f", "jump"}, {"B", "in the browser"}, {"g → comics", "this vault"}}
+			return []hint{{"enter", "open"}, {"f", "jump"}, {"v", "in the browser"}, {"g → comics", "this vault"}}
 		case "6":
 			return []hint{{"g → roll", "2d6+1"}, {"g → ask", "likely <question>"}, {"g → spark", "words · tarot"}, {"g → npc / thread / counter", "keep"}, {"g → pick", "npc · thread"}}
 		case "7":
 			return []hint{{"enter", "open"}, {"f", "jump"}, {"g → usenet", "<word> finds groups"}}
 		case "8":
-			return []hint{{"p", "packet"}, {"x", "deep random"}, {"T", "tarot"}, {"I", "I Ching"}, {"enter", "open"}}
+			return []hint{{"p", "packet"}, {"x", "deep random"}, {"c", "tarot"}, {"i", "I Ching"}, {"enter", "open"}}
 		case "9":
-			return []hint{{"enter", "open"}, {"f", "jump"}, {"a", "queue a page anywhere"}, {"A", "queue the selected link"}}
+			return []hint{{"enter", "open"}, {"f", "jump"}, {"a", "queue a page anywhere"}, {"e", "queue the selected link"}}
 		case "0":
 			return []hint{{"enter", "open"}, {"f", "jump"}, {"n", "write a note"}, {"y", "clip paragraphs"}}
-		case "H":
-			return []hint{{"enter", "open"}, {"f", "jump"}, {"/", "search everything you read"}, {"L", "the ledger"}}
-		case "L":
-			return []hint{{"enter", "open"}, {"f", "jump"}, {"H", "the register"}}
+		case "h":
+			return []hint{{"enter", "open"}, {"f", "jump"}, {"/", "search everything you read"}, {"l", "the ledger"}}
+		case "l":
+			return []hint{{"enter", "open"}, {"f", "jump"}, {"h", "the register"}}
 		}
 	}
 	return append([]hint{{"enter", "open"}, {"bksp", "back"}, {"f", "jump"}}, reading...)

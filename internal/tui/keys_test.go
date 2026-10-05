@@ -157,9 +157,9 @@ func TestQClosesBackToTheRoom(t *testing.T) {
 	if m.cur.target != "w5f:feeds" {
 		t.Fatalf("q closed to %q", m.cur.target)
 	}
-	m = press(m, "l")
+	m = press(m, "alt+right")
 	if m.cur.target != "https://example.org/a" {
-		t.Errorf("l after q reopens what was closed, in order: at %q", m.cur.target)
+		t.Errorf("alt+→ after q reopens what was closed, in order: at %q", m.cur.target)
 	}
 	m = press(m, "q")
 	next, cmd := m.closePage() // the gallery itself: to the Reading Room
@@ -298,5 +298,54 @@ func TestHelpScrolls(t *testing.T) {
 	m = press(m, "?", "esc")
 	if m.mode != modeRead {
 		t.Errorf("esc closes the help: mode %v", m.mode)
+	}
+}
+
+func TestKeysReadWithoutCase(t *testing.T) {
+	for in, want := range map[string]string{
+		"A": "a", "shift+a": "a", "a": "a", "G": "g", "İ": "i", "I": "i", "ı": "i",
+		"ğ": "[", "Ğ": "[", "ü": "]", "Ü": "]", "Ş": "ş",
+		"shift+down": "shift+down", "shift+tab": "shift+tab", "alt+b": "alt+b", "ctrl+r": "ctrl+r",
+		"enter": "enter", "<": "<", "]": "]", "1": "1",
+	} {
+		if got := foldKey(in); got != want {
+			t.Errorf("foldKey(%q) = %q, want %q", in, got, want)
+		}
+	}
+
+	// With caps lock (or shift) a key does what it does in lower case.
+	caps := func(m Model, text string) (Model, tea.Cmd) {
+		next, cmd := m.Update(tea.KeyPressMsg{Code: []rune(text)[0], Text: text, Mod: tea.ModCapsLock})
+		return next.(Model), cmd
+	}
+	page := func() Model {
+		m := sized(New("", "test"))
+		return open(m, "https://example.org/a", &doc.Document{Title: "A", Blocks: []doc.Block{
+			doc.Heading{Level: 2, Text: doc.Inline{{Text: "One"}}}, doc.Paragraph{Text: doc.Inline{{Text: "alpha"}}},
+			doc.Heading{Level: 2, Text: doc.Inline{{Text: "Two"}}}, doc.Paragraph{Text: doc.Inline{{Text: "beta"}}}}})
+	}
+	for _, c := range []struct{ key, loading string }{
+		{"C", "w5f:discover/tarot"}, {"I", "w5f:discover/iching"}, {"İ", "w5f:discover/iching"}, {"ı", "w5f:discover/iching"},
+		{"X", "deep random"}, {"P", "the Daily Packet"}, {"H", "w5f:history"}, {"L", "w5f:ledger"}, {"W", "w5f:weeding"},
+	} {
+		if m, cmd := caps(page(), c.key); cmd == nil || m.loading != c.loading {
+			t.Errorf("%s: loading %q, want %q", c.key, m.loading, c.loading)
+		}
+	}
+	if m, _ := caps(page(), "T"); m.mode != modeTOC {
+		t.Errorf("T: mode %v, want the table of contents", m.mode)
+	}
+	if m, _ := caps(page(), "G"); m.mode != modeGoto {
+		t.Errorf("G: mode %v, want the go-to prompt", m.mode)
+	}
+	if m, _ := caps(page(), "?"); m.mode != modeHelp {
+		t.Errorf("?: mode %v", m.mode)
+	} else if m, _ = caps(m, "J"); m.helpTop != 1 {
+		t.Errorf("J in the help: top %d", m.helpTop)
+	}
+	m := page()
+	m = open(m, "https://example.org/b", textPage("B", "beta"))
+	if m, _ = caps(m, "Q"); m.cur.target != "w5f:welcome" {
+		t.Errorf("Q closed to %q", m.cur.target)
 	}
 }

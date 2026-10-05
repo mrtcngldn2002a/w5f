@@ -2,6 +2,9 @@ package tui
 
 import (
 	"sort"
+	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -11,6 +14,37 @@ import (
 // innermost layer, asking before it quits. ← and → used to open and go back,
 // and in a room of two columns → opened the selected line when the eye was
 // already on the column to its right.
+
+// Keys are read without case (asked for by the owner, 2026-10-05): caps
+// lock or shift changes nothing, so no key has a second meaning in upper
+// case. What used to be upper-case keys moved to letters of their own:
+// c tarot (T), i I Ching (I), v the browser (B), e enqueue the selected
+// link (A), u follow (F), h l w the Register, the Ledger and the Weeding
+// Room (H L W; back and forward are backspace and alt+← →), and G (the
+// end) is gone, end and > stay.
+
+// foldKey is a key as the reader reads it: a letter, typed with shift or
+// caps lock, is its lower case, and the Turkish İ, I and ı are i. On a
+// Turkish keyboard ğ and ü sit where [ and ] are elsewhere, and are read
+// as them.
+func foldKey(s string) string {
+	if rest, ok := strings.CutPrefix(s, "shift+"); ok && utf8.RuneCountInString(rest) == 1 {
+		s = rest
+	}
+	r, n := utf8.DecodeRuneInString(s)
+	if n == 0 || n != len(s) || !unicode.IsLetter(r) {
+		return s
+	}
+	switch r {
+	case 'İ', 'I', 'ı':
+		return "i"
+	case 'ğ', 'Ğ':
+		return "["
+	case 'ü', 'Ü':
+		return "]"
+	}
+	return string(unicode.ToLower(r))
+}
 
 // columnMove moves the selection to the next column (dir 1) or the one
 // before it (dir -1), to the line nearest the selected one. It reports
@@ -165,7 +199,7 @@ func (m Model) closePage() (tea.Model, tea.Cmd) {
 			continue
 		}
 		m.leavePage()
-		// What is closed can still be reopened with l, as after backspace.
+		// What is closed can still be reopened with alt+→, as after backspace.
 		m.forward = append(m.forward, m.cur)
 		for j := len(m.back) - 1; j > i; j-- {
 			m.forward = append(m.forward, m.back[j])

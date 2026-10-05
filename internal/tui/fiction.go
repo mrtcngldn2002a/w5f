@@ -37,7 +37,7 @@ func followKey(d *doc.Document) string {
 	id, ok := fiction.SerialRef(d.Ref)
 	if !ok {
 		if id, ok = fiction.SerialOfPage(db, d); !ok {
-			return "F follows serials and Reddit series — this page is neither"
+			return "u follows serials and Reddit series — this page is neither"
 		}
 	}
 	on, err := fiction.ToggleFollow(db, id)

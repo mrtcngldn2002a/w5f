@@ -58,7 +58,7 @@ func followingDoc(env Env, status string) (*doc.Document, error) {
 	d.Blocks = append(d.Blocks, para(doc.Span{Text: "check now", Link: link(d, "w5f:following/check", "check now")},
 		plain("   (w5f sync checks too)", doc.Italic)))
 	if len(ss) == 0 {
-		d.Blocks = append(d.Blocks, para(plain("Nothing followed yet. Open a serial or a Reddit series and press F.", doc.Italic)))
+		d.Blocks = append(d.Blocks, para(plain("Nothing followed yet. Open a serial or a Reddit series and press u.", doc.Italic)))
 		return d, nil
 	}
 	d.Blocks = append(d.Blocks, followedList(d, ss))

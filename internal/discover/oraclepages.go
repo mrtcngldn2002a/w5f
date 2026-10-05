@@ -84,7 +84,7 @@ func tarotDoc(ctx context.Context, env Env, c Card, rev bool) (*doc.Document, er
 		}
 		p.add(doc.Paragraph{Text: doc.Inline{{Text: "Waite's text: ", Style: doc.Italic}, {Text: t.Source, Link: p.link(t.Source, "Waite's page")}}})
 	}
-	p.add(doc.Rule{}, doc.Paragraph{Text: doc.Inline{{Text: "draw another card", Link: p.link("w5f:discover/tarot", "draw another")}, {Text: "   (T)", Style: doc.Italic}}})
+	p.add(doc.Rule{}, doc.Paragraph{Text: doc.Inline{{Text: "draw another card", Link: p.link("w5f:discover/tarot", "draw another")}, {Text: "   (c)", Style: doc.Italic}}})
 	return p.d, nil
 }
 
@@ -186,7 +186,7 @@ func ichingDoc(ctx context.Context, env Env, lines []int) (*doc.Document, error)
 		}
 		p.add(doc.Paragraph{Text: doc.Inline{{Text: "Legge's text: ", Style: doc.Italic}, {Text: h.Source, Link: p.link(h.Source, "Legge's page")}}})
 	}
-	p.add(doc.Rule{}, doc.Paragraph{Text: doc.Inline{{Text: "cast another", Link: p.link("w5f:discover/iching", "cast another")}, {Text: "   (I)", Style: doc.Italic}}})
+	p.add(doc.Rule{}, doc.Paragraph{Text: doc.Inline{{Text: "cast another", Link: p.link("w5f:discover/iching", "cast another")}, {Text: "   (i)", Style: doc.Italic}}})
 	p.d.Renumber()
 	return p.d, nil
 }

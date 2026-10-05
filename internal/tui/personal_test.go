@@ -86,7 +86,7 @@ func TestSearchPromptQueueSaveHistoryKeys(t *testing.T) {
 	if len(vs) != 1 || vs[0].Pos <= 0 {
 		t.Errorf("position not saved: %+v", vs)
 	}
-	if m = press(m, "H"); m.loading == "" {
+	if m = press(m, "h"); m.loading == "" {
 		t.Error("H should open the history")
 	}
 }
@@ -97,7 +97,7 @@ func TestQueueFocusedLink(t *testing.T) {
 	d.Links = []doc.Link{{Href: "https://backrooms-wiki.wikidot.com/level-0", Text: "Level 0"}}
 	d.Blocks = append(d.Blocks, doc.Paragraph{Text: doc.Inline{{Text: "Level 0", Link: 1}}})
 	m = open(m, "w5f:feeds", d)
-	press(m, "A")
+	press(m, "e")
 	b, _ := os.ReadFile(personal.QueuePath())
 	if !strings.Contains(string(b), "[Level 0](https://backrooms-wiki.wikidot.com/level-0) · FIC·BR·level-0") {
 		t.Errorf("queue:\n%s", b)

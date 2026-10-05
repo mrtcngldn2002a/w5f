@@ -49,8 +49,8 @@ func welcomeDoc(version string) *doc.Document {
 		}
 	}
 	today = append(today, []doc.Block{doc.Paragraph{Text: doc.Inline{{Text: "Draw · ", Style: doc.Bold},
-		{Text: "a tarot card", Link: link("w5f:discover/tarot", "tarot")}, {Text: " (T) · "},
-		{Text: "an I Ching cast", Link: link("w5f:discover/iching", "I Ching")}, {Text: " (I) · "},
+		{Text: "a tarot card", Link: link("w5f:discover/tarot", "tarot")}, {Text: " (c) · "},
+		{Text: "an I Ching cast", Link: link("w5f:discover/iching", "I Ching")}, {Text: " (i) · "},
 		{Text: "a random page", Link: link("w5f:discover/random", "deep random")}, {Text: " (x)"}}}})
 	right = append(right, doc.List{Items: today})
 	right = append(right, doc.Heading{Level: 2, Text: doc.Inline{{Text: "Ultan's note"}}})

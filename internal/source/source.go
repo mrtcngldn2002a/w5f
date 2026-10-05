@@ -257,7 +257,7 @@ func hasNotice(bs []doc.Block) bool {
 var (
 	reSCP     = regexp.MustCompile(`(?i)^scp-\d{3,4}(-j|-ex|-arc|-d)?$`)
 	reBareNum = regexp.MustCompile(`^\d{3,4}$`)
-	reSub     = regexp.MustCompile(`^/?(r|u|user)/[A-Za-z0-9_\-]+$`)
+	reSub     = regexp.MustCompile(`(?i)^/?(r|u|user)/[A-Za-z0-9_\-]+$`)
 )
 
 // Resolve expands what the user typed at the "go to" prompt into a target:
@@ -274,6 +274,25 @@ var (
 //	?<words> or several words  web search
 //	a path to a file           open the file
 func Resolve(input string) string {
+	t := resolve(input)
+	// Commands are read without case. Caps lock on a Turkish keyboard types
+	// LİBGEN, whose lower case is not libgen: read again with İ and ı as i,
+	// where only that makes it a command (the words of a search are kept).
+	if strings.ContainsAny(input, "İı") && strings.HasPrefix(t, "w5f:search/web?") {
+		if again := resolve(FoldCommand(input)); !strings.HasPrefix(again, "w5f:search/web?") {
+			return again
+		}
+	}
+	return t
+}
+
+// FoldCommand is a command as it is matched: lower case, the Turkish İ and
+// ı as i.
+func FoldCommand(s string) string {
+	return strings.ToLower(strings.NewReplacer("İ", "i", "ı", "i").Replace(s))
+}
+
+func resolve(input string) string {
 	s := strings.TrimSpace(input)
 	lower := strings.ToLower(s)
 	switch {
@@ -334,11 +353,14 @@ func Resolve(input string) string {
 		return "w5f:feeds/export?" + url.Values{"f": {userPath(s[len("opml-export "):])}}.Encode()
 	case strings.HasPrefix(lower, "cat ") && isCatalogID(strings.Fields(s)[1]):
 		fields := strings.SplitN(strings.TrimSpace(s[4:]), " ", 2)
+		id := strings.ToLower(fields[0])
 		if len(fields) == 1 {
-			return "w5f:catalog/" + fields[0]
+			return "w5f:catalog/" + id
 		}
-		return "w5f:catalog/" + fields[0] + "?" + url.Values{"q": {strings.TrimSpace(fields[1])}}.Encode()
-	case strings.HasPrefix(s, "w5f:"), strings.Contains(s, "://"):
+		return "w5f:catalog/" + id + "?" + url.Values{"q": {strings.TrimSpace(fields[1])}}.Encode()
+	case strings.HasPrefix(lower, "w5f:"):
+		return "w5f:" + s[4:]
+	case strings.Contains(s, "://"):
 		return s
 	case strings.HasPrefix(s, "?"):
 		return searchTarget("web", strings.TrimSpace(s[1:]))
@@ -412,7 +434,8 @@ func Resolve(input string) string {
 	case strings.HasPrefix(lower, "reddit "):
 		return "https://www.reddit.com/search/?" + url.Values{"q": {strings.TrimSpace(s[7:])}}.Encode()
 	case reSub.MatchString(s):
-		return "https://www.reddit.com/" + strings.TrimPrefix(s, "/") + "/"
+		kind, name, _ := strings.Cut(strings.TrimPrefix(s, "/"), "/")
+		return "https://www.reddit.com/" + strings.ToLower(kind) + "/" + name + "/"
 	case lower == "reddit":
 		return "https://www.reddit.com/"
 	case reSCP.MatchString(s):
