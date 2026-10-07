@@ -268,6 +268,7 @@ var shelves = map[string]string{
 	"encyclopedic": "From the reference stacks. Read it as a traveller reads a map: for the places, not the lines.",
 	"knowledge":    "From the essayists' desks, where someone is always halfway through an argument.",
 	"smallweb":     "From the small rooms at the edge of the web, each lit by a single lamp.",
+	"underground":  "From the underground press, passed hand to hand on floppy disks and photocopies.",
 	"weird":        "From the wing of invented worlds. Its doors open inward only.",
 	"fiction":      "From the serial hall, where the stories are still being written.",
 	"yours":        "From your own shelf. You chose these; I only dust them.",
