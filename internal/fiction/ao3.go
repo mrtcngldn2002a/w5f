@@ -144,7 +144,7 @@ func adultDoc(e errAdult) *doc.Document {
 	d.Blocks = []doc.Block{
 		doc.Notice{Kind: "warn", Text: e.text},
 		para(doc.Span{Text: "Proceed (show adult content)", Style: doc.Bold, Link: link(d, openHref(withAdult("view_adult=true", strings.SplitN(e.work, "?", 2)[0])), "proceed")}),
-		para(plain("Press ← to go back.", doc.Italic)),
+		para(plain("Press backspace to go back.", doc.Italic)),
 	}
 	return d
 }

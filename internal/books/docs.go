@@ -52,6 +52,8 @@ func Route(ctx context.Context, target string, env Env) (*doc.Document, error) {
 	switch {
 	case p == "books":
 		return homeDoc(env)
+	case p == "books/ia" || strings.HasPrefix(p, "books/ia/"):
+		return iaRoute(ctx, p, q, env)
 	case p == "books/libgen" || strings.HasPrefix(p, "books/libgen/"):
 		return libgenRoute(ctx, p, q, env)
 	case p == "books/gutenberg":
@@ -111,7 +113,7 @@ func Route(ctx context.Context, target string, env Env) (*doc.Document, error) {
 			d.Blocks = []doc.Block{doc.Notice{Kind: "warn", Text: err.Error()}}
 		} else {
 			_ = env.DB.SaveProgress(b.ID, 0, 0)
-			d.Blocks = []doc.Block{doc.Notice{Kind: "info", Text: "Opened in the external viewer. Press ← to come back."}}
+			d.Blocks = []doc.Block{doc.Notice{Kind: "info", Text: "Opened in the external viewer. Press backspace to come back."}}
 		}
 		return d, nil
 	case strings.HasPrefix(p, "book/"):
@@ -184,6 +186,8 @@ func homeDoc(env Env) (*doc.Document, error) {
 	find := [][]doc.Block{
 		{doc.Paragraph{Text: doc.Inline{{Text: "Library Genesis", Link: link(d, "w5f:books/libgen", "Library Genesis")},
 			{Text: "   search: g → libgen <words>", Style: doc.Italic}}}},
+		{doc.Paragraph{Text: doc.Inline{{Text: "Internet Archive — texts, by collection", Link: link(d, "w5f:books/ia", "Internet Archive")},
+			{Text: "   search: g → ia <words>", Style: doc.Italic}}}},
 		{doc.Paragraph{Text: doc.Inline{{Text: "Project Gutenberg — most downloaded", Link: link(d, "w5f:books/gutenberg", "Gutenberg")},
 			{Text: "   search: g → gut <words>", Style: doc.Italic}}}},
 		{doc.Paragraph{Text: doc.Inline{{Text: "Standard Ebooks — newest", Link: link(d, "w5f:books/se", "Standard Ebooks")},

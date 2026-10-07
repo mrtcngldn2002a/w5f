@@ -49,8 +49,8 @@ func welcomeDoc(version string) *doc.Document {
 		}
 	}
 	today = append(today, []doc.Block{doc.Paragraph{Text: doc.Inline{{Text: "Draw · ", Style: doc.Bold},
-		{Text: "a tarot card", Link: link("w5f:discover/tarot", "tarot")}, {Text: " (T) · "},
-		{Text: "an I Ching cast", Link: link("w5f:discover/iching", "I Ching")}, {Text: " (I) · "},
+		{Text: "a tarot card", Link: link("w5f:discover/tarot", "tarot")}, {Text: " (c) · "},
+		{Text: "an I Ching cast", Link: link("w5f:discover/iching", "I Ching")}, {Text: " (i) · "},
 		{Text: "a random page", Link: link("w5f:discover/random", "deep random")}, {Text: " (x)"}}}})
 	right = append(right, doc.List{Items: today})
 	right = append(right, doc.Heading{Level: 2, Text: doc.Inline{{Text: "Ultan's note"}}})
@@ -70,8 +70,9 @@ func welcomeDoc(version string) *doc.Document {
 	d.Blocks = append(d.Blocks, doc.Rule{}, doc.Collapsible{ID: 1, Show: "First time here?", Hide: "Hide", Blocks: []doc.Block{
 		doc.Paragraph{Text: doc.Inline{{Text: "A reading terminal for the textual internet and a personal archive: Ultan's library, of which you hold the only card."}}},
 		doc.List{Items: [][]doc.Block{
-			{doc.Paragraph{Text: doc.Inline{{Text: "↑ ↓", Style: doc.Bold}, {Text: " move from link to link; when the next one is off screen the page scrolls instead."}}}},
-			{doc.Paragraph{Text: doc.Inline{{Text: "→", Style: doc.Bold}, {Text: " or "}, {Text: "enter", Style: doc.Bold}, {Text: " opens the selected link or section, "}, {Text: "←", Style: doc.Bold}, {Text: " goes back — as many times as you like."}}}},
+			{doc.Paragraph{Text: doc.Inline{{Text: "↑ ↓", Style: doc.Bold}, {Text: " move from link to link; when the next one is off screen the page scrolls instead. "}, {Text: "← →", Style: doc.Bold}, {Text: " move between the columns of a room."}}}},
+			{doc.Paragraph{Text: doc.Inline{{Text: "enter", Style: doc.Bold}, {Text: " opens the selected link or section, "}, {Text: "backspace", Style: doc.Bold}, {Text: " goes back — as many times as you like; "}, {Text: "q", Style: doc.Bold}, {Text: " closes a page, back to its room."}}}},
+			{doc.Paragraph{Text: doc.Inline{{Text: "space", Style: doc.Bold}, {Text: " and "}, {Text: "b", Style: doc.Bold}, {Text: " turn a screen, "}, {Text: "home", Style: doc.Bold}, {Text: " and "}, {Text: "end", Style: doc.Bold}, {Text: " go to the first and last line, "}, {Text: "f", Style: doc.Bold}, {Text: " numbers the links on screen; "}, {Text: "esc", Style: doc.Bold}, {Text: " closes what is open and, with nothing open, asks before quitting."}}}},
 			{doc.Paragraph{Text: doc.Inline{{Text: "1 … 9, 0", Style: doc.Bold}, {Text: " open the rooms; "}, {Text: `\`, Style: doc.Bold}, {Text: " hides the side menu; "}, {Text: "g → theme", Style: doc.Bold}, {Text: " changes the colours."}}}},
 			{doc.Paragraph{Text: doc.Inline{{Text: "/", Style: doc.Bold}, {Text: " searches everything you have read; "}, {Text: "a", Style: doc.Bold}, {Text: " queues a page, "}, {Text: "n", Style: doc.Bold}, {Text: " writes a note, "}, {Text: "y", Style: doc.Bold}, {Text: " clips paragraphs; "}, {Text: "?", Style: doc.Bold}, {Text: " shows every key."}}}},
 			{doc.Paragraph{Text: doc.Inline{{Text: "Folded sections like this one start closed; enter opens them, "}, {Text: "+", Style: doc.Bold}, {Text: " and "}, {Text: "-", Style: doc.Bold}, {Text: " open or fold them all."}}}},

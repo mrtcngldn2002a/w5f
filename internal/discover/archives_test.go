@@ -82,8 +82,7 @@ func TestBHLOpensTheFullTextOfACuriousBook(t *testing.T) {
 }
 
 func TestSmallWebDirectories(t *testing.T) {
-	var srv *httptest.Server
-	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/random/":
 			fmt.Fprint(w, `<ol class="websites"><li class="websites__item"><p class="website__intro"><a href="https://blog.example/">Quiet Blog</a><br><q>Notes on old books.</q> <a href="/blog/x1/">More info</a></p>

@@ -139,8 +139,8 @@ func TestBottomBarFollowsTheRoom(t *testing.T) {
 	for target, want := range map[string]string{
 		"w5f:feeds":                "g → sync fetch new",
 		"w5f:solo":                 "g → roll 2d6+1",
-		"w5f:discover/tarot/ar16":  "T another card",
-		"w5f:serial/3/ch/2":        "F follow",
+		"w5f:discover/tarot/ar16":  "c another card",
+		"w5f:serial/3/ch/2":        "u follow",
 		"https://example.org/page": "/ search",
 	} {
 		mm := m
@@ -151,7 +151,7 @@ func TestBottomBarFollowsTheRoom(t *testing.T) {
 		}
 	}
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 60, Height: 20})
-	if b := bar(next.(Model)); !strings.HasSuffix(strings.TrimSpace(b), "? help · q quit") || ansi.StringWidth(b) > 60 {
+	if b := bar(next.(Model)); !strings.HasSuffix(strings.TrimSpace(b), "? help · esc quit") || ansi.StringWidth(b) > 60 {
 		t.Errorf("narrow: %q", b)
 	}
 }
@@ -240,10 +240,10 @@ func TestBrowserCommand(t *testing.T) {
 // The Weeding Room is in the side menu under the archive, opened with W.
 func TestWeedingRoomInTheMenu(t *testing.T) {
 	m := wide(New("", "test"))
-	if s := strings.Join(plainView(m), "\n"); !strings.Contains(s, "W  The Weeding Room") {
+	if s := strings.Join(plainView(m), "\n"); !strings.Contains(s, "w  The Weeding Room") {
 		t.Errorf("no Weeding Room in the menu:\n%s", s)
 	}
-	if r := roomFor("w5f:weeding/notes"); r == nil || r.key != "W" {
+	if r := roomFor("w5f:weeding/notes"); r == nil || r.key != "w" {
 		t.Errorf("roomFor: %+v", r)
 	}
 }

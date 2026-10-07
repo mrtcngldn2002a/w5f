@@ -8,9 +8,11 @@ import (
 	"image"
 	"os"
 	"path/filepath"
+	"runtime"
 	"runtime/debug"
 	"time"
 
+	"w5f/internal/browser"
 	"w5f/internal/comics"
 	"w5f/internal/comics/suwayomi"
 	"w5f/internal/comics/view"
@@ -18,9 +20,10 @@ import (
 	"w5f/internal/store"
 )
 
-// runView: w5f view [--comic ID] [--chapter ID] [--bench N] [file]
+// runView: w5f view [--comic ID] [--chapter ID] [--browser] [--bench N] [file]
 func runView(args []string) int {
 	fs := flag.NewFlagSet("view", flag.ContinueOnError)
+	inBrowser := fs.Bool("browser", false, "show the viewer in a browser tab, not an X11 window")
 	comicID := fs.Int64("comic", 0, "a comic of the library (keeps progress)")
 	chapterID := fs.Int("chapter", 0, "a chapter from Suwayomi")
 	bench := fs.Int("bench", 0, "turn N pages and report the time from key to picture")
@@ -33,13 +36,37 @@ func runView(args []string) int {
 		fmt.Fprintln(os.Stderr, "w5f view:", err)
 		return 1
 	}
-	// Pages are big when decoded; keep the heap near what is on screen
-	// (budget: 80 MB on the W5F laptop).
-	debug.SetMemoryLimit(48 << 20)
-	d, err := view.OpenX11()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "w5f view:", err)
-		return 1
+	var d view.Display
+	if *inBrowser || !hasX11() {
+		// A Mac, Windows, a Wayland desktop: the viewer in a browser tab.
+		// Its frames are the screen's own pixels (twice the window on a
+		// Retina screen), so the heap may be larger than on the laptop.
+		debug.SetMemoryLimit(192 << 20)
+		w, err := view.OpenWeb(book.Title)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "w5f view:", err)
+			return 1
+		}
+		if err := browser.Open(w.URL); err != nil {
+			fmt.Fprintln(os.Stderr, "w5f view:", err, "— open", w.URL, "yourself")
+		}
+		fmt.Println("The comics viewer is open in the browser:", w.URL)
+		if err := w.WaitReady(time.Minute); err != nil {
+			w.Close()
+			fmt.Fprintln(os.Stderr, "w5f view:", err)
+			return 1
+		}
+		d = w
+	} else {
+		// Pages are big when decoded; keep the heap near what is on screen
+		// (budget: 80 MB on the W5F laptop).
+		debug.SetMemoryLimit(48 << 20)
+		x, err := view.OpenX11()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "w5f view:", err)
+			return 1
+		}
+		d = x
 	}
 	defer d.Close()
 	if *bench > 0 {
@@ -50,6 +77,13 @@ func runView(args []string) int {
 		return 1
 	}
 	return 0
+}
+
+// hasX11 reports an X display the viewer's own window can use: on Linux
+// and the BSDs with DISPLAY set (a Mac's XQuartz is not used: the browser
+// is at home there).
+func hasX11() bool {
+	return runtime.GOOS != "darwin" && runtime.GOOS != "windows" && os.Getenv("DISPLAY") != ""
 }
 
 // viewBook finds what to show and how to keep its progress.

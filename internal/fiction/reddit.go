@@ -181,7 +181,7 @@ func DecorateRedditPost(ctx context.Context, env Env, d *doc.Document, info *red
 		d.Next = parts[idx+1].URL
 		line = append(line, plain(" · ", 0), doc.Span{Text: "next ›", Link: link(d, d.Next, "next part")})
 	}
-	line = append(line, plain(" · F follows the series", doc.Italic))
+	line = append(line, plain(" · u follows the series", doc.Italic))
 	d.Blocks = append([]doc.Block{para(line...)}, d.Blocks...)
 }
 

@@ -17,12 +17,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
 	"w5f/internal/books"
+	"w5f/internal/browser"
 	"w5f/internal/comics"
 	"w5f/internal/comics/suwayomi"
 	"w5f/internal/config"
@@ -224,7 +224,7 @@ func Load(ctx context.Context, target string, opts Options) (*doc.Document, erro
 		return nil, err
 	}
 	if doc.TextLength(d.Blocks) == 0 && d.Collapsibles == 0 && !hasNotice(d.Blocks) {
-		d.Blocks = append(d.Blocks, doc.Notice{Kind: "info", Text: "No readable text was found on this page. Press ← to go back."})
+		d.Blocks = append(d.Blocks, doc.Notice{Kind: "info", Text: "No readable text was found on this page. Press backspace to go back."})
 	}
 	return d, nil
 }
@@ -257,7 +257,7 @@ func hasNotice(bs []doc.Block) bool {
 var (
 	reSCP     = regexp.MustCompile(`(?i)^scp-\d{3,4}(-j|-ex|-arc|-d)?$`)
 	reBareNum = regexp.MustCompile(`^\d{3,4}$`)
-	reSub     = regexp.MustCompile(`^/?(r|u|user)/[A-Za-z0-9_\-]+$`)
+	reSub     = regexp.MustCompile(`(?i)^/?(r|u|user)/[A-Za-z0-9_\-]+$`)
 )
 
 // Resolve expands what the user typed at the "go to" prompt into a target:
@@ -268,10 +268,31 @@ var (
 //	scp <words>                search the SCP Wiki, Wanderers' Library, Backrooms
 //	r/name, reddit <words>     a subreddit, or a Reddit search
 //	gut <words>, se <words>    search Project Gutenberg / Standard Ebooks
+//	ia [@collection] [words]   the Internet Archive's texts
+//	random-add <address> [shelf], random-sites   your sites in Deep random
 //	books, feeds               the Library / Periodicals
 //	?<words> or several words  web search
 //	a path to a file           open the file
 func Resolve(input string) string {
+	t := resolve(input)
+	// Commands are read without case. Caps lock on a Turkish keyboard types
+	// LİBGEN, whose lower case is not libgen: read again with İ and ı as i,
+	// where only that makes it a command (the words of a search are kept).
+	if strings.ContainsAny(input, "İı") && strings.HasPrefix(t, "w5f:search/web?") {
+		if again := resolve(FoldCommand(input)); !strings.HasPrefix(again, "w5f:search/web?") {
+			return again
+		}
+	}
+	return t
+}
+
+// FoldCommand is a command as it is matched: lower case, the Turkish İ and
+// ı as i.
+func FoldCommand(s string) string {
+	return strings.ToLower(strings.NewReplacer("İ", "i", "ı", "i").Replace(s))
+}
+
+func resolve(input string) string {
 	s := strings.TrimSpace(input)
 	lower := strings.ToLower(s)
 	switch {
@@ -286,6 +307,9 @@ func Resolve(input string) string {
 		return "w5f:catalog/check?" + v.Encode()
 	case lower == "catalogs":
 		return "w5f:catalogs"
+	case strings.HasPrefix(lower, "random-add ") && len(strings.Fields(s)) > 1:
+		fields := strings.Fields(s[len("random-add "):])
+		return RandomAddTarget(fields[0], strings.Join(fields[1:], " "))
 	case lower == "solo", lower == "solo rpg", lower == "oracle":
 		return "w5f:solo"
 	case strings.HasPrefix(lower, "roll ") && isDice(s[len("roll "):]):
@@ -329,11 +353,14 @@ func Resolve(input string) string {
 		return "w5f:feeds/export?" + url.Values{"f": {userPath(s[len("opml-export "):])}}.Encode()
 	case strings.HasPrefix(lower, "cat ") && isCatalogID(strings.Fields(s)[1]):
 		fields := strings.SplitN(strings.TrimSpace(s[4:]), " ", 2)
+		id := strings.ToLower(fields[0])
 		if len(fields) == 1 {
-			return "w5f:catalog/" + fields[0]
+			return "w5f:catalog/" + id
 		}
-		return "w5f:catalog/" + fields[0] + "?" + url.Values{"q": {strings.TrimSpace(fields[1])}}.Encode()
-	case strings.HasPrefix(s, "w5f:"), strings.Contains(s, "://"):
+		return "w5f:catalog/" + id + "?" + url.Values{"q": {strings.TrimSpace(fields[1])}}.Encode()
+	case strings.HasPrefix(lower, "w5f:"):
+		return "w5f:" + s[4:]
+	case strings.Contains(s, "://"):
 		return s
 	case strings.HasPrefix(s, "?"):
 		return searchTarget("web", strings.TrimSpace(s[1:]))
@@ -346,6 +373,10 @@ func Resolve(input string) string {
 		return "w5f:books/gutenberg?" + url.Values{"q": {strings.TrimSpace(s[strings.Index(s, " "):])}}.Encode()
 	case strings.HasPrefix(lower, "se "):
 		return "w5f:books/se?" + url.Values{"q": {strings.TrimSpace(s[3:])}}.Encode()
+	case lower == "ia" || lower == "archive":
+		return "w5f:books/ia"
+	case strings.HasPrefix(lower, "ia ") && len(strings.Fields(s)) > 1:
+		return iaTarget(strings.TrimSpace(s[3:]))
 	case lower == "libgen" || lower == "lg":
 		return "w5f:books/libgen"
 	case lower == "libgen-status":
@@ -370,6 +401,8 @@ func Resolve(input string) string {
 		return "w5f:worlds"
 	case lower == "packet" || lower == "daily" || lower == "daily packet":
 		return "w5f:packet"
+	case lower == "random-sites" || lower == "my sites":
+		return "w5f:discover/sites"
 	case lower == "x" || lower == "deep random":
 		return "w5f:discover/random"
 	case strings.HasPrefix(lower, "serial ") && len(strings.Fields(s)) > 1:
@@ -401,7 +434,8 @@ func Resolve(input string) string {
 	case strings.HasPrefix(lower, "reddit "):
 		return "https://www.reddit.com/search/?" + url.Values{"q": {strings.TrimSpace(s[7:])}}.Encode()
 	case reSub.MatchString(s):
-		return "https://www.reddit.com/" + strings.TrimPrefix(s, "/") + "/"
+		kind, name, _ := strings.Cut(strings.TrimPrefix(s, "/"), "/")
+		return "https://www.reddit.com/" + strings.ToLower(kind) + "/" + name + "/"
 	case lower == "reddit":
 		return "https://www.reddit.com/"
 	case reSCP.MatchString(s):
@@ -509,24 +543,24 @@ func OpenComic(v comics.ViewRequest) error {
 	default:
 		args = append(args, v.Path)
 	}
-	if runtime.GOOS == "linux" && os.Getenv("DISPLAY") == "" {
+	if browser.NoDisplay() {
 		if v.Path != "" {
 			return books.OpenExternal(v.Path)
 		}
-		return errors.New("the comics viewer needs X (it runs in the W5F session, not over SSH or on the console)")
+		return errors.New("the comics viewer needs a desktop (it runs in the W5F session, not over SSH or on the console)")
 	}
-	if runtime.GOOS != "linux" {
-		if v.Path != "" {
-			return books.OpenExternal(v.Path)
-		}
-		return errors.New("reading Suwayomi chapters needs the W5F viewer, which runs on Linux with X")
-	}
+	// An X11 window on Linux; elsewhere (a Mac, Windows, Wayland) w5f view
+	// shows the same viewer in a browser tab.
 	exe, err := os.Executable()
 	if err != nil {
 		return err
 	}
 	cmd := exec.Command(exe, args...)
-	return cmd.Start()
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	go cmd.Wait() // reap it when the viewer closes
+	return nil
 }
 
 // SmallwebEnv is where Gemini's known hosts and the small web cache live.
@@ -549,7 +583,8 @@ func DiscoverEnv() (discover.Env, error) {
 			}
 			return crom.Random(ctx, Fetcher, p)
 		},
-		Smallweb: SmallwebEnv(),
+		Smallweb:  SmallwebEnv(),
+		SitesPath: discover.SitesPath(),
 	}
 	if cat, err := feeds.LoadCatalog(); err == nil {
 		env.Shelves = map[string]string{}
@@ -1091,4 +1126,29 @@ func booksEnv(db *store.DB) books.Env {
 func isCatalogID(id string) bool {
 	ps, _ := sitecat.LoadAll(sitecat.Path())
 	return sitecat.Find(ps, id) >= 0
+}
+
+// iaTarget is g → ia: "@collection words" searches inside a collection
+// ("@collection" alone opens it); other words search all the Archive's texts.
+func iaTarget(s string) string {
+	v := url.Values{}
+	if strings.HasPrefix(s, "@") {
+		coll, rest, _ := strings.Cut(s[1:], " ")
+		v.Set("c", coll)
+		s = strings.TrimSpace(rest)
+	}
+	if s != "" {
+		v.Set("q", s)
+	}
+	return "w5f:books/ia?" + v.Encode()
+}
+
+// RandomAddTarget is the check of a site before it joins Deep random, on
+// the shelf named (unset: "yours").
+func RandomAddTarget(addr, shelf string) string {
+	v := url.Values{"url": {addr}}
+	if shelf = strings.TrimSpace(shelf); shelf != "" {
+		v.Set("family", shelf)
+	}
+	return "w5f:discover/sites/check?" + v.Encode()
 }

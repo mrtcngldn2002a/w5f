@@ -38,7 +38,7 @@ func TestOpenedPagesAreSearchable(t *testing.T) {
 	m = open(m, "https://scp-wiki.wikidot.com/scp-173", textPage("SCP-173", "The statue moves when unobserved."))
 	m = open(m, "https://arkeofili.com/x", &doc.Document{Title: "Göbekli Tepe", Ref: "item:77", URL: "https://arkeofili.com/x",
 		Blocks: []doc.Block{doc.Paragraph{Text: doc.Inline{{Text: "A carved statue of a fox."}}}}})
-	m = open(m, "w5f:book/5/ch/2", &doc.Document{Title: "Dracula · Chapter 3", Ref: "book:5:2",
+	open(m, "w5f:book/5/ch/2", &doc.Document{Title: "Dracula · Chapter 3", Ref: "book:5:2",
 		Blocks: []doc.Block{doc.Paragraph{Text: doc.Inline{{Text: "He stood like a statue in the moonlight."}}}}})
 	db, _ := store.Default()
 	hits, err := index.Search(db, "statue", "", 30, 0)
@@ -86,7 +86,7 @@ func TestSearchPromptQueueSaveHistoryKeys(t *testing.T) {
 	if len(vs) != 1 || vs[0].Pos <= 0 {
 		t.Errorf("position not saved: %+v", vs)
 	}
-	if m = press(m, "H"); m.loading == "" {
+	if m = press(m, "h"); m.loading == "" {
 		t.Error("H should open the history")
 	}
 }
@@ -97,7 +97,7 @@ func TestQueueFocusedLink(t *testing.T) {
 	d.Links = []doc.Link{{Href: "https://backrooms-wiki.wikidot.com/level-0", Text: "Level 0"}}
 	d.Blocks = append(d.Blocks, doc.Paragraph{Text: doc.Inline{{Text: "Level 0", Link: 1}}})
 	m = open(m, "w5f:feeds", d)
-	m = press(m, "A")
+	press(m, "e")
 	b, _ := os.ReadFile(personal.QueuePath())
 	if !strings.Contains(string(b), "[Level 0](https://backrooms-wiki.wikidot.com/level-0) · FIC·BR·level-0") {
 		t.Errorf("queue:\n%s", b)

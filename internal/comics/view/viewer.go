@@ -46,6 +46,18 @@ type Display interface {
 	Close() error
 }
 
+// scaler is a display whose pixels are smaller than a screen's usual ones
+// (a Retina screen in a browser tab): its text is drawn Scale() times larger.
+type scaler interface{ Scale() int }
+
+// scale is how many frame pixels make one pixel of the viewer's text.
+func (v *Viewer) scale() int {
+	if s, ok := v.d.(scaler); ok {
+		return max(1, min(s.Scale(), 4))
+	}
+	return 1
+}
+
 // Viewer shows a book on a display.
 type Viewer struct {
 	d        Display
@@ -293,23 +305,29 @@ func (v *Viewer) draw() error {
 			defer v.prefetch() // the next view gets ready while this one is read
 		}
 		if err != nil {
-			v.text(fmt.Sprintf("page %d cannot be shown: %v", p.Page+1, err), image.Pt(20, sc.Y/2))
+			v.text(fmt.Sprintf("page %d cannot be shown: %v", p.Page+1, err), image.Pt(20*v.scale(), sc.Y/2))
 			continue
 		}
 		draw.Draw(v.frame, p.Dst, img, p.Src.Min, draw.Src)
 	}
 	if v.overlay != "" {
-		v.text(v.overlay, image.Pt(12, sc.Y-12))
+		k := v.scale()
+		v.text(v.overlay, image.Pt(12*k, sc.Y-12*k))
 	}
 	return v.d.Show(v.frame)
 }
 
+// text writes s on a dark box, its baseline starting at at; on a scaled
+// display the box and its letters are drawn larger, pixel for pixel.
 func (v *Viewer) text(s string, at image.Point) {
 	face := basicfont.Face7x13
 	w := font.MeasureString(face, s).Ceil()
-	bg := image.Rect(at.X-6, at.Y-15, at.X+w+6, at.Y+6)
-	draw.Draw(v.frame, bg, image.NewUniform(color.RGBA{0x12, 0x0c, 0x02, 0xff}), image.Point{}, draw.Src)
-	(&font.Drawer{Dst: v.frame, Src: image.NewUniform(ink), Face: face, Dot: fixed.P(at.X, at.Y)}).DrawString(s)
+	box := image.NewRGBA(image.Rect(0, 0, w+12, 21))
+	draw.Draw(box, box.Bounds(), image.NewUniform(color.RGBA{0x12, 0x0c, 0x02, 0xff}), image.Point{}, draw.Src)
+	(&font.Drawer{Dst: box, Src: image.NewUniform(ink), Face: face, Dot: fixed.P(6, 15)}).DrawString(s)
+	k := v.scale()
+	dst := image.Rect(at.X-6*k, at.Y-15*k, at.X+(w+6)*k, at.Y+6*k)
+	xdraw.NearestNeighbor.Scale(v.frame, dst, box, box.Bounds(), draw.Src, nil)
 }
 
 // prefetch gets the next view ready (decoded and scaled) in the background:

@@ -114,6 +114,9 @@ func profileIn(root string) string {
 	return first
 }
 
+// clock is the time cookies expire by (fixed in tests).
+var clock = time.Now
+
 // FirefoxCookies reads the named cookies a site set in a Firefox profile
 // (the domain and its subdomains), most recently used first; expired ones
 // are skipped. Firefox may be running: a copy of the database (and of its
@@ -136,7 +139,7 @@ func FirefoxCookies(profile, domain string, names []string) (map[string]string, 
 			return nil, err
 		}
 	}
-	return readFirefoxCookies(dst, domain, names, time.Now())
+	return readFirefoxCookies(dst, domain, names, clock())
 }
 
 func readFirefoxCookies(path, domain string, names []string, now time.Time) (map[string]string, error) {
@@ -183,8 +186,10 @@ func readFirefoxCookies(path, domain string, names []string, now time.Time) (map
 }
 
 // SessionCookies takes a site's cookies from the browser the owner signed
-// in with: "chromium" (Linux), "firefox", or "" for the first that has
-// them, Chromium first (the laptop's way). It says which one had them.
+// in with: "chromium" (Chromium, Chrome, Brave or Edge on Linux and a Mac),
+// "firefox", or "" for the first that has them: Chromium first on Linux (the
+// laptop's way), Firefox first on a Mac (no keychain question when Firefox
+// has them). It says which one had them.
 func SessionCookies(from, domain string, names []string) (map[string]string, string, error) {
 	var tried []string
 	var firstErr error
@@ -199,22 +204,34 @@ func SessionCookies(from, domain string, names []string) (map[string]string, str
 		}
 		return nil
 	}
-	if from == "" || from == "chromium" {
-		if runtime.GOOS == "linux" || from == "chromium" {
-			if c := try("Chromium", func() (map[string]string, error) { return Cookies(ProfileDir(), domain, names) }); c != nil {
-				return c, "Chromium", nil
-			}
+	type source struct {
+		from, name string
+		read       func() (map[string]string, error)
+	}
+	chromium := source{"chromium", ChromeName(ProfileDir()), func() (map[string]string, error) { return Cookies(ProfileDir(), domain, names) }}
+	firefox := source{"firefox", "Firefox", func() (map[string]string, error) { return FirefoxCookies(FirefoxProfile(), domain, names) }}
+	order := []source{chromium, firefox}
+	switch runtime.GOOS {
+	case "darwin":
+		order = []source{firefox, chromium}
+	case "windows":
+		order = []source{firefox} // Chrome and Edge lock their cookies there
+		if from == "chromium" {
+			order = []source{chromium} // which says so
 		}
 	}
-	if from == "" || from == "firefox" {
-		if c := try("Firefox", func() (map[string]string, error) { return FirefoxCookies(FirefoxProfile(), domain, names) }); c != nil {
-			return c, "Firefox", nil
+	for _, s := range order {
+		if from != "" && from != s.from {
+			continue
+		}
+		if c := try(s.name, s.read); c != nil {
+			return c, s.name, nil
 		}
 	}
 	if from != "" && from != "chromium" && from != "firefox" {
 		return nil, "", fmt.Errorf("sessions are taken from chromium or firefox, not %q", from)
 	}
-	if len(tried) > 1 {
+	if len(tried) > 1 || errors.Is(firstErr, ErrNoCookie) {
 		return nil, "", fmt.Errorf("%w (looked in %s)", ErrNoCookie, strings.Join(tried, " and "))
 	}
 	return nil, "", firstErr

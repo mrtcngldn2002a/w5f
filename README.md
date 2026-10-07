@@ -4,26 +4,38 @@
 Built for a 2006 ASUS W5F laptop · one Go binary · portable to any OS</p>
 
 <p align="center">
+  <a href="https://github.com/mrtcngldn2002a/w5f/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/mrtcngldn2002a/w5f/ci.yml?branch=master&style=flat-square&label=tests&color=ffb000&labelColor=120c02"></a>
   <a href="https://github.com/mrtcngldn2002a/w5f/releases/latest"><img alt="latest release" src="https://img.shields.io/github/v/release/mrtcngldn2002a/w5f?style=flat-square&color=ffb000&labelColor=120c02"></a>
   <img alt="Go 1.26" src="https://img.shields.io/badge/go-1.26-ffb000?style=flat-square&labelColor=120c02">
-  <img alt="platforms" src="https://img.shields.io/badge/runs_on-linux_%C2%B7_windows-ffb000?style=flat-square&labelColor=120c02">
+  <img alt="platforms" src="https://img.shields.io/badge/runs_on-linux_%C2%B7_windows_%C2%B7_macOS-ffb000?style=flat-square&labelColor=120c02">
+</p>
+
+<p align="center">
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#keys">Keys</a> ·
+  <a href="#the-library">The library</a> ·
+  <a href="#themes">Themes</a> ·
+  <a href="#ultans-library">Ultan</a> ·
+  <a href="#in-detail">In detail</a>
 </p>
 
 <p align="center"><img src="docs/screenshots/reading-room-amber.png" alt="The Reading Room in the amber theme: the side menu of rooms, what is left on the desk, today's draws and Ultan's note" width="860"></p>
 
 Web pages, Wikidot wikis (SCP, Wanderers' Library, Backrooms), feeds, books,
-web serials, Usenet, Gemini and Gopher are all turned into one document
-format and read with the same keys, in a terminal, on a laptop from 2006
-(Core 2 Duo T7200, 2 GB RAM). Around the reader stands a library kept by
+web serials, comics, Usenet, Gemini and Gopher are all turned into one
+document format and read with the same keys, in a terminal, on a laptop from
+2006 (Core 2 Duo T7200, 2 GB RAM). Around the reader stands a library kept by
 **Ultan**, the blind librarian of Gene Wolfe's *The Book of the New Sun*: he
 never speaks, but leaves notes in the margin, made by rule from your own
 reading.
 
-- **Reads** HTML, Wikidot, RSS/Atom, EPUB, MOBI/AZW3, FB2, PDF text, Gemini, Gopher, Usenet, Reddit, AO3, Royal Road and forum threadmarks.
-- **Keeps** a queue, notes, clippings and saved pages as Obsidian-friendly Markdown; searches everything you have read (SQLite FTS5).
-- **Wanders**: deep random across eight families of sources, a Daily Packet, a tarot card or an I Ching cast, the day in a book of 1864.
-- **Plays**: a solo RPG table with an oracle, your own dice, sparks, characters, threads and clocks.
-- **Updates itself**, signed, with rollback; runs offline from its cache.
+| | |
+|---|---|
+| **Reads** | HTML, Wikidot, RSS/Atom, EPUB, MOBI/AZW3, FB2, PDF text, Gemini, Gopher, Usenet, Reddit, AO3, Royal Road and forum threadmarks; CBZ/CBR/CB7 comics in its own viewer |
+| **Keeps** | a queue, notes, clippings and saved pages as Obsidian-friendly Markdown; searches everything you have read (SQLite FTS5) |
+| **Wanders** | deep random across eight families of sources and any site you add, a Daily Packet, a tarot card or an I Ching cast, the day in a book of 1864 |
+| **Plays** | a solo RPG table with an oracle, your own dice, sparks, characters, threads and clocks |
+| **Updates itself** | signed, with rollback; runs offline from its cache |
 
 ## Screens
 
@@ -50,57 +62,129 @@ reading.
 
 ## Quick start
 
-Download the binary for your system from the [latest release](https://github.com/mrtcngldn2002a/w5f/releases/latest) (`w5f-linux-amd64`, `w5f-linux-386`, `w5f-windows-amd64.exe`), put it on your `PATH` as `w5f`, and run it:
+Download the binary for your system from the [latest release](https://github.com/mrtcngldn2002a/w5f/releases/latest), put it on your `PATH` as `w5f`, and run it:
+
+| System | Binary |
+|---|---|
+| Linux, 64-bit (the W5F laptop too) | `w5f-linux-amd64` |
+| Linux, 32-bit | `w5f-linux-386` |
+| Windows | `w5f-windows-amd64.exe` |
+| macOS, Apple silicon (M1 and later) | `w5f-darwin-arm64` |
+| macOS, Intel | `w5f-darwin-amd64` |
 
 ```sh
 w5f                 # the Reading Room
 w5f scp-173         # any page: an address, a shorthand, a file
+w5f doctor          # checks this computer, and says how to install what is missing
 w5f update          # later: the next signed release (--rollback goes back)
 ```
 
-Inside, `↑ ↓` move from link to link, `→` opens, `←` goes back, `g` goes anywhere, `?` lists every key. On the W5F laptop, `platform/antix/` makes the machine boot straight into W5F (see its README).
+<details>
+<summary><b>On a Mac</b></summary>
 
-On any other computer it works as it is: a terminal of 80 × 24 or more (110 columns for the side menu), a UTF-8 locale, and a font with `» ○ × │`. Folders, the browser and Java can be set in `config.toml` (see *Settings* below); `w5f doctor` checks the setup and says how this system installs what is missing.
+In Terminal (or iTerm2), for Apple silicon — on an Intel Mac, `amd64` in place of `arm64`:
+
+```sh
+mkdir -p ~/.local/bin
+curl -L -o ~/.local/bin/w5f https://github.com/mrtcngldn2002a/w5f/releases/latest/download/w5f-darwin-arm64
+chmod +x ~/.local/bin/w5f
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zprofile    # once; then open a new window
+w5f
+```
+
+W5F is not notarized by Apple. Fetched with `curl` as above it simply runs; a copy downloaded in a browser is stopped by Gatekeeper ("Apple could not verify…") until you clear it with `xattr -d com.apple.quarantine ~/.local/bin/w5f` (or *System Settings → Privacy & Security → Open Anyway*). A folder you can write to, as `~/.local/bin` is, lets `w5f update` replace the binary without `sudo`.
+
+What is different on a Mac:
+
+- **Comics** open in a browser tab: the same viewer (fit, two-page spreads, right to left, progress, Suwayomi chapters), drawn at the screen's own pixels; the same keys, and a click on the left or right half turns the page. Close the tab or press `q`; the page you were on is kept.
+- **Sessions** come from Firefox, or from Chrome, Chromium, Brave or Edge: their cookie key is in the keychain, and macOS asks once whether W5F may read it (*Always Allow* spares the question). Firefox is asked first, so no question comes when it has the session.
+- **The bot-check helper**: `w5f solver install` sets up Byparr as on Linux, without Xvfb (its browser runs hidden). It was added before a test on a real Mac; if it fails there, a Byparr or FlareSolverr run in Docker at `127.0.0.1:8191` is used all the same.
+- **Keys**: a Mac keyboard has no home and end: `<` and `>` do the same, and its `delete` key is backspace.
+
+</details>
+
+Inside, the arrows move, `enter` opens, `backspace` goes back, `q` closes a page, `g` goes anywhere and `?` lists every key; `esc` twice quits. On the W5F laptop, [`platform/antix/`](platform/antix/README.md) makes the machine boot straight into W5F.
+
+**What it needs.** A terminal of 80 × 24 or more (110 columns for the side menu), a UTF-8 locale and a font with `» ○ × │`. Everything else is optional, and `w5f doctor` names the package for this system (apt, dnf, pacman, Homebrew or winget):
+
+| For | Install |
+|---|---|
+| PDFs read faster and better | Poppler's `pdftotext` (a built-in reader is used without it) |
+| following comics | Java 21, for Suwayomi-Server (`w5f comics server install` fetches the server itself) |
+| sites behind a bot check | Byparr or FlareSolverr on this computer (`w5f solver install` on Linux, Windows and macOS; Linux needs Xvfb) |
+| stories from 100+ fiction sites as EPUB | FanFicFare (`pipx install FanFicFare`) |
+| Reddit or AO3 sessions taken from a browser | Firefox, or Chromium, Chrome, Brave or Edge (Linux and macOS), signed in |
+| the comics viewer | X11 on Linux; on a Mac, Windows or a Wayland desktop it opens in a browser tab |
+
+Folders, the browser and Java can be set in `config.toml` (see *Settings* under [In detail](#in-detail)).
+
+## Keys
+
+The arrows only move; `enter` alone opens. Keys are read without case, so caps lock and shift change nothing and no key means one thing in lower case and another in upper; on a Turkish keyboard `ı` and `İ` are `i`, and `ğ` `ü` are `[` `]`. Commands at the `g` prompt are read without case too (`TAROT`, `LİBGEN dracula`), the words of a search kept as typed. The bottom bar follows the room and shows the keys that matter there (in the Gallery `*` and `m`, in a book `t` and `] [`, at the Gaming Table `g → roll / ask / spark`).
+
+**Moving**
+
+| Key | |
+|:---:|---|
+| `↑` `↓` | previous / next link or section — the page scrolls first when the next one is off screen, so no text is skipped |
+| `←` `→` | the column to the left / right, to the nearest line (rooms are two columns wide); on a page of one column, the previous / next heading |
+| `space` `b` · `pgdn` `pgup` | a screen down / up, the selection along |
+| `home` `end` · `<` `>` | the first / last line of the page (`<` `>` for keyboards without home and end, as on a Mac) |
+| `shift+↑` `shift+↓` | the previous / next heading |
+| `f` | link hints: every link on screen gets a number; type it to open — the quick way down a long list |
+| `t` · `]` `[` | contents (a book's chapters) · next / previous chapter |
+| `j` `k` | a line up / down |
+
+**Opening and leaving**
+
+| Key | |
+|:---:|---|
+| `enter` | open the link · fold or unfold the section |
+| `backspace` · `alt+→` | back (also `alt+←`) · forward again |
+| `q` | close the page and what was opened from it, back to the room it was reached from (a room closes to the Reading Room) |
+| `esc` | close the innermost thing — a pop-up, a prompt, a load; with nothing open it asks *Quit W5F?* and a second `esc` quits |
+| `ctrl+q` | quit at once |
+
+**Going places**
+
+| Key | |
+|:---:|---|
+| `g` | go to: an address, `scp-173`, `w <words>` Wikipedia, `scp <words>`, any other words a web search |
+| `1`…`0` `h` `l` `w` · `\` | the rooms (below) · hide the side menu |
+| `x` · `p` · `c` · `i` | deep random · Daily Packet · a tarot card · an I Ching cast |
+| `r` | a random page of this wiki |
+| `v` · `o` · `ctrl+r` | view the page (or the selected link) in the browser · show the address · reload |
+
+**Keeping**
+
+| Key | |
+|:---:|---|
+| `/` | search everything you have read |
+| `a` `e` · `n` · `y` · `s` | queue the page / enqueue the selected link · note · clip paragraphs · save a Markdown copy |
+| `d` | dictionary pop-up (EN→TR) |
+| `*` · `m` · `u` | star · read / unread (periodicals) · follow a serial's updates |
+| `+` `-` | open / fold all sections |
+| `?` | every key |
 
 ## The library
 
-On a window of 110 columns or more the rooms stay in a side menu on the left (`\` hides it) and the page sits beside it, left-aligned, up to 112 columns; on narrower windows the page is a centred 72-column column. Most rooms are two columns wide.
+On a window of 110 columns or more the rooms stay in a side menu on the left (`\` hides it) and the page sits beside it, left-aligned, up to 112 columns; on narrower windows the page is a centred 72-column column. Most rooms are two columns wide: `←` and `→` cross between them.
 
 | Key | Room | What is there |
 |:---:|---|---|
 | `1` | **The Reading Room** | what is half-read (*On the desk*), what has come in, today's draws, Ultan's note |
 | `2` | **The Periodical Gallery** | shelves of feeds, unread and starred, the newest unread |
-| `3` | **The Stacks** | your books, continue reading, Gutenberg, Standard Ebooks, LibGen, any site you add |
+| `3` | **The Stacks** | your books, continue reading, the Internet Archive's texts, Gutenberg, Standard Ebooks, LibGen, any site you add |
 | `4` | **The Serial Hall** | web serials, forum stories, AO3, weird worlds, what you follow |
 | `5` | **The Picture Vault** | comics: local CBZ and folders, Suwayomi for following |
 | `6` | **The Gaming Table** | the solo RPG table |
 | `7` | **The Newsroom** | Usenet, read only |
-| `8` | **Curiosity Cabinet** | every door of discovery: packet, deep random, tarot, I Ching, almanac, small web |
+| `8` | **Curiosity Cabinet** | every door of discovery: packet, deep random and your sites in it, tarot, I Ching, almanac, small web |
 | `9` | **The Lectern** | the reading queue: this week, someday |
 | `0` | **The Scriptorium** | notes, clippings, saved pages |
-| `H` | **The Register** | the reading history |
-| `L` | **Ultan's Ledger** | your reading, counted |
-| `W` | **The Weeding Room** | what the library keeps on disk, and what can go |
-
-## Keys
-
-| | |
-|---|---|
-| `↑` `↓` | previous / next link or section (scrolls when the next one is off screen) |
-| `→` `enter` · `←` · `l` | open or fold · back · forward |
-| `space` `b` · `home` `end` · `j` `k` | page · top, bottom · a line |
-| `g` | go to: an address, `scp-173`, `w <words>` Wikipedia, `scp <words>`, any other words a web search |
-| `/` | search everything you have read |
-| `a` `A` · `n` · `y` · `s` | queue the page / the link · note · clip paragraphs · save a Markdown copy |
-| `x` · `p` · `T` · `I` | deep random · Daily Packet · a tarot card · an I Ching cast |
-| `t` · `]` `[` | contents (a book's chapters) · next / previous chapter |
-| `d` · `f` · `r` | dictionary pop-up (EN→TR) · link hints · random page of this wiki |
-| `B` | open the page (or the selected link) in the browser |
-| `+` `-` · `o` · `ctrl+r` | open / fold all sections · show the address · reload |
-| `1`…`0` `H` `L` `W` · `\` | the rooms · hide the side menu |
-| `?` · `q` | help · quit |
-
-The bottom bar follows the room: it shows the keys that matter where you are (in the Gallery `*` and `m`, in a book `t` and `] [`, at the Gaming Table `g → roll / ask / spark`).
+| `h` | **The Register** | the reading history |
+| `l` | **Ultan's Ledger** | your reading, counted |
+| `w` | **The Weeding Room** | what the library keeps on disk, and what can go |
 
 ## Themes
 
@@ -116,21 +200,19 @@ The bottom bar follows the room: it shows the keys that matter where you are (in
 
 ## Ultan's library
 
-Ultan leaves notes in the margin, italic and signed "— U.", in a voice after Wolfe's (the words are W5F's own; nothing is quoted). Every note is made by rule from your reading — never by a model, never invented — and on days with nothing to report he offers one of his sayings. In the Reading Room: how long you have been away, new chapters, a book left open for days, heavy shelves, a long queue, a reading habit. Deep random adds his note on the shelf a page came from; the Daily Packet's cover, his note on the issue. **Ultan's Ledger** (`L`, `g → ledger`) counts your reading from `history.log`: days at the desk, pages opened and different pages over 7 days, 30 days and all told, by kind; the pages most returned to; what is left open.
+Ultan leaves notes in the margin, italic and signed "— U.", in a voice after Wolfe's (the words are W5F's own; nothing is quoted). Every note is made by rule from your reading — never by a model, never invented — and on days with nothing to report he offers one of his sayings. In the Reading Room: how long you have been away, new chapters, a book left open for days, heavy shelves, a long queue, a reading habit. Deep random adds his note on the shelf a page came from; the Daily Packet's cover, his note on the issue.
 
-**The Weeding Room** (`W`, `g → weeding`), after the librarian's word for culling a collection. It shows what the library keeps on disk and how much — the page cache, the catalogue (history, periodicals, search index), the visit log, the dictionary, Suwayomi, books, comics, notes — and what can go:
+**Ultan's Ledger** (`l`, `g → ledger`) counts your reading from `history.log`: days at the desk, pages opened and different pages over 7 days, 30 days and all told, by kind; the pages most returned to; what is left open.
+
+**The Weeding Room** (`w`, `g → weeding`), after the librarian's word for culling a collection, shows what the library keeps on disk and how much — the page cache, the catalogue (history, periodicals, search index), the visit log, the dictionary, Suwayomi, books, comics, notes — and what can go:
 
 - **The page cache**, emptied whole: the pages, pictures and PDF texts kept for quick and offline reading; they are fetched again when next opened. It is also kept under a limit on its own (500 MB unless `[cache] limit_mb` says otherwise; 0 keeps everything): past it, the pages read longest ago go first. Only W5F's own cache folders are touched (`http`, `smallweb`, `images`, `pdftext`, and `internet-fiction`, left by W5F v1); whatever other programs keep in the cache folder is never measured, emptied or trimmed.
 - **A note, a book, a comic**, one at a time — there is no way to remove all of them together. A note leaves the notes folder; a book's file is deleted with its place in The Stacks; a comic's file (or a picture folder's pages, never the folders below it) is deleted with its place in The Picture Vault. A chapter Suwayomi downloaded is removed through Suwayomi, so it knows, and the series stays followed. What is removed leaves the search too. Removal is for good: there is no bin.
-- **The history, the desk, the Gaming Table's log**: the clearings below.
-
-Nothing is removed outside W5F's own folders. Every removal asks first, and the question's selection starts on *No*.
-
-**Clearing.** Every clearing asks first, and the question's selection starts on *No*.
-
 - **The desk.** *clear the desk…* under *On the desk* opens the desk, where each page or book can be set aside, or all of them at once. What is set aside stays in the history and comes back to the desk when opened again.
 - **The history.** *clear the history…* on The Register empties the history and restarts the ledger, keeping the old `history.log` beside the database under a dated name. Book and serial progress, notes, the queue and the search index stay.
 - **The Gaming Table's log.** *clear the log…* moves its day files into a dated folder beside it.
+
+Nothing is removed outside W5F's own folders. Every removal and every clearing asks first, and the question's selection starts on *No*.
 
 ---
 
@@ -139,21 +221,27 @@ Nothing is removed outside W5F's own folders. Every removal asks first, and the 
 <details>
 <summary><b>Command line</b></summary>
 
-```
+```sh
+# reading
 w5f                      the Reading Room
 w5f scp-173              shorthand for the SCP Wiki page
 w5f w5f:random/scp       random SCP (also: tale, wl, backrooms)
+w5f https://scp-wiki.wikidot.com/scp-173
+w5f page.html            open a saved page
 w5f --offline <target>   read from the cache only
-w5f r/nosleep            Reddit (connect once: g → reddit-login, paste your own session cookie; read via old.reddit)
-                         or sign in to Reddit in Chromium or Firefox and g → reddit-login browser (AO3: ao3-login browser)
-B / g → browser <url>    open this page (or the selected link, or an address) in the browser
 w5f eksisozluk.com       Ekşi Sözlük: gündem, topics with entries and paging
+w5f r/nosleep            Reddit (read via old.reddit; connect once, see accounts)
+
+# periodicals and Usenet
 w5f w5f:feeds            the Periodical Gallery: shelves, unread, starred, feed status
-w5f sync                 refresh all feeds (cron/timer friendly; in the reader: g → sync)
+w5f sync                 refresh all feeds and followed serials (cron/timer friendly; in the reader: g → sync)
 w5f feeds import x.opml  add another reader's feeds (folders become shelves; in the reader: g → opml-import <file>)
 w5f feeds export [file]  your shelves as OPML (in the reader: g → opml-export [file], default ~/w5f-periodicals.opml)
-w5f w5f:usenet           Usenet, read only: your groups with new posts, threads, g → usenet <word> finds groups, news:alt.magick opens one
+w5f w5f:usenet           Usenet, read only: your groups with new posts; g → usenet <word> finds groups, news:alt.magick opens one
+
+# books and catalogs
 w5f w5f:books            The Stacks: continue reading, your books, catalogs
+w5f ia                   the Internet Archive's texts, by collection (ia <words>, ia @<collection> [words])
 w5f "gut lovecraft"      search Project Gutenberg (also: se <words> for Standard Ebooks)
 w5f "libgen dracula"     search Library Genesis (also: lg <words>)
 w5f "libgen dracula ext:epub lang:english year:1897 sort:title"
@@ -166,11 +254,32 @@ w5f "catalog-add <address> [test word]"  add any book website to the Library (ch
                                          "Index of /" file listings (indexed locally), and falls back to DuckDuckGo
 w5f "cat <id> dracula"                   full search across all its result pages (author:… / title:…)
 w5f catalogs                             manage site catalogs (re-check, remove)
+
+# discovery
+w5f x                    deep random (also: packet, tarot, iching, almanac)
+w5f "random-add <address> [shelf]"  add any site to deep random (checks it first; in the reader,
+                                    g → random-add alone adds the page's site)
+w5f random-sites         your sites in deep random (try, check again, remove)
+
+# your archive
 w5f "find <words>"       search everything you have read (also: press / in the reader)
 w5f queue | notes | history   your reading queue, notes & clippings, history
 w5f reindex              rebuild the search index (after moving or deleting the database)
-w5f https://scp-wiki.wikidot.com/scp-173
-w5f page.html            open a saved page
+w5f dict-install [zip|url]    install the pop-up dictionary (default: English–Turkish)
+
+# accounts (stored only on this computer)
+w5f reddit-login [browser]    paste your own Reddit session cookie, or take it from Chromium or Firefox
+w5f ao3-login [browser]       the same for AO3
+w5f reddit-logout | ao3-logout
+
+# comics
+w5f comics list|update   the local library and followed series (w5f comics for more)
+w5f view [file]          the comics viewer (an X11 window on Linux, a browser tab elsewhere; --browser: the tab anywhere)
+
+# this install
+w5f doctor [--live] [--bench]   check the setup (--live: one source of each kind, --bench: speed)
+w5f solver install [--yes]      install Byparr, the bot-check helper (status | start | stop | update | remove)
+w5f update [--check]            install the latest signed release (--rollback goes back)
 w5f dump [-w 72] [-open all] <file|url>   render as plain text (debugging, golden tests)
 w5f version
 ```
@@ -192,12 +301,25 @@ The web reader extracts articles (Readability), keeps an on-disk cache for offli
 - **Weird worlds:** SCP / Wanderers' Library / Backrooms and 25 archived worlds.
 - **The small web:** Wiby, ooh.directory, Kagi Small Web, the GeoCities archive (OoCities), Gemini via Cosmos, Gopher via Floodgap.
 - **Internet fiction.**
+- **Your own sites** — any you add.
 
 Nothing is filtered by content: what a source holds may come up.
 
+**Your own sites.** `g → random-add <address>` (alone: the site of the page you are on) tries the address once and finds how to draw a page from it — its RSS or Atom feed, its own random-page address, a walk down its links to a page of real text, or one of its links as it is — then shows the page it landed on and offers to add it; another way or another shelf is one link away. A site goes on your own shelf, *yours*, which takes its turn in the shuffle bag like a family; or joins a family (`g → random-add <address> esoteric`), where it comes up as often as each of that family's sources; or makes a shelf of any other name. `g → random-sites` lists them with *try one*, *check again* and *remove*. They are kept in `random.toml` in the data folder, which can be edited by hand:
+
+```toml
+[[site]]
+name = "Hermetic notes"
+url = "https://example.org/library/"
+how = "walk"        # walk, feed, random or links
+scope = "/library/" # walk and links: stay under this path (unset: the address's folder)
+depth = 4           # walk: levels down at most
+family = "occult"   # unset: yours; a family's name joins it
+```
+
 `p` opens today's **Daily Packet**: three unread periodicals from three different shelves (shelves and feeds not in a recent issue first), four sections that take turns through a shuffle bag — weird worlds, fiction, esoterica, folklore, essays and classics, encyclopedias, a public-domain discovery (Public Domain Review, Project Gutenberg or an old curious book of the Biodiversity Heritage Library, whose own site refuses W5F, through its Internet Archive copy), an old-internet text, the small web — and the next item of your queue. Nothing an issue showed in the last 30 days comes back, a reshuffled one's pages included — the same issue all day, `]`/`[` through it, "reshuffle", "save this issue" (Markdown in `Saved/`). Its cover carries two columns: *On this day* (the day's chapter of Chambers's *Book of Days*, 1864, opened in a clean reader page with `g → almanac`; Britannica's *On This Day*: the day's story, the featured event, two more and three birthdays; and *Today in Science History*: a scientist born that day, one who died, an event in science) and *The oracle*.
 
-**The oracle** is a tarot card with Waite's *Pictorial Key to the Tarot* one day and an I Ching hexagram cast with three coins, with Legge's translation, the next (draw another any time: `T` or `g → tarot`, `I` or `g → iching`). Each of the 78 cards has its own picture, drawn for W5F in the manner of framed ASCII tarot decks: Waite's word for the card upright runs down its left side, reversed down its right, a sign beneath it; a reversed card's picture turns over while its words stay readable, and every card is the same size. The card's page gives the drawn way's meaning first, the other in italics, and Waite's description; a hexagram's page draws it large, bottom line first, marks the moving lines (○ old yang, × old yin), names its trigrams, shows the hexagram it turns into, and gives Legge's note on the name, the judgment, the moving lines' texts and all six. The texts come from sacred-texts once, cleaned (the book's page numbers taken out, a few scanning slips mended), and are kept: after that they read the same, offline. Every draw has its own address, so back and history bring the same card or cast.
+**The oracle** is a tarot card with Waite's *Pictorial Key to the Tarot* one day and an I Ching hexagram cast with three coins, with Legge's translation, the next (draw another any time: `c` or `g → tarot`, `i` or `g → iching`). Each of the 78 cards has its own picture, drawn for W5F in the manner of framed ASCII tarot decks: Waite's word for the card upright runs down its left side, reversed down its right, a sign beneath it; a reversed card's picture turns over while its words stay readable, and every card is the same size. The card's page gives the drawn way's meaning first, the other in italics, and Waite's description; a hexagram's page draws it large, bottom line first, marks the moving lines (○ old yang, × old yin), names its trigrams, shows the hexagram it turns into, and gives Legge's note on the name, the judgment, the moving lines' texts and all six. The texts come from sacred-texts once, cleaned (the book's page numbers taken out, a few scanning slips mended), and are kept: after that they read the same, offline. Every draw has its own address, so back and history bring the same card or cast.
 
 **The small web.** `g → smallweb` lists Gemini capsules and Gopher holes; any `gemini://` or `gopher://` address opens like a page (Gemini certificates are trusted on first use and a changed one is refused; pages that ask for input are answered with `g → ? <text>`). The Small Web page also searches Wiby and Marginalia and opens Marginalia's random small sites, each with a "similar" link to steer (its text-friendly interface; when Marginalia is busy with bots it asks for a few seconds' wait, then the reader presses its continue link). `g → worlds` lists the Obscure & Archived Worlds.
 
@@ -208,7 +330,7 @@ Nothing is filtered by content: what a source holds may come up.
 <details>
 <summary><b>Internet fiction</b></summary>
 
-`g → fiction`: web serials and forum stories read like books — contents (`t`), `]`/`[`, resume, "Continue reading", `/` search — and followed for new chapters (`F`; `w5f sync` or "check now" looks for updates; `g → following`).
+`g → fiction`: web serials and forum stories read like books — contents (`t`), `]`/`[`, resume, "Continue reading", `/` search — and followed for new chapters (`u`; `w5f sync` or "check now" looks for updates; `g → following`).
 
 - **Royal Road** (`g → rr <words>`), and **SpaceBattles / Sufficient Velocity / Questionable Questing** threads with threadmarks. Questionable Questing shows on the page only with `[fiction] mature = true` in `config.toml`.
 - **AO3**: its home page menu "Find your favorites", Fandoms by category with a letter index, tag / search / user / series work lists with `]`/`[` for pages and AO3's Sort and Filter as a page of links — sort, include/exclude ratings, warnings, fandoms, characters, relationships and tags, crossovers, completion, language — plus typed filters from the prompt: `g → f tag …`, `f -tag …`, `f words 1000-50000`, `f date 2024-01-01..2025-06-30`, `f q …`, `f clear`; works open as serials; `g → ao3 <words>`; the adult-content warning is shown and only your "Proceed" continues.
@@ -223,9 +345,11 @@ Site logins stay with the owner.
 </details>
 
 <details>
-<summary><b>Books, Library Genesis and custom catalogs</b></summary>
+<summary><b>Books, the Internet Archive, Library Genesis and custom catalogs</b></summary>
 
 W5F reads EPUB, MOBI/AZW/AZW3 (Kindle, including KF8 and combo files), FB2 and `.fb2.zip`, PDF text (10 pages per chapter; uses `pdftotext` from Poppler when installed — `poppler-utils` on Debian and Fedora, `poppler` on Arch and Homebrew — otherwise a built-in reader; every PDF keeps an "external viewer" link), TXT/HTML/Markdown. A PDF linked from the web opens as text too (its first 80 pages, the file kept in the cache's `pdf` folder); a DergiPark journal's item in Periodicals opens the article's full-text PDF instead of its abstract page. DJVU, CBZ and CBR open in the external viewer. DRM-protected and KFX books are listed but not opened — W5F never removes DRM.
+
+**The Internet Archive's texts** (`g → ia`, or *Internet Archive* in The Stacks) are browsed collection by collection: each page shows the collection's description and the collections it belongs to, its sub-collections, then its texts, 50 a page (`]` `[` through them). Above them: the order (most read, read this week, newly added, oldest, newest, title A–Z), a language (English, Turkish, Ottoman Turkish, French, German, Latin, Greek, Arabic, Persian and more), a period (before 1600 to the present), the collections inside it, and *a random text from here*. Lending-library texts, which can only be borrowed on the Archive's site, are left out until asked for. `g → ia <words>` searches all texts, `g → ia @<collection> <words>` one collection; words in the Archive's own syntax pass as written (`ia subject:alchemy AND year:[1600 TO 1700]`, `ia creator:"Blake, William"`). An item's page shows its description, its subjects, collections and author as links to more, and its public files — EPUB first, then PDFs, other ebooks and the full text read from the scans; opening one keeps it in your library and reads it at once, its place remembered.
 
 **Library Genesis** is integrated through a native adapter of the [halfurness/libgen-cli](https://github.com/halfurness/libgen-cli) libgen.li protocol: search tables, file/edition metadata, fresh mirror-specific download keys, Referer, mirror fallback and MD5-verified downloads. EPUBs open in the reader; other supported formats follow the existing external-viewer flow. Search accepts `ext:epub,pdf`, `lang:english`, `year:1897`, `author:"Bram Stoker"`, `title:Dracula`, `publisher:Penguin`, `sort:title`, `sort:-year`, and page sizes `limit:25`, `limit:50`, `limit:100`. Filters apply to each page; follow the next-page link for more matches. The library keeps the canonical `libgen:<md5>` source, avoiding duplicate downloads across mirrors.
 
@@ -244,7 +368,7 @@ No separate libgen executable is required. The upstream command-line progress UI
 <details>
 <summary><b>Personal layer: queue, notes, search, history</b></summary>
 
-`/` searches everything you have read (feeds, wikis, web pages, book chapters, notes; `kafatasi` finds `kafatası`) · `a` / `A` add the page / the selected link to the reading queue · `n` note box (ctrl+s saves) · `y` clip paragraphs (↑↓, shift+↑↓ extends, enter saves) · `s` save a Markdown copy · `H` history.
+`/` searches everything you have read (feeds, wikis, web pages, book chapters, notes; `kafatasi` finds `kafatası`) · `a` / `e` add the page / the selected link to the reading queue · `n` note box (ctrl+s saves) · `y` clip paragraphs (↑↓, shift+↑↓ extends, enter saves) · `s` save a Markdown copy · `h` history.
 
 Notes live in `~/Archive/Notes` (change with `W5F_NOTES` or `notes = "…"` in `config.toml` in the data folder) as Obsidian-compatible Markdown: `Queue.md`, `Notes/`, `Clippings/YYYY/MM/`, `Saved/`. The database only holds the search index and the reading history, both rebuilt by `w5f reindex`.
 
@@ -291,7 +415,7 @@ Notes live in `~/Archive/Notes` (change with `W5F_NOTES` or `notes = "…"` in `
 - **Settings sync**: `w5f comics sync <another server.conf>` compares another Suwayomi's settings (the PC launcher's `%LOCALAPPDATA%\Tachidesk\server.conf`, say) with this server's and lists the differences; `--apply` copies them and adds missing extension stores. What belongs to one computer is kept (addresses, folders, WebUI, database, accounts, the SOCKS proxy) and so are bot-check solver settings (FlareSolverr). Installed extensions and sources' own settings are not copied.
 - **Update**: `check for an update` compares the installed jar with the newest release; updating downloads it, checks it against the release's checksums, stops a server W5F started and starts it again. A server W5F did not start (the launcher) is left alone.
 - **Extensions.** W5F ships and pre-configures no extension repositories. You add a repository by its address and choose what to install; the rights of what a source offers are yours to mind.
-- **Viewer.** `w5f view` is a full-screen X11 window, pure Go with no OpenGL.
+- **Viewer.** `w5f view` is a full-screen X11 window, pure Go with no OpenGL. Where there is no X — a Mac, Windows, a Wayland desktop — or with `--browser`, the same viewer draws into a browser tab instead: a page served only to this computer (127.0.0.1, behind a random address) that shows each frame at the screen's own pixels and sends the keys back; a click on the left or right half turns the page. Closing the tab closes the viewer, its page kept.
 
   | Key | Action |
   |---|---|
@@ -301,7 +425,7 @@ Notes live in `~/Archive/Notes` (change with `W5F_NOTES` or `notes = "…"` in `
   | `r` | right to left |
   | `g` + number + enter | go to page |
   | `n` / `p` (also `]` `[`, ğ ü) | next / previous issue |
-  | `q` | back to W5F |
+  | `q` / `esc` | back to W5F |
 
   Progress is saved on every page turn, and to Suwayomi for its chapters. On the laptop: about 250 ms per page turn, 66 MB.
 
@@ -353,11 +477,11 @@ solver_url = "http://127.0.0.1:8191"  # W5F_SOLVER_URL; "" turns the helper off
 ```
 
 - **Folders.** Without a setting, books and comics are under `~/Archive`. The download folder is the desktop's own: on Linux the one named in `~/.config/user-dirs.dirs` (a Turkish desktop's `~/İndirilenler`), else `~/Downloads`. The older `downloads` under `[fiction]` still counts.
-- **Bot-check helper** (`[fetch] solver_url`, on by default at `http://127.0.0.1:8191`): a local service with FlareSolverr's `/v1` API — Byparr or FlareSolverr — that opens a page in a real browser when a site shows W5F a verification wall (Cloudflare's "Just a moment…", or its 403 challenge). It is asked only then, for pages (not files), one page at a time, and a site it cannot open is left alone for a day; a Deep random draw asks it once at most. The status line says when it is working (it can take up to a minute; `esc` cancels). Its cookies and browser stay with it; W5F keeps only the page, cached for offline reading. W5F asks once whether to install [Byparr](https://github.com/ThePhaseless/Byparr) (~1.1 GB); declining only silences the question. Install it any time with `w5f solver install` (`--yes` for scripts), or `g → solver`. Linux amd64 and Windows amd64 are supported; Linux needs Xvfb (`doctor` gives the package-manager command). W5F starts its installed helper when a page needs it or before starting Suwayomi, and stops only its own process when W5F closes. External Byparr/FlareSolverr services are reused and kept running. `w5f solver status | start | stop | update | remove` manages the helper separately; `w5f update` changes only W5F. See [solver installation](docs/solver-install.md) for verification, disk space and ownership. Nothing listening there costs nothing; `w5f doctor` says what answers. Only a helper on this computer (localhost) is used; on the W5F laptop, `platform/antix/install.sh byparr` runs Byparr as a service. HathiTrust is never sent to it. When W5F first starts Suwayomi it also sets Suwayomi's FlareSolverr to this address, once; after that the setting is yours in *Server settings → Cloudflare*.
-- **Browser** (`B`, `g → browser <address>`, Suwayomi's WebView page): the configured command, else Chromium or Chrome when installed, else the system's default browser (`xdg-open`, `open`, Windows' own). `g → chromium` still works.
-- **Sessions from a browser** (`g → reddit-login browser`, `g → ao3-login browser`): signed in to Reddit or AO3 in a browser, W5F takes that session from its profile — Chromium's or Chrome's on Linux, Firefox's on Linux, Windows and macOS (`… chromium` or `… firefox` picks one; `W5F_CHROMIUM_PROFILE`, `W5F_FIREFOX_PROFILE` point at another profile). Chrome and Edge on Windows lock their cookies; there, use Firefox or paste the cookie.
+- **Bot-check helper** (`[fetch] solver_url`, on by default at `http://127.0.0.1:8191`): a local service with FlareSolverr's `/v1` API — Byparr or FlareSolverr — that opens a page in a real browser when a site shows W5F a verification wall (Cloudflare's "Just a moment…", or its 403 challenge). It is asked only then, for pages (not files), one page at a time, and a site it cannot open is left alone for a day; a Deep random draw asks it once at most. The status line says when it is working (it can take up to a minute; `esc` cancels). Its cookies and browser stay with it; W5F keeps only the page, cached for offline reading. W5F asks once whether to install [Byparr](https://github.com/ThePhaseless/Byparr) (~1.1 GB); declining only silences the question. Install it any time with `w5f solver install` (`--yes` for scripts), or `g → solver`. Linux amd64, Windows amd64 and macOS (Apple silicon and Intel) are supported; Linux needs Xvfb (`doctor` gives the package-manager command). W5F starts its installed helper when a page needs it or before starting Suwayomi, and stops only its own process when W5F closes. External Byparr/FlareSolverr services are reused and kept running. `w5f solver status | start | stop | update | remove` manages the helper separately; `w5f update` changes only W5F. See [solver installation](docs/solver-install.md) for verification, disk space and ownership. Nothing listening there costs nothing; `w5f doctor` says what answers. Only a helper on this computer (localhost) is used; on the W5F laptop, `platform/antix/install.sh byparr` runs Byparr as a service. HathiTrust is never sent to it. When W5F first starts Suwayomi it also sets Suwayomi's FlareSolverr to this address, once; after that the setting is yours in *Server settings → Cloudflare*.
+- **Browser** (`v`, `g → browser <address>`, Suwayomi's WebView page): the configured command, else Chromium or Chrome when installed, else the system's default browser (`xdg-open`, `open`, Windows' own). `g → chromium` still works.
+- **Sessions from a browser** (`g → reddit-login browser`, `g → ao3-login browser`): signed in to Reddit or AO3 in a browser, W5F takes that session from its profile — Firefox's on Linux, Windows and macOS; Chromium's or Chrome's on Linux; Chrome's, Chromium's, Brave's or Edge's on macOS, where macOS asks once whether W5F may read the browser's cookie key from the keychain (`… chromium` or `… firefox` picks one; `W5F_CHROMIUM_PROFILE`, `W5F_FIREFOX_PROFILE` point at another profile). Chrome and Edge on Windows lock their cookies; there, use Firefox or paste the cookie.
 - **Java** for Suwayomi: `[comics] java`, else `JAVA_HOME`, else `java` on the `PATH`.
-- **The comics viewer** (`w5f view`) is an X11 window: on Linux with a desktop. Elsewhere local comics open in the system's viewer, and Suwayomi chapters are read on Linux.
+- **The comics viewer** (`w5f view`) is an X11 window on Linux with a desktop, and a browser tab on a Mac, on Windows and on a Wayland desktop (`--browser` asks for the tab anywhere). Over SSH or on the console, local comics open in the system's viewer.
 
 </details>
 
@@ -379,7 +503,7 @@ solver_url = "http://127.0.0.1:8191"  # W5F_SOLVER_URL; "" turns the helper off
 
 - **Release** (developer machine):
   - Once: `go run ./cmd/w5f-release keygen`. The private key goes to `%APPDATA%\w5f-release\release.key` (Linux: `~/.config/w5f-release/`). Keep it out of the repo and back it up: without it, installed copies cannot be updated.
-  - Each release: `go run ./cmd/w5f-release build -version X.Y.Z -repo owner/w5f`. Always give `-repo`, so the new binary can find the next release. This builds and signs `dist/vX.Y.Z/`; upload every file in it as the assets of release `vX.Y.Z`.
+  - Each release: `go run ./cmd/w5f-release build -version X.Y.Z -repo owner/w5f`. Always give `-repo`, so the new binary can find the next release. This builds the five binaries (Linux amd64 and 386, Windows, macOS arm64 and amd64) and signs `dist/vX.Y.Z/`; upload every file in it as the assets of release `vX.Y.Z`. The macOS binaries cross-build from any system: Go's linker gives the arm64 one the ad hoc signature Apple silicon requires; neither is notarized.
   - Before a push: `sh scripts/secret-scan.sh`.
 - **Doctor.** `w5f doctor` checks folders and config, the database and FTS5, the dictionary, the terminal, locale and font, Suwayomi's Java, and the update setup; what is missing comes with this system's install command (apt, dnf, pacman, Homebrew or winget). `--live` fetches one source of each kind; `--bench` times a 12k-word page against the 150 ms budget. Doctor only reads.
 - **Laptop.** `platform/antix/` makes the W5F boot into W5F (kmscon or X); see its README.
@@ -389,9 +513,13 @@ solver_url = "http://127.0.0.1:8191"  # W5F_SOLVER_URL; "" turns the helper off
 <details>
 <summary><b>Build and layout</b></summary>
 
+Every push to master and every pull request runs [CI](.github/workflows/ci.yml): the tests (with the race detector) on Linux, macOS and Windows, `gofmt`, `staticcheck`, `govulncheck`, the secret scan, and the five binaries built — unsigned, kept for a week as the run's artifact to try a change with. Locally:
+
 ```sh
-go test ./...
+go test ./...                       # every package
+go vet ./... && gofmt -l .          # what a change should pass before it goes in
 go build -o bin/w5f ./cmd/w5f
+sh scripts/secret-scan.sh           # before a push: no keys or session cookies
 ```
 
 For the W5F itself (the T7200 has no SSE4.2, so the amd64 level must stay at v1):
@@ -400,49 +528,67 @@ For the W5F itself (the T7200 has no SSE4.2, so the amd64 level must stay at v1)
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v1 go build -trimpath -ldflags "-s -w" -o bin/w5f-linux-amd64 ./cmd/w5f
 ```
 
+For a Mac, from any system:
+
+```sh
+CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags "-s -w" -o bin/w5f-darwin-arm64 ./cmd/w5f
+```
+
 Golden files: `go test ./internal/render -update` rewrites `testdata/golden/` after an intended rendering change — review the diff.
 
 ```
-cmd/w5f            CLI entry point
-cmd/w5f-release    release tool: key, cross-builds, signed manifest (developer only)
-internal/comics    comics library (CBZ, ComicInfo, progress) and the Comics pages
-internal/comics/suwayomi  Suwayomi-Server client, start/stop, official install
-internal/comics/view      the comics viewer (X11, layout, spreads, RTL)
-internal/update    signed self-update and rollback
-internal/doctor    install checks, live source checks, render bench
-platform/antix     boot shell for the W5F laptop (kmscon or X, Terminus, Amber P3)
-internal/doc       document model (blocks, inline spans, links, columns)
-internal/htmlconv  HTML → document (generic rules + Wikidot profile)
-internal/render    document → terminal lines for a width (pure, tested)
-internal/theme     themes (amber, day, cold, night, green) and their contrast test
-internal/fetch     HTTP client: cache, conditional requests, politeness delay
-internal/crom      Crom GraphQL client (random pages, wiki search)
-internal/search    web search (DuckDuckGo HTML) and wiki search result pages
-internal/books     library: book readers (EPUB, MOBI/AZW3, FB2, PDF), ~/Archive/Books scan, Gutenberg & Standard Ebooks, progress
-internal/libgen    Library Genesis protocol, metadata, mirrors, MD5-verified downloads
-internal/sitecat   site catalogs: search discovery, result-list learning, full search, downloads
-internal/discover  deep random families, Daily Packet, almanac, tarot and I Ching, Obscure & Archived Worlds catalog
-internal/smallweb  Gemini (trust on first use) and Gopher clients, gemtext and gophermap conversion
-internal/fiction   internet fiction: serial adapters (Royal Road, XenForo, AO3, WordPress), Reddit series, following, FanFicFare bridge
-internal/solo      the Gaming Table: oracle, dice, sparks, characters, threads, counters, log
-internal/ultan     Ultan's notes and ledger
-internal/weeding   The Weeding Room: what is kept on disk, the page cache limit, removal one thing at a time
-internal/config    config.toml: folders, browser, Java, cache limit
-internal/sysdeps   system programs (Java, fonts, Poppler) and how this system installs them
-internal/usenet    NNTP reader, read state, kill file
-internal/personal  reading queue, notes, clippings, saved pages (Markdown files)
-internal/index     full-text search over everything read (SQLite FTS5, Turkish folding)
-internal/catalog   call numbers (FIC·SCP·173, PER·…, BK·GUT·…)
-internal/dict      pop-up StarDict dictionary
-internal/feeds     periodicals: built-in catalog (catalog.toml), sync, shelf/item pages
-internal/store     SQLite state (feeds, items, history, books, serials), pure Go
-internal/reddit    Reddit via old.reddit.com with the user's own session (Redlib optional)
-internal/source    resolve targets: files, URLs, shorthands, w5f:random, Wayback fallback
-internal/tui       Bubble Tea reader: side menu, rooms, bottom bar
-testdata/pages     captured pages used as fixtures
-testdata/golden    expected renderings
-```
+cmd/w5f                    CLI entry point
+cmd/w5f-release            release tool: key, cross-builds, signed manifest (developer only)
 
-Planning documents live in the owner's notes, outside this repository.
+the reader
+  internal/doc             document model (blocks, inline spans, links, columns)
+  internal/htmlconv        HTML → document (generic rules + Wikidot profile)
+  internal/render          document → terminal lines for a width (pure, tested)
+  internal/theme           themes (amber, day, cold, night, green) and their contrast test
+  internal/tui             Bubble Tea reader: side menu, rooms, bottom bar, keys
+  internal/source          resolve targets: files, URLs, shorthands, w5f:random, Wayback fallback
+
+getting pages
+  internal/fetch           HTTP client: cache, conditional requests, politeness delay, verification walls
+  internal/browser         a real browser when one is needed: opening pages, sessions from Chromium or Firefox
+  internal/solver          the optional local Byparr: install, start, stop
+  internal/crom            Crom GraphQL client (random pages, wiki search)
+  internal/search          web search (DuckDuckGo HTML) and wiki search result pages
+  internal/smallweb        Gemini (trust on first use) and Gopher clients, gemtext and gophermap conversion
+  internal/reddit          Reddit via old.reddit.com with the user's own session (Redlib optional)
+
+the rooms
+  internal/feeds           periodicals: built-in catalog (catalog.toml), sync, shelf/item pages
+  internal/books           book readers (EPUB, MOBI/AZW3, FB2, PDF), ~/Archive/Books, Internet Archive, Gutenberg & Standard Ebooks, progress
+  internal/libgen          Library Genesis protocol, metadata, mirrors, MD5-verified downloads
+  internal/sitecat         site catalogs: search discovery, result-list learning, full search, downloads
+  internal/fiction         internet fiction: Royal Road, XenForo, AO3, WordPress, Reddit series, following, FanFicFare bridge
+  internal/comics          comics library (CBZ, ComicInfo, progress) and the Comics pages
+  internal/comics/suwayomi Suwayomi-Server client, start/stop, official install, settings
+  internal/comics/view     the comics viewer (an X11 window or a browser tab, layout, spreads, RTL)
+  internal/solo            the Gaming Table: oracle, dice, sparks, characters, threads, counters, log
+  internal/usenet          NNTP reader, read state, kill file
+  internal/discover        deep random families and your own sites, Daily Packet, almanac, tarot and I Ching, Obscure & Archived Worlds
+  internal/ultan           Ultan's notes and ledger
+  internal/weeding         The Weeding Room: what is kept on disk, the page cache limit, removal one thing at a time
+
+your archive
+  internal/personal        reading queue, notes, clippings, saved pages (Markdown files)
+  internal/index           full-text search over everything read (SQLite FTS5, Turkish folding)
+  internal/catalog         call numbers (FIC·SCP·173, PER·…, BK·GUT·…)
+  internal/dict            pop-up StarDict dictionary
+  internal/store           SQLite state (feeds, items, history, books, serials), pure Go
+
+the install
+  internal/config          config.toml: folders, browser, Java, cache limit
+  internal/sysdeps         system programs (Java, fonts, Poppler) and how this system installs them
+  internal/doctor          install checks, live source checks, render bench
+  internal/update          signed self-update and rollback
+  platform/antix           boot shell for the W5F laptop (kmscon or X, Terminus, Amber P3)
+
+testdata/pages             captured pages used as fixtures
+testdata/golden            expected renderings
+docs/superpowers           design specs and implementation plans, one per feature
+```
 
 </details>

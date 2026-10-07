@@ -54,7 +54,8 @@ Usage:
   w5f reddit-logout           remove the stored Reddit session
   w5f ao3-login [browser] / ao3-logout
                               connect AO3 the same way / remove it
-  w5f view [--comic ID] [file] the comics viewer (X11; opened from Comics pages)
+  w5f view [--comic ID] [file] the comics viewer (X11 on Linux, else a browser tab;
+                              opened from Comics pages; --browser: the tab anywhere)
   w5f comics list|update       comics: local library and followed series (w5f comics for more)
   w5f doctor [--live] [--bench]
                               check this install (--live: sources, --bench: speed)

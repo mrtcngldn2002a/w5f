@@ -162,3 +162,35 @@ func TestBMPPagesDecode(t *testing.T) {
 		t.Errorf("pixel: %d %d", r>>8, g>>8)
 	}
 }
+
+type scaledDisplay struct {
+	*fakeDisplay
+	k int
+}
+
+func (s scaledDisplay) Scale() int { return s.k }
+
+// On a display of small pixels (a Retina screen in a browser tab) the
+// viewer's notes are drawn larger, so they read the same size.
+func TestNotesScaleWithTheDisplay(t *testing.T) {
+	note := color.RGBA{0x12, 0x0c, 0x02, 0xff}
+	at := func(k int) color.Color {
+		d := &fakeDisplay{size: image.Pt(400, 300), keys: make(chan Key, 1)}
+		d.keys <- "q"
+		var disp Display = d
+		if k > 1 {
+			disp = scaledDisplay{d, k}
+		}
+		b := Book{Title: "Saga", Pages: &memPages{sizes: []image.Point{{60, 90}}}}
+		if _, err := New(disp, b, nil).Run(); err != nil {
+			t.Fatal(err)
+		}
+		return d.frames[0].At(14, 300-40) // above a 1x note, inside a 2x one
+	}
+	if c := at(1); c == color.Color(note) {
+		t.Errorf("1x: the note reaches %v", c)
+	}
+	if c := at(2); c != color.Color(note) {
+		t.Errorf("2x: the note is not drawn larger: %v", c)
+	}
+}

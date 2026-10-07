@@ -127,7 +127,7 @@ func serialDoc(env Env, s store.Serial, note error) (*doc.Document, error) {
 	} else if len(chs) > 0 {
 		act = append(act, doc.Span{Text: "▶ Start reading", Style: doc.Bold, Link: link(d, serialHref(s.ID, "ch/0"), "start")})
 	}
-	follow := map[bool]string{true: "unfollow", false: "follow (F)"}[s.Followed]
+	follow := map[bool]string{true: "unfollow", false: "follow (u)"}[s.Followed]
 	act = append(act, plain("   ", 0), doc.Span{Text: follow, Link: link(d, serialHref(s.ID, "follow"), follow)},
 		plain("   ", 0), doc.Span{Text: "refresh", Link: link(d, serialHref(s.ID, "refresh"), "refresh")})
 	if s.Kind == "ao3" {
@@ -254,7 +254,7 @@ func chapterDoc(ctx context.Context, env Env, s store.Serial, chs []store.Serial
 	} else {
 		end := "   — latest chapter —"
 		if !s.Followed {
-			end += " press F to follow"
+			end += " press u to follow"
 		}
 		nav = append(nav, plain(end, doc.Italic))
 	}

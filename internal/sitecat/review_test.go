@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"w5f/internal/doc"
@@ -127,7 +128,7 @@ func TestBotWallIgnoresOrdinaryRecaptcha(t *testing.T) {
 }
 
 func TestDownloadHopToAFileIsNotFetched(t *testing.T) {
-	served := 0
+	var served atomic.Int64 // the server writes it while the test reads it
 	mux := http.NewServeMux()
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
@@ -139,7 +140,7 @@ func TestDownloadHopToAFileIsNotFetched(t *testing.T) {
 		w.Write([]byte("PK\x03\x04"))
 		for i := 0; i < 128; i++ {
 			n, err := w.Write(make([]byte, 64<<10))
-			served += n
+			served.Add(int64(n))
 			if err != nil {
 				return
 			}
@@ -149,8 +150,8 @@ func TestDownloadHopToAFileIsNotFetched(t *testing.T) {
 	if err != nil || len(ds) != 1 || ds[0].Format != "epub" || ds[0].URL != srv.URL+"/get/5" {
 		t.Fatalf("ds=%+v err=%v", ds, err)
 	}
-	if served >= 8<<20 {
-		t.Errorf("the whole file (%d bytes) was read during discovery", served)
+	if n := served.Load(); n >= 8<<20 {
+		t.Errorf("the whole file (%d bytes) was read during discovery", n)
 	}
 }
 

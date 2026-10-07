@@ -50,7 +50,14 @@ func fakeInstaller(t *testing.T) (Installer, *int) {
 		}
 	}))
 	t.Cleanup(s.Close)
-	i := Installer{DataDir: t.TempDir(), GOOS: "linux", GOARCH: "amd64", UV: Artifact{s.URL + "/uv", hashOf(uv)}, Byparr: Artifact{s.URL + "/byparr", hashOf(byparr)}, Free: func(string) (uint64, error) { return MinFreeBytes + 1, nil }}
+	// The data folder as W5F resolves it (cleanData): a Mac's temporary
+	// folder is behind /var -> /private/var, a Windows runner's is a short
+	// name (RUNNER~1), and the paths the tests compare must be the same.
+	data, e := filepath.EvalSymlinks(t.TempDir())
+	if e != nil {
+		t.Fatal(e)
+	}
+	i := Installer{DataDir: data, GOOS: "linux", GOARCH: "amd64", UV: Artifact{s.URL + "/uv", hashOf(uv)}, Byparr: Artifact{s.URL + "/byparr", hashOf(byparr)}, Free: func(string) (uint64, error) { return MinFreeBytes + 1, nil }}
 	i.Run = func(ctx context.Context, exe string, args, env []string, dir string, out io.Writer) error {
 		if e := ctx.Err(); e != nil {
 			return e
@@ -326,5 +333,55 @@ func TestFirstQuestionAndRemovalDefaultToNo(t *testing.T) {
 		if len(d.Links) < 2 || !strings.HasPrefix(d.Links[0].Text, "No") {
 			t.Fatal("confirmation does not default to no")
 		}
+	}
+}
+
+// Byparr installs on Linux, Windows and a Mac (Apple silicon and Intel),
+// each with its own pinned uv.
+func TestPlatformsAndTheirUV(t *testing.T) {
+	for _, p := range []struct {
+		goos, goarch, uv string
+		ok               bool
+	}{
+		{"linux", "amd64", "uv-x86_64-unknown-linux-gnu.tar.gz", true},
+		{"windows", "amd64", "uv-x86_64-pc-windows-msvc.zip", true},
+		{"darwin", "arm64", "uv-aarch64-apple-darwin.tar.gz", true},
+		{"darwin", "amd64", "uv-x86_64-apple-darwin.tar.gz", true},
+		{"linux", "386", "", false},
+		{"linux", "arm64", "", false},
+		{"freebsd", "amd64", "", false},
+	} {
+		if err := Supported(p.goos, p.goarch); (err == nil) != p.ok {
+			t.Errorf("%s/%s supported: %v", p.goos, p.goarch, err)
+		}
+		if !p.ok {
+			continue
+		}
+		uv := Installer{GOOS: p.goos, GOARCH: p.goarch}.defaults().UV
+		if !strings.HasSuffix(uv.URL, "/"+UVVersion+"/"+p.uv) || len(uv.SHA256) != 64 {
+			t.Errorf("%s/%s uv: %+v", p.goos, p.goarch, uv)
+		}
+	}
+	old := DarwinEnabled
+	DarwinEnabled = "no"
+	defer func() { DarwinEnabled = old }()
+	if Supported("darwin", "arm64") == nil {
+		t.Error("DarwinEnabled = no still offers Byparr on a Mac")
+	}
+}
+
+// A Mac installs the same way: verified uv, Python, Byparr, its browser.
+func TestMacInstall(t *testing.T) {
+	i, _ := fakeInstaller(t)
+	i.GOOS, i.GOARCH = "darwin", "arm64"
+	dir, e := i.Install(context.Background())
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e := os.Stat(filepath.Join(dir, "tools", "uv")); e != nil {
+		t.Errorf("uv: %v", e)
+	}
+	if !present(dir) {
+		t.Error("the installation is not complete")
 	}
 }

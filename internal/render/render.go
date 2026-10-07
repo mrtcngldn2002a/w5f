@@ -67,6 +67,11 @@ type Focusable struct {
 	Link int // for FocusLink
 	Fold int // collapsible ID for FocusFold
 	Line int // first line where it appears
+	// Group and Col place it in side-by-side columns: Group is the first
+	// line of the columns block plus one (0 = not in columns), Col the
+	// column, left first. ← and → move between columns by them.
+	Group int
+	Col   int
 }
 
 // HeadingRef is a table-of-contents entry.
@@ -317,7 +322,7 @@ func (r *renderer) columns(b doc.Columns, c ctx) {
 	base := len(r.out.Lines)
 	var cols [][]Line
 	rows := 0
-	for _, col := range b.Cols {
+	for k, col := range b.Cols {
 		sub := &renderer{d: r.d, o: Options{Width: colW, Open: r.o.Open}, out: &Layout{Width: colW}, lastLinkFocus: map[int]int{}}
 		sub.blocks(col, ctx{width: colW})
 		for len(sub.out.Lines) > 0 && len(sub.out.Lines[len(sub.out.Lines)-1].Segs) == 0 {
@@ -325,6 +330,11 @@ func (r *renderer) columns(b doc.Columns, c ctx) {
 		}
 		shift := len(r.out.Focus)
 		for _, f := range sub.out.Focus {
+			if f.Group > 0 {
+				f.Group += base // columns inside a column keep their own place
+			} else {
+				f.Group, f.Col = base+1, k
+			}
 			f.Line += base
 			r.out.Focus = append(r.out.Focus, f)
 		}

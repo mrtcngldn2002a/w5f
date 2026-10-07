@@ -67,7 +67,10 @@ func TestFirefoxCookies(t *testing.T) {
 	if _, err := readFirefoxCookies(filepath.Join(dir, "cookies.sqlite"), "archiveofourown.org", []string{"_otwarchive_session"}, now); !errors.Is(err, ErrNoCookie) {
 		t.Errorf("an expired cookie is no cookie: %v", err)
 	}
-	// Through a copy, as W5F reads it while Firefox runs.
+	// Through a copy, as W5F reads it while Firefox runs (on the day the
+	// cookies were made: they expire an hour after).
+	defer func(old func() time.Time) { clock = old }(clock)
+	clock = func() time.Time { return now }
 	t.Setenv("W5F_FIREFOX_PROFILE", dir)
 	if _, which, err := SessionCookies("firefox", "reddit.com", []string{"reddit_session"}); err != nil || which != "Firefox" {
 		t.Errorf("session: %q %v", which, err)

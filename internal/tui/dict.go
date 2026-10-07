@@ -253,15 +253,32 @@ func (m Model) overlayDict(page []string) []string {
 	for len(out) < m.bodyHeight() {
 		out = append(out, "")
 	}
-	x := strings.Repeat(" ", max(0, (m.pageWidth()-w)/2))
+	x := max(0, (m.pageWidth()-w)/2)
 	for i, l := range lines {
 		r := 1 + i
 		if r >= len(out) {
 			break
 		}
-		out[r] = x + l
+		out[r] = overlayLine(out[r], x, l)
 	}
 	return out
+}
+
+// overlayLine lays box over a page line from column x: the page stays
+// visible on both sides of a pop-up.
+func overlayLine(under string, x int, box string) string {
+	left := ansi.Truncate(under, x, "")
+	if d := x - ansi.StringWidth(left); d > 0 {
+		left += strings.Repeat(" ", d) // a short line, or a wide letter cut in half
+	}
+	right := ""
+	if end := x + ansi.StringWidth(box); ansi.StringWidth(under) > end {
+		right = ansi.TruncateLeft(under, end, "")
+		if ansi.StringWidth(right) > ansi.StringWidth(under)-end {
+			right = " " + ansi.TruncateLeft(under, end+1, "") // a wide letter under the box's edge
+		}
+	}
+	return left + "\x1b[0m" + box + "\x1b[0m" + right
 }
 
 func wrapPlain(s string, w int) []string {

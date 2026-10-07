@@ -131,7 +131,7 @@ func SaveAll(path string, ps []Profile) error {
 // Find returns the index of a profile id, or -1.
 func Find(ps []Profile, id string) int {
 	for i := range ps {
-		if ps[i].ID == id {
+		if strings.EqualFold(ps[i].ID, id) { // typed ids are read without case
 			return i
 		}
 	}

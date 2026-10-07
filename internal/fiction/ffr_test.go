@@ -55,7 +55,8 @@ func TestFanFicFareBridge(t *testing.T) {
 
 	ffrCommand = []string{"w5f-no-such-fanficfare"}
 	d, err := Route(ctx, "w5f:fiction/ffr?u=https%3A%2F%2Fexample.org%2Fs%2F1", env)
-	if err != nil || !strings.Contains(flat(d), "pip install FanFicFare") {
+	// pip, or pipx where the system's Python refuses pip installs (Debian).
+	if err != nil || !strings.Contains(flat(d), "install FanFicFare") {
 		t.Fatalf("missing command page: %v\n%s", err, flat(d))
 	}
 

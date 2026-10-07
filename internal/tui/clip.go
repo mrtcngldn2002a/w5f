@@ -40,7 +40,7 @@ func (m *Model) startClip() {
 func (m Model) clipKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	paras := m.cur.layout.Paras
 	cs := &m.clip
-	switch k.String() {
+	switch foldKey(k.String()) {
 	case "esc", "q":
 		m.mode, m.status = modeRead, "clipping cancelled"
 		return m, nil
@@ -54,11 +54,11 @@ func (m Model) clipKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			cs.cur++
 		}
 		cs.anchor = cs.cur
-	case "shift+up", "K":
+	case "shift+up":
 		if cs.cur > 0 {
 			cs.cur--
 		}
-	case "shift+down", "J":
+	case "shift+down":
 		if cs.cur < len(paras)-1 {
 			cs.cur++
 		}

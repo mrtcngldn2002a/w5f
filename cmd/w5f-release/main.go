@@ -32,6 +32,10 @@ var targets = []target{
 	{"linux", "amd64", "v1", "linux-amd64", "w5f-linux-amd64"}, // the W5F laptop (Core 2: no SSE4.2)
 	{"linux", "386", "", "linux-386", "w5f-linux-386"},
 	{"windows", "amd64", "v1", "windows-amd64", "w5f-windows-amd64.exe"},
+	// macOS: Apple silicon, and Intel Macs. Go's linker signs the arm64
+	// binary ad hoc, as Apple silicon requires; neither is notarized.
+	{"darwin", "arm64", "", "darwin-arm64", "w5f-darwin-arm64"},
+	{"darwin", "amd64", "v1", "darwin-amd64", "w5f-darwin-amd64"},
 }
 
 // keyPath is where the private key lives: outside the repo.

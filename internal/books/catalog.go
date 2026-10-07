@@ -127,6 +127,8 @@ func Download(ctx context.Context, f *fetch.Fetcher, db *store.DB, src string) (
 	switch {
 	case strings.HasPrefix(src, "libgen:"):
 		return downloadLibgen(ctx, Env{Fetcher: f, DB: db}, strings.TrimPrefix(src, "libgen:"))
+	case strings.HasPrefix(src, "ia:"):
+		return downloadIA(ctx, f, db, src)
 	case strings.HasPrefix(src, "gutenberg:"):
 		epubURL = GutenbergBase + "/ebooks/" + strings.TrimPrefix(src, "gutenberg:") + ".epub3.images"
 	case strings.HasPrefix(src, "se:"):
