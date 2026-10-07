@@ -33,7 +33,7 @@ reading.
 |---|---|
 | **Reads** | HTML, Wikidot, RSS/Atom, EPUB, MOBI/AZW3, FB2, PDF text, Gemini, Gopher, Usenet, Reddit, AO3, Royal Road and forum threadmarks; CBZ/CBR/CB7 comics in its own viewer |
 | **Keeps** | a queue, notes, clippings and saved pages as Obsidian-friendly Markdown; searches everything you have read (SQLite FTS5) |
-| **Wanders** | deep random across eight families of sources and any site you add, a Daily Packet, a tarot card or an I Ching cast, the day in a book of 1864 |
+| **Wanders** | deep random across nine families of sources and any site you add, a Daily Packet, a tarot card or an I Ching cast, the day in a book of 1864 |
 | **Plays** | a solo RPG table with an oracle, your own dice, sparks, characters, threads and clocks |
 | **Updates itself** | signed, with rollback; runs offline from its cache |
 
@@ -291,11 +291,12 @@ The web reader extracts articles (Readability), keeps an on-disk cache for offli
 <details>
 <summary><b>Discovery: deep random, the Daily Packet, the oracle, the small web</b></summary>
 
-`x` draws a random page from eight families in turn, with a line saying where it came from; ten draws always span at least six families.
+`x` draws a random page from nine families in turn, with a line saying where it came from; ten draws always span at least six families.
 
 - **Esoteric primary texts:** Sacred Texts (its official archive), Hermetic Library, gnosis.org, esotericarchives, The Alchemy Web Site, Early Christian Writings.
 - **Knowledge:** Aeon, JSTOR Daily, Quanta, Wikipedia featured articles, Wikisource featured texts, World History Encyclopedia, the Internet Classics Archive, the 1913 Catholic Encyclopedia, English translations of the Perseus Digital Library's Greek and Roman texts.
 - **textfiles.com:** every one of its directories — anarchy, drugs, hacking, phreak, sex and virus included — going down into collections (magazines, groups, BBSes) to a file.
+- **The underground press:** Phrack (every issue as plain text), the Cult of the Dead Cow's t-files, The Anarchist Library, Erowid's substance vaults and Totse (closed; read from the Internet Archive's copies). Erowid sits behind a bot check, so it needs the bot-check helper to come up.
 - **Folklore and myth:** Ashliman, Theoi.
 - **Encyclopedic:** Britannica, English Wikipedia, the Stanford and the Internet Encyclopedias of Philosophy.
 - **Weird worlds:** SCP / Wanderers' Library / Backrooms and 25 archived worlds.
