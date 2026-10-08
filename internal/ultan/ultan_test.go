@@ -66,7 +66,7 @@ func TestDeskNotes(t *testing.T) {
 
 	// Away for a while: that comes first.
 	db := testDB(t, store.LoggedVisit{Target: "https://a.example/x", Title: "X", Kind: "web", At: now.AddDate(0, 0, -9)})
-	if n := Desk(db, now); !strings.Contains(n.Text, "Nine days") {
+	if n := Desk(db, now); !strings.Contains(strings.ToLower(n.Text), "nine days") {
 		t.Errorf("absence: %q", n.Text)
 	}
 
@@ -80,7 +80,7 @@ func TestDeskNotes(t *testing.T) {
 		t.Fatal(err)
 	}
 	n := Desk(db, now)
-	if !strings.Contains(n.Text, "An Undertow of Sand") || !strings.Contains(n.Text, "eleven days") || !strings.Contains(n.Text, "34%") ||
+	if !strings.Contains(n.Text, "An Undertow of Sand") || !strings.Contains(strings.ToLower(n.Text), "eleven days") || !strings.Contains(n.Text, "34%") ||
 		n.Subject != "An Undertow of Sand" || n.Href != "https://a.example/sand" {
 		t.Errorf("stale: %+v", n)
 	}

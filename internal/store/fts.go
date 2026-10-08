@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS docs (
   updated INTEGER NOT NULL
 );
 CREATE VIRTUAL TABLE IF NOT EXISTS docs_fts USING fts5(title, body, tokenize='unicode61');
+CREATE VIRTUAL TABLE IF NOT EXISTS docs_vocab USING fts5vocab(docs_fts, row);
 `
 
 func init() { schemaExtras = append(schemaExtras, ftsSchema) }
@@ -126,4 +127,80 @@ func (db *DB) ItemsToIndex(limit int) ([]Item, error) {
 		out = append(out, it)
 	}
 	return out, rows.Err()
+}
+
+// DocFreq tells in how many indexed documents each (folded) word occurs,
+// and how many documents there are.
+func (db *DB) DocFreq(words []string) (map[string]int, int, error) {
+	var total int
+	if err := db.sql.QueryRow(`SELECT count(*) FROM docs`).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	out := map[string]int{}
+	for len(words) > 0 {
+		part := words[:min(len(words), 200)]
+		words = words[len(part):]
+		args := make([]any, len(part))
+		for i, w := range part {
+			args[i] = w
+		}
+		rows, err := db.sql.Query(`SELECT term, doc FROM docs_vocab WHERE term IN (`+
+			strings.TrimSuffix(strings.Repeat("?,", len(part)), ",")+`)`, args...)
+		if err != nil {
+			return nil, 0, err
+		}
+		for rows.Next() {
+			var t string
+			var n int
+			if err := rows.Scan(&t, &n); err != nil {
+				rows.Close()
+				return nil, 0, err
+			}
+			out[t] = n
+		}
+		if err := rows.Close(); err != nil {
+			return nil, 0, err
+		}
+	}
+	return out, total, nil
+}
+
+// ReadDoc is an indexed page that is also in the reading history.
+type ReadDoc struct {
+	IndexDoc
+	Last time.Time // when it was last opened
+}
+
+// FindRead runs an FTS5 query over the pages of the reading history last
+// opened before a time, leaving one target out; best matches first.
+func (db *DB) FindRead(match, except string, before time.Time, limit int) ([]ReadDoc, error) {
+	rows, err := db.sql.Query(`SELECT d.id,d.target,d.kind,d.title,d.catalog,d.text,d.updated,h.last
+	  FROM docs_fts JOIN docs d ON d.id=docs_fts.rowid JOIN history h ON h.target=d.target
+	  WHERE docs_fts MATCH ? AND d.target <> ? AND h.last < ?
+	  ORDER BY bm25(docs_fts, 5.0, 1.0) LIMIT ?`, match, except, before.UnixNano(), limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []ReadDoc
+	for rows.Next() {
+		var d ReadDoc
+		var up, last int64
+		if err := rows.Scan(&d.ID, &d.Target, &d.Kind, &d.Title, &d.Catalog, &d.Text, &up, &last); err != nil {
+			return nil, err
+		}
+		d.Updated, d.Last = time.Unix(up, 0), time.Unix(0, last)
+		out = append(out, d)
+	}
+	return out, rows.Err()
+}
+
+// Doc is the indexed document of a target.
+func (db *DB) Doc(target string) (IndexDoc, bool) {
+	var d IndexDoc
+	var up int64
+	err := db.sql.QueryRow(`SELECT id,target,kind,title,catalog,text,updated FROM docs WHERE target=?`, target).
+		Scan(&d.ID, &d.Target, &d.Kind, &d.Title, &d.Catalog, &d.Text, &up)
+	d.Updated = time.Unix(up, 0)
+	return d, err == nil
 }
