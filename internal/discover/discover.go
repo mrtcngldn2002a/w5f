@@ -109,8 +109,13 @@ func Next(ctx context.Context, env Env) (Draw, *doc.Document, error) {
 				d.Family = f.Name()
 				_ = env.DB.Set(lastKey, d.Family)
 				head := []doc.Block{doc.Notice{Kind: "info", Text: "Deep random · " + d.Why + " · press x for another"}}
-				// Ultan's note on the shelf it came from.
-				head = append(head, ultan.Shelf(env.DB, d.Family, time.Now()).Blocks(func(href, text string) int {
+				// Ultan's note on the shelf it came from, and on a page
+				// read before that it is kin to.
+				note := ultan.Shelf(env.DB, d.Family, time.Now())
+				if k, ok := ultan.Echo(env.DB, d.Target, page, time.Now()); ok {
+					note = note.And(k)
+				}
+				head = append(head, note.Blocks(func(href, text string) int {
 					page.Links = append(page.Links, doc.Link{Href: href, Text: text})
 					return len(page.Links)
 				})...)

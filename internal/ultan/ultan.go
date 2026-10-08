@@ -85,27 +85,48 @@ var (
 	absence = []string{
 		"%s days since your lamp was lit here. Nothing has moved but the dust, and the periodicals, which never rest.",
 		"You have been away %s days. The shelves kept their silence for you; they are good at it.",
+		"%s days, and no step in the aisles but mine. I told the books you would return; they are used to such promises.",
+		"Welcome back, after %s days. I kept the door on the latch and the chair where you left it.",
+		"%s days away. A library does not miss its readers, it only waits; but I am not a library.",
 	}
 	stale = []string{
 		"A book left open is a door left ajar. %[1]s has not stirred in %[2]s days; I have kept your place at %[3]s.",
 		"%[1]s waits at %[3]s, as it has these %[2]s days. The page does not mind; pages are patient.",
 		"I dusted around %[1]s again: %[3]s, untouched for %[2]s days. Some books are read in a season, some in a life.",
+		"Your marker still stands in %[1]s, at %[3]s. It has stood there %[2]s days, like a sentry no one came to relieve.",
+		"%[2]s days ago you set %[1]s down at %[3]s. I have let no one move it; there is no one else to move it.",
 	}
 	fresh = []string{
 		"Word came while you were away: %[1]s has grown by %[2]s %[3]s. The ink is still wet.",
-		"%[4]s new %[3]s of %[1]s lie on the desk, unopened. I have not read them; I never do.",
+		"%[2]s new %[3]s of %[1]s lie on the desk, unopened. I have not read them; I never do.",
+		"%[1]s has sent %[2]s more %[3]s. The author is still at work somewhere, and so, it seems, are you.",
+		"A parcel for you: %[2]s %[3]s of %[1]s, still in their string.",
 	}
 	heavy = []string{
-		"The shelves of periodicals grow heavy: %s voices unread, the eldest from %s.",
-		"%s periodicals wait unread, the oldest since %s. A periodical is a letter that arrives on time; these are late.",
+		"The shelves of periodicals grow heavy: %[1]s voices unread, the eldest from %[2]s.",
+		"%[1]s periodicals wait unread, the oldest since %[2]s. A periodical is a letter that arrives on time; these are late.",
+		"The periodical racks hold %[1]s unread, back to %[2]s. I hear them rustle when the door opens.",
+		"%[1]s issues unopened since %[2]s. Not all news keeps; some of it improves.",
 	}
 	waiting = []string{
 		"Your queue holds %[1]s pages. The first, %[2]s, has waited the longest; it has not complained.",
-		"%[3]s pages in your queue. %[2]s stands at the head of the line, hat in hand.",
+		"%[1]s pages in your queue. %[2]s stands at the head of the line, hat in hand.",
+		"Of the %[1]s pages you set aside for later, %[2]s was the first. Later has come for it, I think.",
+		"%[2]s heads a queue of %[1]s. A queue is a promise made in a hurry.",
 	}
 	habit = []string{
 		"You have come to the stacks on %s of the last seven days. The lamps have learned your hours.",
 		"%s days of the last seven, reading. A library is kept by such habits, not by its walls.",
+		"%s days in seven at the desk. I know your step now; it is lighter than you think.",
+		"On %s of the last seven days you came. The chair has kept your shape.",
+	}
+	// kinned is a page read lately and an older one it has rare words in
+	// common with: %[1]s the older, %[2]s when it was read, %[3]s the
+	// words, %[4]s the newer.
+	kinned = []string{
+		"%[4]s and %[1]s, read %[2]s, share %[3]s. I have filed them side by side.",
+		"Something in %[4]s sent me back to %[1]s, which you read %[2]s: %[3]s, in both.",
+		"%[4]s has a cousin on these shelves: %[1]s, read %[2]s. Look for %[3]s.",
 	}
 	// sayings are for days with nothing to report.
 	sayings = []string{
@@ -123,40 +144,91 @@ var (
 		"A reader who returns to a page is not repeating himself; the page has changed.",
 		"Nothing is shelved by accident, though much is shelved by mistake.",
 		"Quiet is not the absence of voices here. It is the voices waiting their turn.",
+		"A librarian's first duty is to the book no one has asked for.",
+		"Fire is the oldest reader; it finishes everything.",
+		"Some read to remember and some to forget. The books do not mind which.",
+		"The catalogue says where a book is. Only a reader can say where it goes.",
+		"Dust is the library's own handwriting.",
+		"A shelf in order is a sentence; a shelf in disorder is a riddle.",
+		"There is no last page in a library, only the last one you reached.",
+		"Some doors here are bricked up. I have read the bricks.",
+		"Every book was once a stranger's voice in an empty room.",
+		"When I could still see, I read faster. I did not read more.",
+		"The rarest book is the one you meant to come back to.",
+		"A library is a crowd that has agreed to whisper.",
+		"Footnotes are where a writer keeps what could not be thrown away.",
+		"Lamps are for readers. The books themselves prefer the dark.",
+		"I shelve by touch, and so I know which books are warm.",
+		"A book lent is a book half lost; a book read is a book half found.",
 	}
 )
 
+// fact is one thing worth saying at the desk, in several ways.
 type fact struct {
-	note   Note
+	key    string // its kind, then what it is about: what Ultan remembers saying
+	forms  []string
+	say    func(form string) Note
 	urgent bool // said before anything else
 }
 
-// Desk is the note for the reading room: the day's most worth saying.
+func sayingFacts() []fact {
+	out := make([]fact, len(sayings))
+	for i, s := range sayings {
+		out[i] = fact{key: fmt.Sprintf("saying %d", i), forms: []string{s}, say: func(string) Note { return Note{Text: s} }}
+	}
+	return out
+}
+
+// Desk is the note for the reading room: the day's most worth saying. He
+// remembers what he said: today's note holds all day while it is true, and
+// what he said longest ago, or never, comes next, in words he used least
+// lately.
 func Desk(db *store.DB, now time.Time) Note {
 	seed := day(now)
 	var facts []fact
 	if db != nil {
-		facts = deskFacts(db, now, seed)
+		facts = deskFacts(db, now)
 	}
-	for _, f := range facts {
-		if f.urgent {
-			return f.note
+	m := recall(db)
+	if s, ok := m.today(seed); ok {
+		for _, f := range append(facts, sayingFacts()...) {
+			if f.key == s.Key && s.Form < len(f.forms) {
+				return f.say(f.forms[s.Form])
+			}
 		}
 	}
-	if len(facts) > 0 {
-		// The rest take turns, one a day.
-		return facts[seed%len(facts)].note
+	var pool []fact
+	for _, f := range facts {
+		if f.urgent {
+			pool = append(pool, f)
+		}
 	}
-	return Note{Text: pick(sayings, seed)}
+	if len(pool) == 0 {
+		pool = facts
+	}
+	if len(pool) == 0 {
+		pool = sayingFacts()
+	}
+	f := m.choose(pool, seed)
+	// A fact he gave yesterday too, with nothing else to say: a saying
+	// today, so the desk does not nag.
+	if y := len(m.list) - 1; !f.urgent && y >= 0 && m.list[y].Day == seed-1 && m.list[y].Key == f.key {
+		f = m.choose(sayingFacts(), seed)
+	}
+	form := m.form(f, seed)
+	m.remember(said{Day: seed, Key: f.key, Form: form})
+	return f.say(f.forms[form])
 }
 
 func days(d time.Duration) int { return int(d.Hours() / 24) }
 
-func deskFacts(db *store.DB, now time.Time, seed int) []fact {
+func deskFacts(db *store.DB, now time.Time) []fact {
 	var out []fact
 	if hs, _ := db.History(1, 0); len(hs) == 1 {
 		if n := days(now.Sub(hs[0].Last)); n >= 3 {
-			out = append(out, fact{Note{Text: fmt.Sprintf(pick(absence, seed), capital(words(n)))}, true})
+			out = append(out, fact{key: "absence", forms: absence, urgent: true, say: func(form string) Note {
+				return Note{Text: capital(fmt.Sprintf(form, words(n)))}
+			}})
 		}
 	}
 	// New chapters of what is followed.
@@ -168,9 +240,11 @@ func deskFacts(db *store.DB, now time.Time, seed int) []fact {
 			}
 		}
 		if bestN > 0 {
-			v := pick(fresh, seed)
-			t := fmt.Sprintf(v, best.Title, words(bestN), plural(bestN, "chapter", "chapters"), capital(words(bestN)))
-			out = append(out, fact{Note{Text: t, Subject: best.Title, Href: fmt.Sprintf("w5f:serial/%d/continue", best.ID)}, false})
+			href := fmt.Sprintf("w5f:serial/%d/continue", best.ID)
+			out = append(out, fact{key: "fresh " + href, forms: fresh, say: func(form string) Note {
+				t := fmt.Sprintf(form, best.Title, words(bestN), plural(bestN, "chapter", "chapters"))
+				return Note{Text: capital(t), Subject: best.Title, Href: href}
+			}})
 		}
 	}
 	// The longest-untouched thing left half-read.
@@ -206,8 +280,10 @@ func deskFacts(db *store.DB, now time.Time, seed int) []fact {
 	}
 	if oldest != nil {
 		if n := days(now.Sub(oldest.last)); n >= 4 {
-			t := fmt.Sprintf(pick(stale, seed), oldest.title, words(n), oldest.where)
-			out = append(out, fact{Note{Text: capital(t), Subject: oldest.title, Href: oldest.href}, false})
+			o := *oldest
+			out = append(out, fact{key: "stale " + o.href, forms: stale, say: func(form string) Note {
+				return Note{Text: capital(fmt.Sprintf(form, o.title, words(n), o.where)), Subject: o.title, Href: o.href}
+			}})
 		}
 	}
 	// The periodicals: those of the catalog's feeds, as the Periodical
@@ -230,7 +306,9 @@ func deskFacts(db *store.DB, now time.Time, seed int) []fact {
 					when = p.Format("2 January")
 				}
 			}
-			out = append(out, fact{Note{Text: capital(fmt.Sprintf(pick(heavy, seed), words(unread), when))}, false})
+			out = append(out, fact{key: "heavy", forms: heavy, say: func(form string) Note {
+				return Note{Text: capital(fmt.Sprintf(form, words(unread), when))}
+			}})
 		}
 	}
 	// The queue.
@@ -242,8 +320,10 @@ func deskFacts(db *store.DB, now time.Time, seed int) []fact {
 			}
 		}
 		if len(left) >= 3 {
-			t := fmt.Sprintf(pick(waiting, seed), words(len(left)), left[0].Title, capital(words(len(left))))
-			out = append(out, fact{Note{Text: t, Subject: left[0].Title, Href: left[0].URL}, false})
+			first := left[0]
+			out = append(out, fact{key: "waiting " + first.URL, forms: waiting, say: func(form string) Note {
+				return Note{Text: capital(fmt.Sprintf(form, words(len(left)), first.Title)), Subject: first.Title, Href: first.URL}
+			}})
 		}
 	}
 	// A reading habit.
@@ -253,25 +333,73 @@ func deskFacts(db *store.DB, now time.Time, seed int) []fact {
 			seen[v.At.Format("2006-01-02")] = true
 		}
 		if k := len(seen); k >= 5 {
-			out = append(out, fact{Note{Text: capital(fmt.Sprintf(pick(habit, seed), words(min(k, 7))))}, false})
+			out = append(out, fact{key: "habit", forms: habit, say: func(form string) Note {
+				return Note{Text: capital(fmt.Sprintf(form, words(min(k, 7))))}
+			}})
 		}
+	}
+	// A page read lately and an older one it is kin to.
+	if k, ok := deskKin(db, now); ok {
+		out = append(out, fact{key: "kin " + k.Href, forms: kinned, say: func(form string) Note {
+			return Note{Text: capital(fmt.Sprintf(form, k.Title, when(k.Last, now), quoted(k.Shared), k.From)), Subject: k.Title, Href: k.Href}
+		}})
 	}
 	return out
 }
 
 // --- discovery ---
 
-var shelves = map[string]string{
-	"esoteric":     "From the locked shelves, where the old names are kept under older dust.",
-	"folklore":     "From the cabinet of tales: none of them happened, all of them are true.",
-	"textfiles":    "From the boxes of loose text files, typed into the night by people who did not sign their names.",
-	"encyclopedic": "From the reference stacks. Read it as a traveller reads a map: for the places, not the lines.",
-	"knowledge":    "From the essayists' desks, where someone is always halfway through an argument.",
-	"smallweb":     "From the small rooms at the edge of the web, each lit by a single lamp.",
-	"underground":  "From the underground press, passed hand to hand on floppy disks and photocopies.",
-	"weird":        "From the wing of invented worlds. Its doors open inward only.",
-	"fiction":      "From the serial hall, where the stories are still being written.",
-	"yours":        "From your own shelf. You chose these; I only dust them.",
+var shelves = map[string][]string{
+	"esoteric": {
+		"From the locked shelves, where the old names are kept under older dust.",
+		"From the cases with no labels on their spines. The binders feared what a label might summon.",
+		"From behind the grille. I keep the key; no one has told me what it is for.",
+	},
+	"folklore": {
+		"From the cabinet of tales: none of them happened, all of them are true.",
+		"From the tellers' corner, where each story has outlived everyone who first heard it.",
+		"From the tales told at hearths. Mind the ending; they seldom end where you expect.",
+	},
+	"textfiles": {
+		"From the boxes of loose text files, typed into the night by people who did not sign their names.",
+		"From the drawers of plain text, eighty columns wide and written past midnight.",
+		"From the bulletin boards' leavings, saved by someone who thought they might matter. They were right.",
+	},
+	"encyclopedic": {
+		"From the reference stacks. Read it as a traveller reads a map: for the places, not the lines.",
+		"From the reference stacks, where everything is explained and little is understood.",
+		"From the great books of facts. Each entry is a door; most readers stop at the handle.",
+	},
+	"knowledge": {
+		"From the essayists' desks, where someone is always halfway through an argument.",
+		"From the essayists' desks. Argue back; they cannot hear you, which is a mercy to both.",
+		"From the long tables of the essayists, where the ink is mostly second thoughts.",
+	},
+	"smallweb": {
+		"From the small rooms at the edge of the web, each lit by a single lamp.",
+		"From the small web, where one person keeps one room, and keeps it well.",
+		"From the far rooms, reached by narrow stairs. The lamps there are tended by hand.",
+	},
+	"underground": {
+		"From the underground press, passed hand to hand on floppy disks and photocopies.",
+		"From the underground press, where the type was crooked and the sentences were not.",
+		"From the samizdat shelf. Every page here was copied by someone who meant it.",
+	},
+	"weird": {
+		"From the wing of invented worlds. Its doors open inward only.",
+		"From the wing of invented worlds, whose maps disagree with ours and with each other.",
+		"From the shelves of other worlds. Some are better kept than this one.",
+	},
+	"fiction": {
+		"From the serial hall, where the stories are still being written.",
+		"From the serial hall. The authors are still writing; mind you do not wake them.",
+		"From the hall of stories in parts. Each chapter is a promise of the next.",
+	},
+	"yours": {
+		"From your own shelf. You chose these; I only dust them.",
+		"From your own shelf, where every book is one you asked for.",
+		"From the shelf you built. I know it by the order you gave it, which is no one else's.",
+	},
 }
 
 const drawsKey = "ultan:draws"
@@ -284,24 +412,29 @@ type draw struct {
 // Shelf is the note on a Deep Random draw: the shelf it came from, and how
 // often that shelf has opened this week. It keeps the draw.
 func Shelf(db *store.DB, family string, now time.Time) Note {
-	text, ok := shelves[family]
+	texts, ok := shelves[family]
 	if !ok {
-		text = "From a shelf I do not know. The library grows in the night."
+		texts = []string{"From a shelf I do not know. The library grows in the night."}
 	}
 	if db == nil {
-		return Note{Text: text}
+		return Note{Text: texts[0]}
 	}
 	var ds []draw
 	_ = json.Unmarshal([]byte(db.Get(drawsKey)), &ds)
-	week, kept := 0, []draw{}
+	week, month, kept := 0, 0, []draw{}
 	for _, d := range ds {
 		if now.Sub(d.At) < 30*24*time.Hour {
 			kept = append(kept, d)
-			if d.Family == family && now.Sub(d.At) < 7*24*time.Hour {
-				week++
+			if d.Family == family {
+				month++
+				if now.Sub(d.At) < 7*24*time.Hour {
+					week++
+				}
 			}
 		}
 	}
+	// Each draw from a shelf is greeted in the next of its words.
+	text := texts[month%len(texts)]
 	kept = append(kept, draw{family, now})
 	if len(kept) > 200 {
 		kept = kept[len(kept)-200:]
