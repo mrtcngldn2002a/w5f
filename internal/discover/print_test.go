@@ -53,3 +53,18 @@ func TestPrintFailsWhenTheArchiveHasNothing(t *testing.T) {
 		t.Errorf("empty archive: %v", err)
 	}
 }
+
+func TestArchiveSearchReportsAFailingBackend(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"error":"[BACKEND_ERROR] Invalid or no response from Elasticsearch"}`)
+	}))
+	defer srv.Close()
+	swap(t, &archiveAPI, srv.URL)
+	_, _, err := archiveSearch(context.Background(), testFetcher(), "x", 1, 1)
+	if err == nil || !strings.Contains(err.Error(), "failing") {
+		t.Errorf("a failing backend is an error, not an empty result: %v", err)
+	}
+	if _, err := (printFamily{}).Draw(context.Background(), Env{Fetcher: testFetcher()}); err == nil || strings.Contains(err.Error(), "nothing found") {
+		t.Errorf("print: %v", err)
+	}
+}

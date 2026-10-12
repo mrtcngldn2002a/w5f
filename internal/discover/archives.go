@@ -121,11 +121,14 @@ func archiveSearch(ctx context.Context, f *fetch.Fetcher, q string, rows, page i
 	v := url.Values{"q": {q}, "fl[]": {"identifier", "title", "year"}, "rows": {strconv.Itoa(rows)},
 		"page": {strconv.Itoa(page)}, "output": {"json"}}
 	u, _ := url.Parse(archiveAPI + "/advancedsearch.php?" + v.Encode())
-	resp, err := f.Get(ctx, u, fetch.Options{})
+	// Not cached: the search answers a failing backend with a 200 and an
+	// error in the body, which must not be kept as an answer.
+	resp, err := f.Get(ctx, u, fetch.Options{NoStore: true})
 	if err != nil {
 		return 0, nil, err
 	}
 	var r struct {
+		Error    string `json:"error"`
 		Response struct {
 			NumFound int          `json:"numFound"`
 			Docs     []archiveDoc `json:"docs"`
@@ -133,6 +136,9 @@ func archiveSearch(ctx context.Context, f *fetch.Fetcher, q string, rows, page i
 	}
 	if err := json.Unmarshal(resp.Body, &r); err != nil {
 		return 0, nil, errors.New("unexpected answer from the Internet Archive")
+	}
+	if r.Error != "" {
+		return 0, nil, errors.New("the Internet Archive's search is failing: " + r.Error)
 	}
 	return r.Response.NumFound, r.Response.Docs, nil
 }
