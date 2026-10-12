@@ -67,6 +67,10 @@ func TestBHLOpensTheFullTextOfACuriousBook(t *testing.T) {
 	var queries []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		queries = append(queries, r.URL.Query().Get("q"))
+		if r.URL.Path == "/services/search/v1/scrape" {
+			fmt.Fprint(w, `{"items":[{"identifier":"traditionsofcadd41dors","title":"Traditions of the  Caddo","year":1905}],"count":1,"total":73}`)
+			return
+		}
 		fmt.Fprint(w, `{"response":{"numFound":73,"start":0,"docs":[{"identifier":"traditionsofcadd41dors","title":"Traditions of the  Caddo","year":1905}]}}`)
 	}))
 	defer srv.Close()
@@ -76,7 +80,7 @@ func TestBHLOpensTheFullTextOfACuriousBook(t *testing.T) {
 		d.Why != "public domain/Biodiversity Heritage Library · Traditions of the Caddo (1905)" {
 		t.Fatalf("bhl: %+v %v", d, err)
 	}
-	if len(queries) != 2 || !strings.Contains(queries[0], "collection:biodiversity") {
+	if len(queries) != 1 || !strings.Contains(queries[0], "collection:biodiversity") {
 		t.Errorf("queries: %q", queries)
 	}
 }

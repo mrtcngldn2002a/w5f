@@ -3,7 +3,6 @@ package discover
 import (
 	"context"
 	"errors"
-	"math/rand/v2"
 	"net/url"
 	"strings"
 )
@@ -57,22 +56,34 @@ func (printFamily) Draw(ctx context.Context, env Env) (Draw, error) {
 }
 
 // printDraw takes a random item of the source's Internet Archive query and
-// returns a window onto its text.
+// returns a window onto its text. Not every item has a text of its own (a
+// scan of pictures, a file that was never read) nor a passage worth showing,
+// so the text is fetched here, and another item tried when it fails.
 func printDraw(ctx context.Context, env Env, s printSource) (Draw, error) {
-	n, _, err := archiveSearch(ctx, env.Fetcher, s.query, 1, 1)
-	if err != nil {
-		return Draw{}, err
+	var errs []string
+	for range 4 {
+		d, err := archivePick(ctx, env.Fetcher, s.query)
+		if err != nil {
+			return Draw{}, err
+		}
+		name, err := archiveTextFile(ctx, env.Fetcher, d.Identifier)
+		if err != nil {
+			if ctx.Err() != nil {
+				return Draw{}, ctx.Err()
+			}
+			errs = append(errs, d.Identifier+": "+err.Error())
+			continue
+		}
+		label := d.label()
+		target := windowTarget(archiveAPI+"/download/"+url.PathEscape(d.Identifier)+"/"+url.PathEscape(name), label)
+		if _, err := buildWindow(ctx, env.Fetcher, target); err != nil {
+			if ctx.Err() != nil {
+				return Draw{}, ctx.Err()
+			}
+			errs = append(errs, d.Identifier+": "+err.Error())
+			continue
+		}
+		return Draw{Target: target, Why: "print/" + s.name + " · " + label}, nil
 	}
-	if n == 0 {
-		return Draw{}, errors.New("nothing found")
-	}
-	_, docs, err := archiveSearch(ctx, env.Fetcher, s.query, 1, 1+rand.IntN(min(n, 10000)))
-	if err != nil || len(docs) == 0 {
-		return Draw{}, errors.New("no item on that page")
-	}
-	d := docs[0]
-	id := url.PathEscape(d.Identifier)
-	label := d.label()
-	return Draw{Target: windowTarget(archiveAPI+"/download/"+id+"/"+id+"_djvu.txt", label),
-		Why: "print/" + s.name + " · " + label}, nil
+	return Draw{}, errors.New(strings.Join(errs, "; "))
 }

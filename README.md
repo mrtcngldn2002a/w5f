@@ -291,7 +291,7 @@ The web reader extracts articles (Readability), keeps an on-disk cache for offli
 <details>
 <summary><b>Discovery: deep random, the Daily Packet, the oracle, the small web</b></summary>
 
-`x` draws a random page from twelve families in turn, with a line saying where it came from. The families with the most sources (textfiles, knowledge, the small web, fiction) come up twice as often as the others, the same family never comes twice in a row, a page shown lately is not drawn again, and ten draws usually reach eight or nine of the twelve.
+`x` draws a random page from twelve families in turn, with a line saying where it came from. The families with the most sources (textfiles, knowledge, the small web, fiction, print) come up twice as often as the others, the same family never comes twice in a row, a page shown lately is not drawn again, and ten draws usually reach eight of the twelve.
 
 - **Esoteric primary texts:** Sacred Texts (its official archive), Hermetic Library, gnosis.org, esotericarchives, The Alchemy Web Site, Early Christian Writings.
 - **Knowledge:** Aeon, JSTOR Daily, Quanta, Wikipedia featured articles, Wikisource featured texts, World History Encyclopedia, the Internet Classics Archive, the 1913 Catholic Encyclopedia, English translations of the Perseus Digital Library's Greek and Roman texts.
