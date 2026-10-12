@@ -49,14 +49,20 @@ func paragraphs(text string) []string {
 	return out
 }
 
-// readable tells text from the noise of a bad scan: most of its words are
-// whole words of ordinary length.
+// readable tells English prose from the noise of a bad scan, a table, an
+// index, a list of Latin names or a text in another language: most of its
+// words are whole words of ordinary length; a good share of them are the
+// small words of English (the, of, and, to...); few characters are digits;
+// and the letter f is not as frequent as in a text printed with the long s
+// ("fhells", "firft"). The limits come from 60 pages of the Biodiversity
+// Heritage Library read by hand: prose had 0.38 or more small words, indexes
+// and lists 0.35 or less; prose 0.036 f at most, long-s texts 0.056 or more.
 func readable(text string) bool {
 	words := strings.Fields(text)
 	if len(words) < 40 {
 		return false
 	}
-	good, letters, total := 0, 0, 0
+	good, letters, total, small, f, digits := 0, 0, 0, 0, 0, 0
 	for _, w := range words {
 		w = strings.TrimFunc(w, func(r rune) bool { return unicode.IsPunct(r) || unicode.IsSymbol(r) })
 		n := 0
@@ -64,8 +70,14 @@ func readable(text string) bool {
 		for _, r := range w {
 			if unicode.IsLetter(r) {
 				n++
+				if r == 'f' || r == 'F' {
+					f++
+				}
 			} else if r != '\'' && r != '’' && r != '-' {
 				ok = false
+			}
+			if unicode.IsDigit(r) {
+				digits++
 			}
 		}
 		letters += n
@@ -73,10 +85,29 @@ func readable(text string) bool {
 		if ok && n >= 1 && n <= 14 {
 			good++
 		}
+		if smallWords[strings.ToLower(w)] {
+			small++
+		}
 	}
 	avg := float64(letters) / float64(len(words))
-	return float64(good)/float64(len(words)) >= 0.8 && avg >= 3 && avg <= 9 && letters*10 >= total*9
+	if !(float64(good)/float64(len(words)) >= 0.8 && avg >= 3 && avg <= 9 && letters*10 >= total*9) {
+		return false
+	}
+	return float64(small)/float64(len(words)) >= 0.33 && float64(f)/float64(max(letters, 1)) <= 0.043 &&
+		float64(digits)/float64(max(total, 1)) <= 0.02
 }
+
+// smallWords are the commonest words of English.
+var smallWords = func() map[string]bool {
+	m := map[string]bool{}
+	for _, w := range strings.Fields(`the of and to a in is that it was he for on are as with his they i at be this from or
+		had by not but what all were when we there can an your which their said if do will each about how up out them then
+		she many some so these would other into has her two like him see time could no make than first been its who now
+		people my made over did down only way find use may water long little very after`) {
+		m[w] = true
+	}
+	return m
+}()
 
 const (
 	windowMin = 3000 // characters a window grows to at least
@@ -113,6 +144,13 @@ func pickWindow(paras []string, seed int64) (win []string, from int) {
 }
 
 func windowRoute(ctx context.Context, env Env, target string) (*doc.Document, error) {
+	return buildWindow(ctx, env.Fetcher, target)
+}
+
+// buildWindow makes the page of a window address; a draw calls it too, to
+// know the text exists and has a passage worth showing (the fetch is cached,
+// so opening the page costs nothing more).
+func buildWindow(ctx context.Context, f *fetch.Fetcher, target string) (*doc.Document, error) {
 	q, err := url.ParseQuery(strings.TrimPrefix(target, "w5f:discover/window?"))
 	if err != nil {
 		return nil, err
@@ -122,7 +160,7 @@ func windowRoute(ctx context.Context, env Env, target string) (*doc.Document, er
 		return nil, errors.New("window: bad address")
 	}
 	seed, _ := strconv.ParseInt(q.Get("k"), 10, 64)
-	resp, err := env.Fetcher.Get(ctx, src, fetch.Options{})
+	resp, err := f.Get(ctx, src, fetch.Options{})
 	if err != nil {
 		return nil, err
 	}

@@ -144,18 +144,10 @@ func archiveSearch(ctx context.Context, f *fetch.Fetcher, q string, rows, page i
 }
 
 func bhlPick(ctx context.Context, env Env) (Draw, error) {
-	n, _, err := archiveSearch(ctx, env.Fetcher, bhlQuery, 1, 1)
+	d, err := archivePick(ctx, env.Fetcher, bhlQuery)
 	if err != nil {
-		return Draw{}, err
+		return Draw{}, errors.New("BHL: " + err.Error())
 	}
-	if n == 0 {
-		return Draw{}, errors.New("BHL: nothing found")
-	}
-	_, docs, err := archiveSearch(ctx, env.Fetcher, bhlQuery, 1, 1+rand.IntN(min(n, 10000)))
-	if err != nil || len(docs) == 0 {
-		return Draw{}, errors.New("BHL: no book on that page")
-	}
-	d := docs[0]
 	id := url.PathEscape(d.Identifier)
 	return Draw{Target: archiveAPI + "/stream/" + id + "/" + id + "_djvu.txt",
 		Why: "public domain/Biodiversity Heritage Library · " + d.label()}, nil

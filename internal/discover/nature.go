@@ -3,17 +3,12 @@ package discover
 import (
 	"context"
 	_ "embed"
-	"encoding/xml"
 	"errors"
-	"fmt"
 	"math/rand/v2"
 	"net/url"
-	"path"
 	"strconv"
 	"strings"
 	"sync"
-
-	"w5f/internal/fetch"
 )
 
 func init() { families = append(families, nature{}) }
@@ -115,62 +110,6 @@ func pickBHL() (bhlItem, bool) {
 		return bhlItem{}, false
 	}
 	return bhlItems[tier][rand.IntN(len(bhlItems[tier]))], true
-}
-
-type s3Listing struct {
-	Contents []struct {
-		Key  string `xml:"Key"`
-		Size int    `xml:"Size"`
-	} `xml:"Contents"`
-}
-
-// bhlPage opens a page of text of a random book: not a plate, an index or a
-// blank, and readable.
-func bhlPage(ctx context.Context, env Env) (string, string, error) {
-	var errs []string
-	for range 4 {
-		it, ok := pickBHL()
-		if !ok {
-			return "", "", errors.New("no list of books")
-		}
-		prefix := fmt.Sprintf("ocr/item-%06d/", it.id)
-		u, _ := url.Parse(bhlBucket + "/?list-type=2&max-keys=1000&prefix=" + url.QueryEscape(prefix))
-		resp, err := env.Fetcher.Get(ctx, u, fetch.Options{})
-		if err != nil {
-			errs = append(errs, err.Error())
-			continue
-		}
-		var l s3Listing
-		if err := xml.Unmarshal(resp.Body, &l); err != nil {
-			errs = append(errs, "unexpected listing")
-			continue
-		}
-		type page struct{ key string }
-		var pages []page
-		for i, c := range l.Contents {
-			// Not the first or last few leaves (covers, plates, indexes); a
-			// page with a body of text.
-			if c.Size >= 1500 && c.Size <= 12000 && i >= 3 && i < len(l.Contents)-3 {
-				pages = append(pages, page{c.Key})
-			}
-		}
-		for _, i := range rand.Perm(len(pages))[:min(len(pages), 4)] {
-			key := pages[i].key
-			pu, _ := url.Parse(bhlBucket + "/" + key)
-			pr, err := env.Fetcher.Get(ctx, pu, fetch.Options{})
-			if err != nil || !readable(string(pr.Body)) {
-				continue
-			}
-			seq := strings.TrimSuffix(path.Base(key)[strings.LastIndex(path.Base(key), "-")+1:], ".txt")
-			title := strings.TrimSpace(it.title)
-			if it.year > 0 {
-				title += " (" + strconv.Itoa(it.year) + ")"
-			}
-			return bhlBucket + "/" + key, title + ", leaf " + strings.TrimLeft(seq, "0"), nil
-		}
-		errs = append(errs, fmt.Sprintf("item %d: no readable page", it.id))
-	}
-	return "", "", errors.New(strings.Join(errs, "; "))
 }
 
 // --- The Popular Science Monthly on Wikisource: a random article of a random

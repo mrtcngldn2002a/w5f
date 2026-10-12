@@ -72,7 +72,7 @@ func TestWeightedOrderIsAPermutation(t *testing.T) {
 }
 
 func TestWeightOfSeesThroughJoined(t *testing.T) {
-	if weightOf(textfiles{}) != 2 || weightOf(esoteric{}) != 1 {
+	if weightOf(textfiles{}) != 2 || weightOf(printFamily{}) != 2 || weightOf(esoteric{}) != 1 {
 		t.Error("textfiles weigh 2, esoteric 1")
 	}
 	if weightOf(joined{Family: textfiles{}}) != 2 {

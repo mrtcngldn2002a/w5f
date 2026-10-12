@@ -15,7 +15,7 @@ func (textfiles) weight() int      { return 2 }
 func (knowledge) weight() int      { return 2 }
 func (smallwebFamily) weight() int { return 2 }
 func (fiction) weight() int        { return 2 }
-func (printFamily) weight() int    { return 1 }
+func (printFamily) weight() int    { return 2 }
 func (literature) weight() int     { return 1 }
 
 // weightOf is how many places a family takes in the bag (at least one).
