@@ -151,6 +151,12 @@ func bhlPick(ctx context.Context, env Env) (Draw, error) {
 	}
 	d := docs[0]
 	id := url.PathEscape(d.Identifier)
+	return Draw{Target: archiveAPI + "/stream/" + id + "/" + id + "_djvu.txt",
+		Why: "public domain/Biodiversity Heritage Library · " + d.label()}, nil
+}
+
+// label is the item's title, shortened, with its year.
+func (d archiveDoc) label() string {
 	title := strings.Join(strings.Fields(d.Title), " ")
 	if len([]rune(title)) > 110 {
 		title = string([]rune(title)[:110]) + "…"
@@ -165,8 +171,7 @@ func bhlPick(ctx context.Context, env Env) (Draw, error) {
 	if year != "" {
 		title += " (" + year + ")"
 	}
-	return Draw{Target: archiveAPI + "/stream/" + id + "/" + id + "_djvu.txt",
-		Why: "public domain/Biodiversity Heritage Library · " + title}, nil
+	return title
 }
 
 // --- Small web directories.

@@ -385,6 +385,21 @@ var shelves = map[string][]string{
 		"From the underground press, where the type was crooked and the sentences were not.",
 		"From the samizdat shelf. Every page here was copied by someone who meant it.",
 	},
+	"print": {
+		"From the bound volumes of the press, foxed at the edges and read by a hundred thumbs before yours.",
+		"From the stacks of old papers and pulps. The ink comes off on the fingers; so does the century.",
+		"From the periodical room, where every issue was the latest news once and is now only the weather of its day.",
+	},
+	"nature": {
+		"From the cabinet of natural history, where the specimens are drawn and the drawings are not quite true.",
+		"From the naturalists' shelves. They counted everything, and where they could not, they invented.",
+		"From the old herbals and bestiaries, kept dry. The monsters keep well.",
+	},
+	"literature": {
+		"From the reading room of the reviews, where the essays are long and the poems are not.",
+		"From the quarterlies' table. Someone has left a poem open on it, face up.",
+		"From the little magazines. Few people read them, and fewer forget them.",
+	},
 	"weird": {
 		"From the wing of invented worlds. Its doors open inward only.",
 		"From the wing of invented worlds, whose maps disagree with ours and with each other.",

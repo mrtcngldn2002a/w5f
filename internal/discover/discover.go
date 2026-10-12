@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
+	"slices"
 	"strings"
 	"time"
 
@@ -72,17 +73,37 @@ func nextFamily(db *store.DB, families []Family) (Family, error) {
 	for len(bag) > 0 && byName[bag[0]] == nil {
 		bag = bag[1:]
 	}
-	if len(bag) == 0 {
-		for _, f := range families {
-			bag = append(bag, f.Name())
+	fresh := func() []string {
+		// The bag is dealt in rounds: every family once, then those worth a
+		// second place, and so on, each round shuffled. A family with
+		// several sources takes several places, but not close together.
+		var b []string
+		for round := 1; ; round++ {
+			var r []string
+			for _, f := range families {
+				if weightOf(f) >= round {
+					r = append(r, f.Name())
+				}
+			}
+			if len(r) == 0 {
+				break
+			}
+			rand.Shuffle(len(r), func(i, j int) { r[i], r[j] = r[j], r[i] })
+			b = append(b, r...)
 		}
-		rand.Shuffle(len(bag), func(i, j int) { bag[i], bag[j] = bag[j], bag[i] })
+		spreadBag(b)
+		return b
+	}
+	if len(bag) == 0 {
+		bag = fresh()
 	}
 	// The family of the last page shown never comes right again (even when
-	// the one in between failed).
-	if last := db.Get(lastKey); len(bag) > 1 && bag[0] == last {
-		bag[0], bag[1] = bag[1], bag[0]
+	// the one in between failed), even when only its own places are left.
+	last := db.Get(lastKey)
+	if bag[0] == last && !slices.ContainsFunc(bag, func(n string) bool { return n != last }) {
+		bag = append(bag, fresh()...)
 	}
+	notFirst(bag, last)
 	f := byName[bag[0]]
 	b, _ := json.Marshal(bag[1:])
 	_ = db.Set(bagKey, string(b))
@@ -102,12 +123,13 @@ func Next(ctx context.Context, env Env) (Draw, *doc.Document, error) {
 		if err != nil {
 			return Draw{}, nil, err
 		}
-		d, err := f.Draw(ctx, env)
+		d, err := drawUnseen(ctx, env, f)
 		if err == nil {
 			var page *doc.Document
 			if page, err = env.Load(ctx, d.Target); err == nil {
 				d.Family = f.Name()
 				_ = env.DB.Set(lastKey, d.Family)
+				markSeen(env.DB, d.Target)
 				head := []doc.Block{doc.Notice{Kind: "info", Text: "Deep random · " + d.Why + " · press x for another"}}
 				// Ultan's note on the shelf it came from, and on a page
 				// read before that it is kin to.
@@ -126,6 +148,19 @@ func Next(ctx context.Context, env Env) (Draw, *doc.Document, error) {
 		errs = append(errs, fmt.Sprintf("%s: %v", f.Name(), err))
 	}
 	return Draw{}, nil, errors.New("Deep random found nothing this time (" + strings.Join(errs, "; ") + ")")
+}
+
+// drawUnseen draws from a family, drawing again (twice at most) when the page
+// was shown lately; a shelf too small to offer anything new repeats itself.
+func drawUnseen(ctx context.Context, env Env, f Family) (Draw, error) {
+	var d Draw
+	var err error
+	for range 3 {
+		if d, err = f.Draw(ctx, env); err != nil || ctx.Err() != nil || !wasSeen(env.DB, d.Target) {
+			return d, err
+		}
+	}
+	return d, nil
 }
 
 // IsTarget reports discovery addresses.
@@ -147,6 +182,8 @@ func Route(ctx context.Context, target string, env Env) (*doc.Document, error) {
 		return almanacDoc(ctx, env, strings.TrimPrefix(target, "w5f:almanac/"))
 	case target == "w5f:discover/sites" || strings.HasPrefix(target, "w5f:discover/sites/") || strings.HasPrefix(target, "w5f:discover/sites?"):
 		return sitesRoute(ctx, env, target)
+	case strings.HasPrefix(target, "w5f:discover/window?"):
+		return windowRoute(ctx, env, target)
 	case target == "w5f:discover/random":
 		_, page, err := Next(ctx, env)
 		return page, err

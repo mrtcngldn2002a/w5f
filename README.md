@@ -33,7 +33,7 @@ reading.
 |---|---|
 | **Reads** | HTML, Wikidot, RSS/Atom, EPUB, MOBI/AZW3, FB2, PDF text, Gemini, Gopher, Usenet, Reddit, AO3, Royal Road and forum threadmarks; CBZ/CBR/CB7 comics in its own viewer |
 | **Keeps** | a queue, notes, clippings and saved pages as Obsidian-friendly Markdown; searches everything you have read (SQLite FTS5) |
-| **Wanders** | deep random across nine families of sources and any site you add, a Daily Packet, a tarot card or an I Ching cast, the day in a book of 1864 |
+| **Wanders** | deep random across twelve families of sources and any site you add, a Daily Packet, a tarot card or an I Ching cast, the day in a book of 1864 |
 | **Plays** | a solo RPG table with an oracle, your own dice, sparks, characters, threads and clocks |
 | **Updates itself** | signed, with rollback; runs offline from its cache |
 
@@ -291,7 +291,7 @@ The web reader extracts articles (Readability), keeps an on-disk cache for offli
 <details>
 <summary><b>Discovery: deep random, the Daily Packet, the oracle, the small web</b></summary>
 
-`x` draws a random page from nine families in turn, with a line saying where it came from; ten draws always span at least six families.
+`x` draws a random page from twelve families in turn, with a line saying where it came from. The families with the most sources (textfiles, knowledge, the small web, fiction) come up twice as often as the others, the same family never comes twice in a row, a page shown lately is not drawn again, and ten draws usually reach eight or nine of the twelve.
 
 - **Esoteric primary texts:** Sacred Texts (its official archive), Hermetic Library, gnosis.org, esotericarchives, The Alchemy Web Site, Early Christian Writings.
 - **Knowledge:** Aeon, JSTOR Daily, Quanta, Wikipedia featured articles, Wikisource featured texts, World History Encyclopedia, the Internet Classics Archive, the 1913 Catholic Encyclopedia, English translations of the Perseus Digital Library's Greek and Roman texts.
@@ -301,7 +301,10 @@ The web reader extracts articles (Readability), keeps an on-disk cache for offli
 - **Encyclopedic:** Britannica, English Wikipedia, the Stanford and the Internet Encyclopedias of Philosophy.
 - **Weird worlds:** SCP / Wanderers' Library / Backrooms and 25 archived worlds.
 - **The small web:** Wiby, ooh.directory, Kagi Small Web, the GeoCities archive (OoCities), Gemini via Cosmos, Gopher via Floodgap.
-- **Internet fiction.**
+- **Internet fiction:** top-of-all-time posts of eight horror and literary subreddits (with your Reddit session), Nature's one-page science fiction (Futures), Creepypasta.com and SCP tales.
+- **Print:** old magazines, zines and newspapers scanned by the Internet Archive (pulps such as Weird Tales, zines, the magazine rack, microfilmed newspapers). A scan is hundreds of pages, so Deep random opens a passage of a page or two at a place it picked (the same place when you come back), with a link to the whole text; scans too dirty to read are skipped.
+- **Nature:** a page of an old natural history, travel or curiosities book from the Biodiversity Heritage Library's open data (bestiaries, herbals, folklore of animals, cabinets of curiosities; a list of 4,500 English books is built in, see `scripts/bhl_index.py`), or an article of the Popular Science Monthly (1872–1915) on Wikisource.
+- **Literature:** not books but what literary magazines and poetry sites keep online: The Believer (3,000 essays and interviews since 2004), Electric Literature, Words Without Borders, Poets.org and the Poetry Foundation's poems (read from the site's own search; it needs the bot-check helper).
 - **Your own sites** — any you add.
 
 Nothing is filtered by content: what a source holds may come up.
