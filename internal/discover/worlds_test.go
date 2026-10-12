@@ -58,8 +58,22 @@ func TestWeirdAndFictionFamilies(t *testing.T) {
 	env.RedditTop = func(ctx context.Context, sub string) ([]string, error) {
 		return []string{"https://www.reddit.com/r/" + sub + "/comments/x/story/"}, nil
 	}
-	d, _ = fiction{}.Draw(ctx, env)
-	if !strings.Contains(d.Target, "/comments/") || !strings.HasPrefix(d.Why, "fiction/r/") {
-		t.Errorf("fiction with Reddit: %+v", d)
+	// With Reddit it is a post or a tale, by weight (four to two).
+	reddit, tales := 0, 0
+	for range 150 {
+		d, err := fiction{}.Draw(ctx, env)
+		switch {
+		case err != nil:
+			t.Fatal(err)
+		case strings.Contains(d.Target, "/comments/") && strings.HasPrefix(d.Why, "fiction/r/"):
+			reddit++
+		case strings.Contains(d.Target, "random-tale"):
+			tales++
+		default:
+			t.Fatalf("fiction with Reddit: %+v", d)
+		}
+	}
+	if reddit < 60 || tales < 20 {
+		t.Errorf("the mix of 150 draws: %d posts, %d tales", reddit, tales)
 	}
 }

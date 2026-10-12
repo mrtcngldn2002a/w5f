@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 
@@ -96,28 +97,76 @@ func (weird) Draw(ctx context.Context, env Env) (Draw, error) {
 	return Draw{Target: w.URL, Why: fmt.Sprintf("weird/archived worlds · %s (tier %d)", w.Name, w.Tier)}, nil
 }
 
-// fiction: a top-of-all-time story from a few literary subreddits (with
-// the owner's Reddit session), else a random SCP tale.
+// fiction: a story from several places: a top-of-all-time post of a few
+// horror and literary subreddits (with the owner's Reddit session), Nature's
+// one-page science fiction, Creepypasta.com, or a random SCP tale. The
+// places that need the web are in fictionWeb (fictionweb.go).
 type fiction struct{}
 
-var fictionSubs = []string{"WeirdLit", "LibraryOfShadows", "shortstories"}
+var fictionSubs = []string{"WeirdLit", "LibraryOfShadows", "shortstories", "nosleep", "TheCrypticCompendium",
+	"Odd_directions", "Cryosleep", "shortscarystories"}
 
 func (fiction) Name() string { return "fiction" }
+func (fiction) sources() int { return 3 + len(fictionWeb) }
+
 func (fiction) Draw(ctx context.Context, env Env) (Draw, error) {
+	type source struct {
+		weight int
+		draw   func() (Draw, error)
+	}
+	var srcs []source
 	if env.RedditTop != nil {
-		sub := pick(fictionSubs)
-		if posts, err := env.RedditTop(ctx, sub); err == nil && len(posts) > 0 {
+		srcs = append(srcs, source{4, func() (Draw, error) {
+			sub := pick(fictionSubs)
+			posts, err := env.RedditTop(ctx, sub)
+			if err != nil || len(posts) == 0 {
+				return Draw{}, errors.New("no posts on r/" + sub)
+			}
 			return Draw{Target: pick(posts), Why: "fiction/r/" + sub + " · top of all time"}, nil
+		}})
+	}
+	if env.Fetcher != nil {
+		for _, s := range fictionWeb {
+			srcs = append(srcs, source{s.weight, func() (Draw, error) {
+				target, title, err := s.pick(ctx, env)
+				if err != nil {
+					return Draw{}, errors.New(s.name + ": " + err.Error())
+				}
+				return Draw{Target: target, Why: "fiction/" + s.name + " · " + title}, nil
+			}})
 		}
 	}
-	if env.Crom == nil {
+	if env.Crom != nil {
+		srcs = append(srcs, source{2, func() (Draw, error) {
+			u, err := env.Crom(ctx, "tale")
+			if err != nil {
+				return Draw{}, err
+			}
+			return Draw{Target: u, Why: "fiction/SCP tales"}, nil
+		}})
+	}
+	if len(srcs) == 0 {
 		return Draw{}, errors.New("no fiction source")
 	}
-	u, err := env.Crom(ctx, "tale")
-	if err != nil {
-		return Draw{}, err
+	w := make([]int, len(srcs))
+	for i, s := range srcs {
+		w[i] = s.weight
 	}
-	return Draw{Target: u, Why: "fiction/SCP tales"}, nil
+	var errs []string
+	for n, i := range weightedOrder(w) {
+		if n == 3 {
+			break
+		}
+		d, err := srcs[i].draw()
+		if err == nil {
+			return d, nil
+		}
+		if ctx.Err() != nil {
+			return Draw{}, ctx.Err()
+		}
+		errs = append(errs, err.Error())
+	}
+	return Draw{}, errors.New(strings.Join(errs, "; "))
 }
 
 func init() { families = append(families, weird{}, fiction{}) }
