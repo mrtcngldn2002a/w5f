@@ -32,8 +32,7 @@ func TestEmbeddedBHLList(t *testing.T) {
 // (covers and plates), the rest alternate between a readable page and noise.
 func bhlServer(t *testing.T) *httptest.Server {
 	t.Helper()
-	var srv *httptest.Server
-	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Get("list-type") == "2" {
 			prefix := r.URL.Query().Get("prefix") // ocr/item-000123/
 			fmt.Fprint(w, `<?xml version="1.0"?><ListBucketResult>`)
