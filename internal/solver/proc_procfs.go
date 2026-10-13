@@ -11,7 +11,9 @@ import (
 )
 
 // stamp is a process's start time, read from /proc: with its pid, it tells
-// the process W5F started from a later one given the same pid.
+// the process W5F started from a later one given the same pid. A zombie has
+// exited, unless only its main thread has: the others (a Go helper's, say)
+// still hold its listening socket, and it still counts as running.
 func stamp(pid int) (string, error) {
 	b, e := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
 	if e != nil {
@@ -19,7 +21,7 @@ func stamp(pid int) (string, error) {
 	}
 	_, rest, ok := strings.Cut(string(b), ") ")
 	fields := strings.Fields(rest)
-	if !ok || len(fields) < 20 || fields[0] == "Z" {
+	if !ok || len(fields) < 20 || fields[0] == "Z" && fields[17] == "1" {
 		return "", os.ErrNotExist
 	}
 	return fields[19], nil
