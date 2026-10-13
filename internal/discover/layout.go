@@ -105,17 +105,20 @@ func extent(ws []lword) (lo, hi, top, bottom int) {
 
 // cutRegion reads a region of a page: it is cut where space runs through it
 // and the pieces are read in turn; a piece that cannot be cut is a block of
-// lines. Cuts go from the surest to the least sure: a gutter with no word
-// across it; a wide space between blocks (so that a headline over the
-// columns is told from them); a gutter a few words cross (a headline or a
-// rule that reaches over it); a gutter of the page's columns that no word of
-// this piece crosses; then narrower spaces between lines.
+// lines. Cuts go from the surest to the least sure: the lines that run
+// across a gutter the rest of the piece has (a headline set close over its
+// columns), taken out whole so that no gutter cuts them in two; a gutter with
+// no word across it; a wide space between blocks (so that a headline over the
+// columns is told from them); a gutter a few words cross (a rule that reaches
+// over it); a gutter of the page's columns that no word of this piece
+// crosses; then narrower spaces between lines.
 func cutRegion(ws []lword, h float64, grid []int, out *[]string) {
 	if len(ws) == 0 {
 		return
 	}
 	if len(ws) >= 2 {
 		for _, cut := range []func() [][]lword{
+			func() [][]lword { return cutSpanners(ws, h) },
 			func() [][]lword { return cutColumns(ws, h, false) },
 			func() [][]lword { return cutRows(ws, 1.5*h) },
 			func() [][]lword { return cutColumns(ws, h, true) },
@@ -137,6 +140,10 @@ func cutRegion(ws []lword, h float64, grid []int, out *[]string) {
 // cutColumns cuts a region down its gutters: runs of x with no (or, when
 // tolerant, hardly any) word across them.
 func cutColumns(ws []lword, h float64, tolerant bool) [][]lword {
+	return splitAt(ws, columnCuts(ws, h, tolerant))
+}
+
+func columnCuts(ws []lword, h float64, tolerant bool) []int {
 	_, _, top, bottom := extent(ws)
 	lines := float64(bottom-top) / h
 	need := 1.5 * h
@@ -150,7 +157,70 @@ func cutColumns(ws []lword, h float64, tolerant bool) [][]lword {
 	if tolerant && lines >= 8 {
 		tol = int(0.06 * lines)
 	}
-	return splitAt(ws, gutterCuts(ws, h, tol, need))
+	return gutterCuts(ws, h, tol, need)
+}
+
+// wordsOnBothSides tells a row that goes on on both sides of a word (a line
+// of print across the gutter), not a word that strays into it.
+func wordsOnBothSides(row []lword, w lword) bool {
+	left, right := false, false
+	for _, o := range row {
+		left = left || o.r <= w.l
+		right = right || o.l >= w.r
+	}
+	return left && right
+}
+
+// cutSpanners takes out of a region the lines that run across a gutter the
+// rest of it has (a headline set close over its columns, a caption, a line of
+// an advertisement), so that they are read whole instead of being cut in two
+// with the columns: the region is cut across above and below them.
+func cutSpanners(ws []lword, h float64) [][]lword {
+	cuts := columnCuts(ws, h, true)
+	if len(cuts) == 0 {
+		return nil
+	}
+	crosses := func(w lword) bool {
+		for _, c := range cuts {
+			if w.l < c && w.r > c {
+				return true
+			}
+		}
+		return false
+	}
+	rows := textRows(ws, h)
+	spans := make([]bool, len(rows))
+	any := false
+	for i, r := range rows {
+		if len(r) < 3 {
+			continue
+		}
+		for _, w := range r {
+			if crosses(w) && wordsOnBothSides(r, w) {
+				spans[i], any = true, true
+				break
+			}
+		}
+	}
+	if !any {
+		return nil
+	}
+	var out [][]lword
+	var cur []lword
+	band := false
+	for i, r := range rows {
+		if spans[i] != band && len(cur) > 0 {
+			out = append(out, cur)
+			cur = nil
+		}
+		band = spans[i]
+		cur = append(cur, r...)
+	}
+	out = append(out, cur)
+	if len(out) == 1 {
+		return nil
+	}
+	return out
 }
 
 // gutterCuts are the x positions of the gutters of a region: runs of at
@@ -265,24 +335,94 @@ func blockText(ws []lword, h float64, out *[]string) {
 // textRows groups words into rows by where they stand on the page, each
 // row left to right, top to bottom.
 func textRows(ws []lword, h float64) [][]lword {
+	rows := groupRows(ws, 0.6*h)
+	// Newspaper print is often set tighter than the height of a word's box
+	// (the lines nearly touch), and two such lines would be read as one.
+	if p := linePitch(rows, h); p > 0 && p < 0.9*h {
+		rows = groupRows(ws, 0.55*p)
+	}
+	return rows
+}
+
+func midY(w lword) float64 { return float64(w.b+w.t) / 2 }
+
+// groupRows makes rows of the words whose middles are at most tol from the
+// middle of their row, each row left to right.
+func groupRows(ws []lword, tol float64) [][]lword {
 	s := append([]lword(nil), ws...)
-	mid := func(w lword) float64 { return float64(w.b+w.t) / 2 }
-	sort.Slice(s, func(i, j int) bool { return mid(s[i]) < mid(s[j]) })
+	sort.Slice(s, func(i, j int) bool { return midY(s[i]) < midY(s[j]) })
 	var rows [][]lword
-	cur, sum := []lword{s[0]}, mid(s[0])
+	cur, sum := []lword{s[0]}, midY(s[0])
 	for _, w := range s[1:] {
-		if abs := mid(w) - sum/float64(len(cur)); abs > 0.6*h || abs < -0.6*h {
+		if abs := midY(w) - sum/float64(len(cur)); abs > tol || abs < -tol {
 			rows = append(rows, cur)
 			cur, sum = nil, 0
 		}
 		cur = append(cur, w)
-		sum += mid(w)
+		sum += midY(w)
 	}
 	rows = append(rows, cur)
 	for _, r := range rows {
 		sort.Slice(r, func(i, j int) bool { return r[i].l < r[j].l })
 	}
 	return rows
+}
+
+// linePitch is the usual distance between the middles of two rows that
+// follow each other, or 0 when there are too few rows to tell.
+func linePitch(rows [][]lword, h float64) float64 {
+	var gaps []float64
+	for i := 1; i < len(rows); i++ {
+		if g := rowMid(rows[i]) - rowMid(rows[i-1]); g > 0.3*h && g < 1.6*h {
+			gaps = append(gaps, g)
+		}
+	}
+	if len(gaps) < 4 {
+		return 0
+	}
+	sort.Float64s(gaps)
+	return gaps[len(gaps)/2]
+}
+
+func rowMid(r []lword) float64 {
+	sum := 0.0
+	for _, w := range r {
+		sum += midY(w)
+	}
+	return sum / float64(len(r))
+}
+
+// sideBySide tells whether the rows of a block hold the lines of columns that
+// stand side by side: pieces of different lines of the Archive's layout start
+// on the same x row after row. Justified print is also cut into lines by the
+// Archive, at its widest spaces, but there the pieces start anywhere.
+func sideBySide(rows [][]lword, h float64) bool {
+	var starts []int
+	multi := 0
+	for _, r := range rows {
+		n := len(starts)
+		for i := 1; i < len(r); i++ {
+			if r[i].line != r[i-1].line {
+				starts = append(starts, r[i].l)
+			}
+		}
+		if len(starts) > n {
+			multi++
+		}
+	}
+	if multi == 0 {
+		return false
+	}
+	sort.Ints(starts)
+	best := 0
+	for i, x := range starts {
+		j := i
+		for j < len(starts) && float64(starts[j]-x) <= 0.5*h {
+			j++
+		}
+		best = max(best, j-i)
+	}
+	return 2*best >= multi
 }
 
 // lineChains reads a block whose columns are too close to cut between (the
@@ -293,15 +433,7 @@ func textRows(ws []lword, h float64) [][]lword {
 // the columns, read one after the other. It returns nil when no row of the
 // block holds two lines (the rows are then right as they are).
 func lineChains(rows [][]lword, h float64) [][][]lword {
-	multi := false
-	for _, r := range rows {
-		for _, w := range r[1:] {
-			if w.line != r[0].line {
-				multi = true
-			}
-		}
-	}
-	if !multi {
+	if !sideBySide(rows, h) {
 		return nil
 	}
 	byLine := map[int][]lword{}
@@ -402,9 +534,22 @@ func lineChains(rows [][]lword, h float64) [][][]lword {
 // begins where the print starts it: a wider space between lines, a first
 // line set in, or a line that stopped short.
 func emitParagraphs(lines [][]lword, h float64, out *[]string) {
-	minL, maxR := lines[0][0].l, 0
+	// The edges of the column: the rule between columns leaves stray marks
+	// outside them, and the start of a line wanders by a few pixels, so the
+	// left edge is where the middle line begins and the right where most end.
+	var starts, ends []int
 	for _, l := range lines {
-		minL, maxR = min(minL, l[0].l), max(maxR, l[len(l)-1].r)
+		starts = append(starts, lineStart(l))
+		ends = append(ends, l[len(l)-1].r)
+	}
+	sort.Ints(starts)
+	sort.Ints(ends)
+	minL, maxR := starts[len(starts)/2], ends[len(ends)-1-len(ends)/8]
+	// The em of the print: lines set tight are closer than the height of a
+	// word's box.
+	u, pitch := h, 0.0
+	if pitch = linePitch(lines, h); pitch > 0 {
+		u = min(h, pitch)
 	}
 	var para []string
 	var prev []lword
@@ -425,7 +570,10 @@ func emitParagraphs(lines [][]lword, h float64, out *[]string) {
 			}
 			indent := float64(l[0].l - minL)
 			short := float64(prev[len(prev)-1].r) < float64(maxR)-4*h
-			if float64(top-bottom) > 0.6*h || indent >= 1.2*h && indent <= 5*h || short {
+			apart := pitch > 0 && rowMid(l)-rowMid(prev) > 1.5*pitch
+			// a headline or a deck is set in another size than the text under it
+			resized := rowHeight(l) > 1.4*rowHeight(prev) || rowHeight(prev) > 1.4*rowHeight(l)
+			if float64(top-bottom) > 0.6*h || apart || indent >= u && indent <= 5*u || short || resized {
 				flush()
 			}
 		}
@@ -433,6 +581,31 @@ func emitParagraphs(lines [][]lword, h float64, out *[]string) {
 		prev = l
 	}
 	flush()
+}
+
+// lineStart is where the first word of a line that is no stray mark begins.
+func lineStart(l []lword) int {
+	for _, w := range l {
+		if strings.Trim(w.s, edgeMarks) != "" {
+			return w.l
+		}
+	}
+	return l[0].l
+}
+
+// rowHeight is the usual height of the words of a row.
+func rowHeight(r []lword) float64 {
+	var hs []int
+	for _, w := range r {
+		if len([]rune(w.s)) >= 2 {
+			hs = append(hs, w.b-w.t)
+		}
+	}
+	if len(hs) == 0 {
+		return 1
+	}
+	sort.Ints(hs)
+	return float64(max(hs[len(hs)/2], 1))
 }
 
 // edgeMarks are what the rule between two columns turns into where the line

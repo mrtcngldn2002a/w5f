@@ -312,8 +312,21 @@ var reWord = regexp.MustCompile(`\p{L}+(?:['’]\p{L}+)*`)
 // the list, inside a sentence, is taken for a name and left out of the count.
 // Marks that belong to no print (< > { } = and so on) count against the text.
 func cleanliness(text string) (score float64, words int) {
+	good, bad, junk := cleanCounts(text)
+	return cleanScore(good, bad+junk/3)
+}
+
+func cleanScore(good, bad int) (score float64, words int) {
+	if good+bad == 0 {
+		return 0, 0
+	}
+	return float64(good) / float64(good+bad), good + bad
+}
+
+// cleanCounts are the words of a text that are words and those that are not,
+// and the marks that belong to no print (three of them count as a bad word).
+func cleanCounts(text string) (good, bad, junk int) {
 	known := englishWords()
-	good, bad := 0, 0
 	for _, loc := range reWord.FindAllStringIndex(text, -1) {
 		w := text[loc[0]:loc[1]]
 		lw := strings.ToLower(strings.ReplaceAll(w, "’", "'"))
@@ -332,17 +345,12 @@ func cleanliness(text string) (score float64, words int) {
 		}
 		bad++
 	}
-	junk := 0
 	for _, r := range text {
 		if strings.ContainsRune("<>{}=\\@#$%&+*[]", r) {
 			junk++
 		}
 	}
-	bad += junk / 3
-	if good+bad == 0 {
-		return 0, 0
-	}
-	return float64(good) / float64(good+bad), good + bad
+	return good, bad, junk
 }
 
 // sentenceStart tells whether the word at offset i opens a sentence (so that

@@ -111,3 +111,28 @@ func TestWindowRoute(t *testing.T) {
 		t.Error("only web addresses are windowed")
 	}
 }
+
+// In a dirty scan the clean stretches are few, and they are found by looking
+// at every place, not at a few.
+func TestPickWindowFindsTheOneCleanStretch(t *testing.T) {
+	noise := strings.Repeat("xq vz kt jj qq zz bk wq lx jh rr tt ", 12)
+	var paras []string
+	for i := 0; i < 80; i++ {
+		if i >= 40 && i < 60 {
+			paras = append(paras, fmt.Sprintf("%s Entry %d records the tide, the weather and the birds that came with them.", goodText, i))
+			continue
+		}
+		paras = append(paras, noise)
+	}
+	for seed := int64(1); seed <= 20; seed++ {
+		win, from := pickWindow(paras, seed)
+		if len(win) == 0 || from < 40 || from > 59 {
+			t.Fatalf("seed %d: a window of %d paragraphs from %d", seed, len(win), from)
+		}
+		for _, p := range win {
+			if strings.HasPrefix(p, "xq") {
+				t.Fatalf("seed %d: noise in the window", seed)
+			}
+		}
+	}
+}

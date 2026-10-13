@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"w5f/internal/doc"
 	"w5f/internal/fetch"
@@ -48,11 +49,11 @@ func pagesText(ctx context.Context, f *fetch.Fetcher, src *url.URL, r string) (t
 	u.Fragment = "range=" + r
 	resp, err := f.Get(ctx, &u, fetch.Options{Header: http.Header{"Range": {fmt.Sprintf("bytes=%d-%d", from, to)}}})
 	if err != nil {
-		return "", 0, 0, 0, err
+		return "", 0, 0, 0, fmt.Errorf("%w: %v", errFetch, err)
 	}
 	pages := djvuPages(string(resp.Body))
 	if len(pages) == 0 {
-		return "", 0, 0, 0, errors.New("window: no whole page in the range")
+		return "", 0, 0, 0, errNoPage
 	}
 	return reflowPages(pages), from, to, size, nil
 }
@@ -77,7 +78,7 @@ func paragraphs(text string) []string {
 	var scraps []string
 	for _, p := range reParagraphBreak.Split(text, -1) {
 		p = mendMarks(strings.TrimSpace(reBlanks.ReplaceAllString(p, " ")))
-		if len([]rune(p)) >= 40 {
+		if len([]rune(p)) >= 40 || fragment(p) {
 			scraps = append(scraps, p)
 		}
 	}
@@ -85,7 +86,7 @@ func paragraphs(text string) []string {
 	// next paragraph, in lower case.
 	var joined []string
 	for _, p := range scraps {
-		if n := len(joined); n > 0 && !endsSentence(joined[n-1]) && startsLower(firstWord(p)) {
+		if n := len(joined); n > 0 && !endsSentence(joined[n-1]) && continues(p) {
 			joined[n-1] += " " + p
 			continue
 		}
@@ -94,7 +95,7 @@ func paragraphs(text string) []string {
 	var out []string
 	for _, whole := range joined {
 		for _, p := range splitJunk(whole) {
-			if p = wholeSentences(p); len([]rune(p)) < 60 || dropCapLost(p) {
+			if p = wholeSentences(p); len([]rune(p)) < 60 || dropCapLost(p) || boilerplate(p) || advertisement(p) {
 				continue
 			}
 			if score, n := cleanliness(p); n >= 8 && score < paragraphMin {
@@ -104,6 +105,37 @@ func paragraphs(text string) []string {
 		}
 	}
 	return out
+}
+
+// fragment tells a short piece of a sentence (the last line of a paragraph
+// that a page break cut off: "courting.", "I said. “Your shining") from a page
+// number or a running head: it has words in lower case that are not those of
+// a title, or it ends on a mark of the sentence.
+func fragment(p string) bool {
+	if p == strings.ToUpper(p) {
+		return false
+	}
+	words := strings.Fields(p)
+	if last, _ := utf8.DecodeLastRuneInString(p); strings.ContainsRune(`.,;:!?)”’"'—-`, last) {
+		return len(words) >= 2 || startsLower(strings.TrimRight(p, `.,;:!?)”’"'—-`))
+	}
+	for _, w := range words {
+		w = strings.TrimFunc(w, func(r rune) bool { return !unicode.IsLetter(r) })
+		if startsLower(w) && !titleWords[w] {
+			return true
+		}
+	}
+	return false
+}
+
+// titleWords are the small words a title keeps in lower case.
+var titleWords = map[string]bool{"of": true, "the": true, "and": true, "in": true, "a": true, "an": true, "to": true, "for": true,
+	"on": true, "at": true, "by": true, "with": true, "from": true, "or": true}
+
+// continues tells a paragraph that goes on with a sentence begun in the
+// one before: it begins with a plain word in lower case.
+func continues(p string) bool {
+	return startsLower(strings.TrimRight(firstWord(p), `.,;:!?)”’"'—`))
 }
 
 func firstWord(p string) string {
@@ -215,40 +247,82 @@ const (
 	windowClean = 0.95 // share of its words that must be words
 )
 
-// pickWindow picks, from 16 random places in the middle of the text, the
-// cleanest readable run of paragraphs (see cleanliness);
-// the same seed always picks the same one.
+// pickWindow picks a run of paragraphs worth reading: of every run in the
+// middle of the text that is clean (see cleanliness), readable and prose, the
+// cleanest of 16 picked by the seed (the same seed always picks the same
+// one). Every place is looked at, not a few: in a dirty scan there are not
+// many clean ones, and they are found only by looking.
 func pickWindow(paras []string, seed int64) (win []string, from int) {
 	if len(paras) == 0 {
 		return nil, 0
 	}
-	rng := rand.New(rand.NewPCG(uint64(seed), 7))
 	lo, hi := len(paras)/20, len(paras)-len(paras)/20
 	if hi <= lo {
 		lo, hi = 0, len(paras)
 	}
-	best := 0.0
-	for range 16 {
-		start := lo + rng.IntN(hi-lo)
-		size := 0
-		var run []string
-		for i := start; i < len(paras) && size < windowMin; i++ {
-			if size+len(paras[i]) > windowMax && size > 0 {
+	// each paragraph is read for its words once, the runs add them up
+	type counts struct{ good, bad int }
+	cs := make([]counts, len(paras))
+	for i, p := range paras {
+		good, bad, junk := cleanCounts(p)
+		cs[i] = counts{good, bad + junk/3}
+	}
+	type candidate struct {
+		start, end int
+		score      float64
+	}
+	var found []candidate
+	for start := lo; start < hi; start++ {
+		size, good, bad, end := 0, 0, 0, start
+		for ; end < len(paras) && size < windowMin; end++ {
+			if size+len(paras[end]) > windowMax && size > 0 {
 				break
 			}
-			run = append(run, paras[i])
-			size += len(paras[i])
+			size += len(paras[end])
+			good, bad = good+cs[end].good, bad+cs[end].bad
 		}
 		if size < windowMin/2 {
 			continue
 		}
-		text := strings.Join(run, " ")
-		if score, _ := cleanliness(text); score >= windowClean && score > best && readable(text) {
-			best, win, from = score, run, start
+		if score, _ := cleanScore(good, bad); score >= windowClean {
+			found = append(found, candidate{start, end, score})
+		}
+	}
+	rng := rand.New(rand.NewPCG(uint64(seed), 7))
+	rng.Shuffle(len(found), func(a, b int) { found[a], found[b] = found[b], found[a] })
+	best, checked := 0.0, 0
+	for _, c := range found {
+		if checked == 16 {
+			break
+		}
+		if text := strings.Join(paras[c.start:c.end], " "); !readable(text) || !proseOK(text) {
+			continue
+		}
+		checked++
+		if c.score > best {
+			best, win, from = c.score, paras[c.start:c.end], c.start
 		}
 	}
 	return win, from
 }
+
+// errFetch is the answer when the Archive's file cannot be had (a data node
+// that does not answer): the same file will not come from the same place
+// again soon.
+var errFetch = errors.New("window: the file cannot be had")
+
+// errNoPage is the answer when the bytes asked for hold no whole page: the
+// pages of the scan are bigger than they are.
+var errNoPage = errors.New("window: no whole page in the range")
+
+// errDirtyScan is the answer for a text of which hardly anything is clean
+// (a bad microfilm, a language that is not English): another place in the
+// same scan will not do better, as one with a few clean words in it might.
+var errDirtyScan = errors.New("window: too dirty to read")
+
+// dirtyShare is the percent of a text that must be left after the cleaning
+// for it not to be dirty; scans that read have been found with a tenth.
+const dirtyShare = 8
 
 func windowRoute(ctx context.Context, env Env, target string) (*doc.Document, error) {
 	return buildWindow(ctx, env.Fetcher, target)
@@ -283,6 +357,13 @@ func buildWindow(ctx context.Context, f *fetch.Fetcher, target string) (*doc.Doc
 	paras := paragraphs(text)
 	win, from := pickWindow(paras, seed)
 	if len(win) == 0 {
+		kept := 0
+		for _, p := range paras {
+			kept += len(p)
+		}
+		if kept < len(text)*dirtyShare/100 {
+			return nil, fmt.Errorf("%w (%s)", errDirtyScan, src.Host)
+		}
 		return nil, errors.New("window: no readable passage in " + src.Host)
 	}
 	percent := from * 100 / max(len(paras), 1)
