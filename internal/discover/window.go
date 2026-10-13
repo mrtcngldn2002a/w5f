@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
+	"net/http"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -25,6 +26,35 @@ import (
 func windowTarget(src, title string) string {
 	v := url.Values{"u": {src}, "t": {title}, "k": {strconv.FormatInt(rand.Int64N(1<<40), 10)}}
 	return "w5f:discover/window?" + v.Encode()
+}
+
+// windowPagesTarget is the address of a window onto the pages in bytes
+// from..to (of size) of the DjVu XML at src, where every word of the scan
+// has its place on the page (see layout.go).
+func windowPagesTarget(src, title string, from, to, size int) string {
+	v := url.Values{"u": {src}, "t": {title}, "k": {strconv.FormatInt(rand.Int64N(1<<40), 10)},
+		"r": {fmt.Sprintf("%d-%d/%d", from, to, size)}}
+	return "w5f:discover/window?" + v.Encode()
+}
+
+// pagesText reads the bytes of r ("from-to/size") of the DjVu XML at src and
+// makes the text of the pages in them, columns in order. The cache key of a
+// range is the address with the range after a #, which is not sent.
+func pagesText(ctx context.Context, f *fetch.Fetcher, src *url.URL, r string) (text string, from, to, size int, err error) {
+	if _, err = fmt.Sscanf(r, "%d-%d/%d", &from, &to, &size); err != nil || from < 0 || to < from || size < to {
+		return "", 0, 0, 0, errors.New("window: bad range")
+	}
+	u := *src
+	u.Fragment = "range=" + r
+	resp, err := f.Get(ctx, &u, fetch.Options{Header: http.Header{"Range": {fmt.Sprintf("bytes=%d-%d", from, to)}}})
+	if err != nil {
+		return "", 0, 0, 0, err
+	}
+	pages := djvuPages(string(resp.Body))
+	if len(pages) == 0 {
+		return "", 0, 0, 0, errors.New("window: no whole page in the range")
+	}
+	return reflowPages(pages), from, to, size, nil
 }
 
 var (
@@ -237,22 +267,37 @@ func buildWindow(ctx context.Context, f *fetch.Fetcher, target string) (*doc.Doc
 		return nil, errors.New("window: bad address")
 	}
 	seed, _ := strconv.ParseInt(q.Get("k"), 10, 64)
-	resp, err := f.Get(ctx, src, fetch.Options{})
-	if err != nil {
-		return nil, err
+	var text string
+	rFrom, rTo, rSize := 0, 0, 0
+	if r := q.Get("r"); r != "" {
+		if text, rFrom, rTo, rSize, err = pagesText(ctx, f, src, r); err != nil {
+			return nil, err
+		}
+	} else {
+		resp, err := f.Get(ctx, src, fetch.Options{})
+		if err != nil {
+			return nil, err
+		}
+		text = string(resp.Body)
 	}
-	paras := paragraphs(string(resp.Body))
+	paras := paragraphs(text)
 	win, from := pickWindow(paras, seed)
 	if len(win) == 0 {
 		return nil, errors.New("window: no readable passage in " + src.Host)
+	}
+	percent := from * 100 / max(len(paras), 1)
+	whole := src.String()
+	if rSize > 0 { // pages of the XML: the way in is by bytes, the whole text is the Archive's text file
+		percent = (rFrom + (rTo-rFrom)*from/max(len(paras), 1)) * 100 / rSize
+		whole = strings.Replace(whole, "_djvu.xml", "_djvu.txt", 1)
 	}
 	title := strings.TrimSpace(q.Get("t"))
 	if title == "" {
 		title = "A passage"
 	}
 	d := &doc.Document{URL: target, Title: title, Lang: "en", Origin: "archive",
-		Byline: fmt.Sprintf("a passage, %d%% into the text", from*100/max(len(paras), 1))}
-	d.Links = []doc.Link{{Href: src.String(), Text: "The whole text"}}
+		Byline: fmt.Sprintf("a passage, %d%% into the text", percent)}
+	d.Links = []doc.Link{{Href: whole, Text: "The whole text"}}
 	for _, p := range win {
 		d.Blocks = append(d.Blocks, doc.Paragraph{Text: doc.Inline{{Text: p}}})
 	}

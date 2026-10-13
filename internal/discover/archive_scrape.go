@@ -89,15 +89,16 @@ func archivePick(ctx context.Context, f *fetch.Fetcher, q string) (archiveDoc, e
 	return archiveDoc{}, errors.New(strings.Join(errs, "; "))
 }
 
-// archiveTextFile is the name of an item's text (the OCR the Archive keeps
-// as DjVuTXT): not always "<identifier>_djvu.txt", the files keep the names
-// they were uploaded with. The largest is taken (a supplement is another,
-// shorter file).
-func archiveTextFile(ctx context.Context, f *fetch.Fetcher, id string) (string, error) {
+// archiveFiles are the names of the files of an item that matter here: its
+// text (the OCR the Archive keeps as DjVuTXT: not always
+// "<identifier>_djvu.txt", the files keep the names they were uploaded with;
+// the largest is taken, a supplement is another, shorter file) and its DjVu
+// XML, which keeps where every word stood on the page, with its size.
+func archiveFiles(ctx context.Context, f *fetch.Fetcher, id string) (text, xml string, xmlSize int, err error) {
 	u, _ := url.Parse(archiveAPI + "/metadata/" + url.PathEscape(id) + "/files")
 	resp, err := f.Get(ctx, u, fetch.Options{NoStore: true})
 	if err != nil {
-		return "", err
+		return "", "", 0, err
 	}
 	var r struct {
 		Result []struct {
@@ -107,19 +108,33 @@ func archiveTextFile(ctx context.Context, f *fetch.Fetcher, id string) (string, 
 		} `json:"result"`
 	}
 	if err := json.Unmarshal(resp.Body, &r); err != nil {
-		return "", errors.New("unexpected answer from the Internet Archive's metadata")
+		return "", "", 0, errors.New("unexpected answer from the Internet Archive's metadata")
 	}
-	best, bestSize := "", -1
+	textSize := -1
 	for _, file := range r.Result {
-		if file.Format != "DjVuTXT" {
-			continue
-		}
-		if n, _ := strconv.Atoi(file.Size); n > bestSize {
-			best, bestSize = file.Name, n
+		n, _ := strconv.Atoi(file.Size)
+		switch file.Format {
+		case "DjVuTXT":
+			if n > textSize {
+				text, textSize = file.Name, n
+			}
+		case "Djvu XML":
+			if n > xmlSize {
+				xml, xmlSize = file.Name, n
+			}
 		}
 	}
-	if best == "" {
-		return "", errors.New("no text file")
+	if text == "" && xml == "" {
+		return "", "", 0, errors.New("no text file")
 	}
-	return best, nil
+	return text, xml, xmlSize, nil
+}
+
+// archiveTextFile is the name of an item's text file.
+func archiveTextFile(ctx context.Context, f *fetch.Fetcher, id string) (string, error) {
+	text, _, _, err := archiveFiles(ctx, f, id)
+	if err == nil && text == "" {
+		err = errors.New("no text file")
+	}
+	return text, err
 }

@@ -3,6 +3,7 @@ package discover
 import (
 	"context"
 	"errors"
+	"math/rand/v2"
 	"net/url"
 	"strings"
 )
@@ -55,10 +56,27 @@ func (printFamily) Draw(ctx context.Context, env Env) (Draw, error) {
 	return Draw{}, errors.New(strings.Join(errs, "; "))
 }
 
+// pagesRange is how much of an item's DjVu XML a draw reads: a few pages.
+const pagesRange = 3 << 20 / 2
+
+// pagesWindowRange is the bytes of an XML of size bytes a draw reads: all of
+// it when it is small, else pagesRange bytes from a random place, not in the
+// first or last twentieth (covers, advertisements, indexes).
+func pagesWindowRange(size int) (from, to int) {
+	if span := size - size/10 - pagesRange; span > 0 {
+		from = size/20 + rand.IntN(span)
+		return from, from + pagesRange - 1
+	}
+	return 0, size - 1
+}
+
 // printDraw takes a random item of the source's Internet Archive query and
 // returns a window onto its text. Not every item has a text of its own (a
 // scan of pictures, a file that was never read) nor a passage worth showing,
-// so the text is fetched here, and another item tried when it fails.
+// so the text is fetched here, and another item tried when it fails. Where
+// the item has its DjVu XML the window is cut from a few pages of it, the
+// columns put in order from where its words stood (layout.go); otherwise
+// from the Archive's plain text, which reads a page across its columns.
 func printDraw(ctx context.Context, env Env, s printSource) (Draw, error) {
 	var errs []string
 	for range 4 {
@@ -66,7 +84,7 @@ func printDraw(ctx context.Context, env Env, s printSource) (Draw, error) {
 		if err != nil {
 			return Draw{}, err
 		}
-		name, err := archiveTextFile(ctx, env.Fetcher, d.Identifier)
+		text, xml, xmlSize, err := archiveFiles(ctx, env.Fetcher, d.Identifier)
 		if err != nil {
 			if ctx.Err() != nil {
 				return Draw{}, ctx.Err()
@@ -75,15 +93,26 @@ func printDraw(ctx context.Context, env Env, s printSource) (Draw, error) {
 			continue
 		}
 		label := d.label()
-		target := windowTarget(archiveAPI+"/download/"+url.PathEscape(d.Identifier)+"/"+url.PathEscape(name), label)
-		if _, err := buildWindow(ctx, env.Fetcher, target); err != nil {
-			if ctx.Err() != nil {
-				return Draw{}, ctx.Err()
+		base := archiveAPI + "/download/" + url.PathEscape(d.Identifier) + "/"
+		var targets []string
+		if xml != "" {
+			for range 2 {
+				from, to := pagesWindowRange(xmlSize)
+				targets = append(targets, windowPagesTarget(base+url.PathEscape(xml), label, from, to, xmlSize))
 			}
-			errs = append(errs, d.Identifier+": "+err.Error())
-			continue
+		} else if text != "" {
+			targets = append(targets, windowTarget(base+url.PathEscape(text), label))
 		}
-		return Draw{Target: target, Why: "print/" + s.name + " · " + label}, nil
+		for _, target := range targets {
+			if _, err := buildWindow(ctx, env.Fetcher, target); err != nil {
+				if ctx.Err() != nil {
+					return Draw{}, ctx.Err()
+				}
+				errs = append(errs, d.Identifier+": "+err.Error())
+				continue
+			}
+			return Draw{Target: target, Why: "print/" + s.name + " · " + label}, nil
+		}
 	}
 	return Draw{}, errors.New(strings.Join(errs, "; "))
 }
