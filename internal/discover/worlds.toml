@@ -10,7 +10,7 @@
 
 [[world]]
 name = "RPC Authority"
-url = "https://rpc-authority.wikidot.com/"
+url = "https://rpcauthority.wikidot.com/"
 family = "confic"
 status = "live"
 tier = 1
@@ -70,17 +70,19 @@ tier = 2
 
 [[world]]
 name = "The Chaos Insurgency"
-url = "https://chaos-insurgency.wikidot.com/"
+url = "https://scp-wiki.wikidot.com/chaos-insurgency-hub"
 family = "confic"
 status = "live"
 tier = 2
+note = "The group's hub on the SCP wiki (its own site, chaos-insurgency.wikidot.com, is members only)."
 
 [[world]]
 name = "The Antisphere"
-url = "https://antisphere.wikidot.com/"
+url = "https://antisphere.wikidot.com/what-is-the-antisphere"
 family = "confic"
 status = "live"
 tier = 2
+note = "About ninety pages; the front page is an unused template, so it opens at the introduction."
 
 [[world]]
 name = "Psychotronics Division"
@@ -168,10 +170,11 @@ tier = 3
 
 [[world]]
 name = "The Middlerooms"
-url = "https://the-middlerooms.wikidot.com/"
+url = "https://middlerooms.fandom.com/wiki/The_Middlerooms_Wiki"
 family = "backrooms"
 status = "live"
 tier = 3
+note = "On Fandom, about three hundred articles (levels, entities, timeline). The Wikidot site of the same name holds three pages."
 
 [[world]]
 name = "Backrooms Archive Unit"
