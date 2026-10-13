@@ -731,6 +731,17 @@ func loadURL(ctx context.Context, u *url.URL, opts Options) (*doc.Document, erro
 		}
 		return d, err
 	}
+	if htmlconv.IsFandom(u) {
+		// The pages turn readers away; the wiki's API gives the same text.
+		if resp, err := Fetcher.Get(ctx, htmlconv.FandomAPI(u), fetch.Options{Revalidate: opts.Reload}); err == nil {
+			if d, cerr := htmlconv.Fandom(resp.Body, u.String()); cerr == nil {
+				if resp.FromCache || resp.Stale {
+					d.Origin = "cache"
+				}
+				return d, nil
+			}
+		}
+	}
 	resp, err := Fetcher.Get(ctx, u, fetch.Options{Revalidate: opts.Reload})
 	if err != nil {
 		if !Fetcher.Offline && (fetch.Gone(err) || isUnreachable(err)) {
