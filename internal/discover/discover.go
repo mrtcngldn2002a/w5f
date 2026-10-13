@@ -186,6 +186,8 @@ func Route(ctx context.Context, target string, env Env) (*doc.Document, error) {
 		return windowRoute(ctx, env, target)
 	case strings.HasPrefix(target, "w5f:discover/bhl?"):
 		return bhlRoute(ctx, env, target)
+	case strings.HasPrefix(target, "w5f:discover/futures?"):
+		return futuresRoute(ctx, env, target)
 	case target == "w5f:discover/random":
 		_, page, err := Next(ctx, env)
 		return page, err
