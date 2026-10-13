@@ -2,6 +2,7 @@ package discover
 
 import (
 	"html"
+	"math"
 	"regexp"
 	"sort"
 	"strconv"
@@ -85,6 +86,7 @@ func reflowPage(ws []lword) string {
 	}
 	sort.Ints(hs)
 	h := float64(max(hs[len(hs)/2], 1))
+	ws = upright(level(ws, h), h)
 	// The columns of the page as a whole, found with some words allowed
 	// across them (headlines, advertisements): a block of a few lines has too
 	// little of its own to find its gutters by.
@@ -93,6 +95,179 @@ func reflowPage(ws []lword) string {
 	var paras []string
 	cutRegion(ws, h, grid, &paras)
 	return strings.Join(paras, "\n\n")
+}
+
+// A scan is seldom square to its page: the film lay askew, the page curled
+// away from the glass. Where the lines of print run downhill by more than the
+// space between two of them, a row of words taken straight across holds pieces
+// of several lines; where the columns lean by more than their gutter, no
+// straight cut goes down between them. Both are measured and undone before
+// the page is cut (and the slant of the lines again in each block, because a
+// curled page slants more on one side than on the other).
+
+// slant is the slope of one of the Archive's own lines (how much it falls,
+// or rises below 0, for each pixel to the right) and where the line stands.
+type slant struct {
+	slope  float64
+	lo, hi int
+}
+
+// lineSlants are the slopes of the lines of a region that are long enough to
+// show one.
+func lineSlants(ws []lword, h float64) []slant {
+	byLine := map[int][]lword{}
+	for _, w := range ws {
+		if len([]rune(w.s)) >= 2 {
+			byLine[w.line] = append(byLine[w.line], w)
+		}
+	}
+	var fits []slant
+	for _, l := range byLine {
+		lo, hi, _, _ := extent(l)
+		if len(l) < 4 || float64(hi-lo) < 8*h {
+			continue
+		}
+		var sx, sy, sxx, sxy float64
+		for _, w := range l {
+			x, y := float64(w.l+w.r)/2, midY(w)
+			sx, sy, sxx, sxy = sx+x, sy+y, sxx+x*x, sxy+x*y
+		}
+		n := float64(len(l))
+		if d := n*sxx - sx*sx; d > 0 {
+			fits = append(fits, slant{(n*sxy - sx*sy) / d, lo, hi})
+		}
+	}
+	sort.Slice(fits, func(i, j int) bool { return fits[i].slope < fits[j].slope })
+	return fits
+}
+
+// slantBetween is the slant of the print between two x: the middle one of
+// the slopes of the lines that pass there, each counted by how much of it
+// does. ok is false where fewer than five lines pass.
+func slantBetween(fits []slant, lo, hi int) (s float64, ok bool) {
+	total, n := 0, 0
+	for _, f := range fits {
+		if over := min(f.hi, hi) - max(f.lo, lo); over > 0 {
+			total, n = total+over, n+1
+		}
+	}
+	if n < 5 {
+		return 0, false
+	}
+	sum := 0
+	for _, f := range fits {
+		if over := min(f.hi, hi) - max(f.lo, lo); over > 0 {
+			if sum += over; 2*sum >= total {
+				return f.slope, true
+			}
+		}
+	}
+	return 0, false
+}
+
+// levelStrips is the number of strips, side by side, a region's slant is
+// measured in: a page that curled away from the glass slants more on one
+// side than on the other.
+const levelStrips = 12
+
+// level makes the lines of a region run straight across: every word is moved
+// up or down by what the slant comes to between the left edge and its place.
+// A slant too small to carry a word into the next line is left alone.
+func level(ws []lword, h float64) []lword {
+	fits := lineSlants(ws, h)
+	lo, hi, _, _ := extent(ws)
+	whole, ok := slantBetween(fits, lo, hi)
+	if !ok {
+		return ws
+	}
+	// shift[k] is how far the print has fallen at the left edge of strip k
+	width := float64(hi-lo+1) / levelStrips
+	var slope [levelStrips]float64
+	var shift [levelStrips + 1]float64
+	far := 0.0
+	for k := 0; k < levelStrips; k++ {
+		from, to := lo+int(float64(k)*width), lo+int(float64(k+1)*width)
+		if slope[k], ok = slantBetween(fits, from, to); !ok {
+			slope[k] = whole
+		}
+		shift[k+1] = shift[k] + slope[k]*width
+		far = max(far, math.Abs(shift[k+1]))
+	}
+	if far < 0.25*h {
+		return ws
+	}
+	out := make([]lword, len(ws))
+	for i, w := range ws {
+		at := (float64(w.l+w.r)/2 - float64(lo)) / width
+		k := min(int(at), levelStrips-1)
+		d := int(math.Round(shift[k] + slope[k]*(at-float64(k))*width))
+		w.t, w.b = w.t-d, w.b-d
+		out[i] = w
+	}
+	return out
+}
+
+// columnLean is how much the columns of a page move to the right (or to the
+// left, below 0) for each pixel down: the lean at which the lines of the
+// Archive's layout begin at the fewest different places, as the lines of
+// columns do when the columns stand upright. It is 0 where no lean sets them
+// clearly better than they stand.
+func columnLean(ws []lword, h float64) float64 {
+	type start struct{ x, y float64 }
+	first := map[int]start{}
+	words := map[int]int{}
+	_, _, top, _ := extent(ws)
+	for _, w := range ws {
+		if f, ok := first[w.line]; !ok || float64(w.l) < f.x {
+			first[w.line] = start{float64(w.l), float64(w.t - top)}
+		}
+		words[w.line]++
+	}
+	var starts []start
+	for n, f := range first {
+		if words[n] >= 3 {
+			starts = append(starts, f)
+		}
+	}
+	if len(starts) < 40 {
+		return 0
+	}
+	bin := max(2, h/5)
+	crowding := func(lean float64) float64 {
+		at := map[int]int{}
+		for _, p := range starts {
+			at[int(math.Floor((p.x-lean*p.y)/bin))]++
+		}
+		sum := 0.0
+		for _, n := range at {
+			sum += float64(n * n)
+		}
+		return sum
+	}
+	best, lean := 1.25*crowding(0), 0.0
+	for i := -40; i <= 40; i++ {
+		if c := crowding(float64(i) / 1000); c > best {
+			best, lean = c, float64(i)/1000
+		}
+	}
+	return lean
+}
+
+// upright makes the columns of a page stand straight: every word is moved
+// left or right by what the lean comes to at its height.
+func upright(ws []lword, h float64) []lword {
+	s := columnLean(ws, h)
+	if s == 0 {
+		return ws
+	}
+	_, _, top, _ := extent(ws)
+	out := make([]lword, len(ws))
+	for i, w := range ws {
+		d := int(math.Round(s * (midY(w) - float64(top))))
+		w.l, w.r = w.l-d, w.r-d
+		out[i] = w
+	}
+	return out
 }
 
 func extent(ws []lword) (lo, hi, top, bottom int) {
@@ -181,8 +356,13 @@ func cutSpanners(ws []lword, h float64) [][]lword {
 		return nil
 	}
 	crosses := func(w lword) bool {
+		if float64(w.r-w.l) < 0.45*h {
+			return false // a piece of the rule between the columns, read as a mark
+		}
+		// well across it: the last word of a line often reaches a little
+		// into a narrow gutter
 		for _, c := range cuts {
-			if w.l < c && w.r > c {
+			if float64(c-w.l) > 0.5*h && float64(w.r-c) > 0.5*h {
 				return true
 			}
 		}
@@ -322,6 +502,7 @@ func cutRows(ws []lword, gap float64) [][]lword {
 // side by side, the columns are too close to cut between and the lines are
 // chained instead (see lineChains).
 func blockText(ws []lword, h float64, out *[]string) {
+	ws = level(ws, h)
 	rows := textRows(ws, h)
 	if chains := lineChains(rows, h); chains != nil {
 		for _, c := range chains {
@@ -392,6 +573,17 @@ func rowMid(r []lword) float64 {
 	return sum / float64(len(r))
 }
 
+// rowMiddle is the height on the page at which the middle word of a row
+// stands.
+func rowMiddle(r []lword) float64 {
+	ys := make([]float64, len(r))
+	for i, w := range r {
+		ys[i] = midY(w)
+	}
+	sort.Float64s(ys)
+	return ys[len(ys)/2]
+}
+
 // sideBySide tells whether the rows of a block hold the lines of columns that
 // stand side by side: pieces of different lines of the Archive's layout start
 // on the same x row after row. Justified print is also cut into lines by the
@@ -445,16 +637,20 @@ func lineChains(rows [][]lword, h float64) [][][]lword {
 	type seg struct {
 		ws         []lword
 		l, r, t, b int
+		mid, tall  float64
 	}
 	var segs []*seg
 	for _, ws := range byLine {
 		sort.Slice(ws, func(i, j int) bool { return ws[i].l < ws[j].l })
-		l, r, t, b := extent(ws)
-		segs = append(segs, &seg{ws, l, r, t, b})
+		l, r, _, _ := extent(ws)
+		// top and bottom are those of the line's usual word: one mark read
+		// too tall (a blot, a rule) would make the line reach into the next
+		mid, tall := rowMiddle(ws), rowHeight(ws)
+		segs = append(segs, &seg{ws, l, r, int(mid - tall/2), int(mid + tall/2), mid, tall})
 	}
 	sort.Slice(segs, func(i, j int) bool {
-		if segs[i].t != segs[j].t {
-			return segs[i].t < segs[j].t
+		if segs[i].mid != segs[j].mid {
+			return segs[i].mid < segs[j].mid
 		}
 		return segs[i].l < segs[j].l
 	})
@@ -464,22 +660,25 @@ func lineChains(rows [][]lword, h float64) [][][]lword {
 		next[i] = -1
 	}
 	for i, si := range segs {
-		best, bestGap := -1, 1e18
+		best, bestDown := -1, 1e18
 		for j := i - 1; j >= 0; j-- {
 			sj := segs[j]
-			gap := float64(si.t - sj.b)
-			if gap > 2.2*h && float64(si.t-sj.t) > 6*h {
+			// how far under the other line this one stands, middle to middle:
+			// small print is set tighter than its words' boxes are tall, so
+			// the boxes of two lines that follow each other overlap
+			down := si.mid - sj.mid
+			if down > 6*h {
 				break // everything before is further up still
 			}
-			if next[j] >= 0 || gap < -0.4*h || gap > 2.2*h {
+			if next[j] >= 0 || down < 0.35*min(si.tall, sj.tall) || down > 3.2*h {
 				continue
 			}
 			over := float64(min(si.r, sj.r) - max(si.l, sj.l))
 			if over < 0.5*float64(min(si.r-si.l, sj.r-sj.l)) {
 				continue
 			}
-			if gap < bestGap {
-				best, bestGap = j, gap
+			if down < bestDown {
+				best, bestDown = j, down
 			}
 		}
 		if best >= 0 {

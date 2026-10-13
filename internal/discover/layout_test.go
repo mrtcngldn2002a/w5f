@@ -309,3 +309,159 @@ func TestEmitParagraphsSetsApartAHeadline(t *testing.T) {
 		t.Errorf("the headline apart from the text: %q", out)
 	}
 }
+
+// justifiedLine is a line of a column set to its full width: words of uneven
+// width, the last one ending at the column's right edge, all of one line of
+// the Archive's layout.
+func justifiedLine(x0, width, y, box, id int, words []string) []lword {
+	widths, total := make([]int, len(words)), 0
+	for k := range words {
+		widths[k] = 50 + (k*37+id*11)%50
+		total += widths[k]
+	}
+	var ws []lword
+	x := x0
+	for k, w := range words {
+		if k == len(words)-1 {
+			x = x0 + width - widths[k]
+		}
+		ws = append(ws, lword{l: x, r: x + widths[k], t: y, b: y + box, s: w, line: id})
+		x += widths[k] + (width-total)/(len(words)-1)
+	}
+	return ws
+}
+
+// narrowColumns is a page of two columns 600 pixels wide with 20 between,
+// lines of them 40 apart.
+func narrowColumns(lines int) []lword {
+	var page []lword
+	for i := 0; i < lines; i++ {
+		y := 200 + i*40
+		page = append(page, justifiedLine(100, 600, y, 34, 2*i+1, strings.Fields(fmt.Sprintf("left%d aa bbb cc dddd ee ff", i)))...)
+		page = append(page, justifiedLine(720, 600, y, 34, 2*i+2, strings.Fields(fmt.Sprintf("right%d aa bbb cc dddd ee ff", i)))...)
+	}
+	return page
+}
+
+func columnsReadInTurn(t *testing.T, out string, lines int) {
+	t.Helper()
+	last, first := strings.Index(out, fmt.Sprintf("left%d ", lines-1)), strings.Index(out, "right0 ")
+	if last < 0 || first < 0 || last > first {
+		t.Errorf("the left column is read first, to its end:\n%.400s", out)
+	}
+	if strings.Contains(out, "ff right") || strings.Contains(out, "ff left") {
+		t.Errorf("no line holds pieces of two columns:\n%.400s", out)
+	}
+	for i := 0; i+1 < lines; i++ {
+		if strings.Index(out, fmt.Sprintf("left%d ", i)) > strings.Index(out, fmt.Sprintf("left%d ", i+1)) {
+			t.Fatalf("lines out of order at %d:\n%.400s", i, out)
+		}
+	}
+}
+
+// A page whose lines run uphill by nearly the space between two of them (the
+// page curled, the film lay askew) is read line by line all the same.
+func TestReflowPageLevelsSlantedLines(t *testing.T) {
+	var page []lword
+	for i := 0; i < 24; i++ {
+		line := justifiedLine(100, 1300, 200+i*40, 34, i+1, strings.Fields(fmt.Sprintf("line%d aa bbb cc dddd ee ff gg hhh ii jj kkk ll end%d", i, i)))
+		for k := range line {
+			up := (line[k].l - 100) * 35 / 1000 // 42 pixels at the right edge, the lines 40 apart
+			line[k].t, line[k].b = line[k].t-up, line[k].b-up
+		}
+		page = append(page, line...)
+	}
+	lines := strings.Split(strings.ReplaceAll(reflowPage(page), "\n\n", "\n"), "\n")
+	if len(lines) != 24 {
+		t.Fatalf("%d lines, want 24:\n%.400s", len(lines), strings.Join(lines, "\n"))
+	}
+	for i, l := range lines {
+		if !strings.HasPrefix(l, fmt.Sprintf("line%d ", i)) || !strings.HasSuffix(l, fmt.Sprintf(" end%d", i)) {
+			t.Errorf("line %d: %q", i, l)
+		}
+	}
+}
+
+// A curled page slants more on one side than on the other: each side is
+// levelled by its own slant.
+func TestLevelFollowsASlantThatChangesAcrossThePage(t *testing.T) {
+	page := narrowColumns(30)
+	for k := range page {
+		if page[k].l < 710 { // the left column runs uphill, the right one is level
+			up := (page[k].l - 100) * 30 / 1000
+			page[k].t, page[k].b = page[k].t-up, page[k].b-up
+		}
+	}
+	top, bottom := map[int]float64{}, map[int]float64{}
+	for _, w := range level(page, 34) {
+		y := midY(w)
+		if _, ok := top[w.line]; !ok {
+			top[w.line], bottom[w.line] = y, y
+		}
+		top[w.line], bottom[w.line] = min(top[w.line], y), max(bottom[w.line], y)
+	}
+	for id := range top {
+		if bottom[id]-top[id] > 6 {
+			t.Errorf("line %d still runs %v pixels up or down", id, bottom[id]-top[id])
+		}
+	}
+}
+
+// Columns that lean by more than their gutter is wide (no straight cut goes
+// down between them) are stood upright and read one after the other.
+func TestReflowPageStandsLeaningColumnsUpright(t *testing.T) {
+	page := narrowColumns(60)
+	for k := range page {
+		over := (page[k].t - 200) * 30 / 1000 // 72 pixels at the foot of the page
+		page[k].l, page[k].r = page[k].l+over, page[k].r+over
+	}
+	columnsReadInTurn(t, reflowPage(page), 60)
+}
+
+// The rule between two columns, read as a mark in the gutter, and a last word
+// that reaches a little into it are not a headline across the columns: the
+// page is not cut across at their lines.
+func TestReflowPageKeepsColumnsWholeWhereMarksCrossTheGutter(t *testing.T) {
+	page := narrowColumns(60)
+	for k := range page {
+		if page[k].s == "ff" && page[k].line == 2*20+1 {
+			page[k].r += 13 // the last word of a left line, three pixels past the middle of the gutter
+		}
+	}
+	for _, i := range []int{7, 33, 48} {
+		page = append(page, lword{l: 704, r: 716, t: 200 + i*40, b: 234 + i*40, s: ",", line: 2*i + 1})
+	}
+	columnsReadInTurn(t, reflowPage(page), 60)
+}
+
+// Small print is set tighter than its words' boxes are tall (a legal notice,
+// a market report): the lines of two columns too close to cut between are
+// still chained each to the one under it, not to the next but one.
+func TestBlockTextChainsSmallPrintSetTight(t *testing.T) {
+	var ws []lword
+	for i := 0; i < 30; i++ {
+		y := 200 + i*16
+		ws = append(ws, justifiedLine(100, 600, y, 28, 2*i+1, strings.Fields(fmt.Sprintf("left%d aa bbb cc dddd ee ff", i)))...)
+		ws = append(ws, justifiedLine(706, 600, y, 28, 2*i+2, strings.Fields(fmt.Sprintf("right%d aa bbb cc dddd ee ff", i)))...)
+	}
+	var out []string
+	blockText(ws, 29, &out)
+	columnsReadInTurn(t, strings.Join(out, "\n"), 30)
+}
+
+// One mark read too tall in a line (a blot, a piece of a rule) does not make
+// the line reach into the next and break the chain of its column.
+func TestBlockTextChainsPastAMarkReadTooTall(t *testing.T) {
+	var ws []lword
+	for i := 0; i < 20; i++ {
+		y := 200 + i*40
+		ws = append(ws, justifiedLine(100, 600, y, 34, 2*i+1, strings.Fields(fmt.Sprintf("left%d aa bbb cc dddd ee ff", i)))...)
+		ws = append(ws, justifiedLine(706, 600, y, 34, 2*i+2, strings.Fields(fmt.Sprintf("right%d aa bbb cc dddd ee ff", i)))...)
+		if i%2 == 1 {
+			ws = append(ws, lword{l: 300, r: 308, t: y - 30, b: y + 60, s: "l", line: 2*i + 1})
+		}
+	}
+	var out []string
+	blockText(ws, 34, &out)
+	columnsReadInTurn(t, strings.Join(out, "\n"), 20)
+}
