@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"unicode"
+	"unicode/utf8"
 )
 
 // The text the Internet Archive keeps for a scan is OCR, and OCR leaves
@@ -41,7 +42,7 @@ var cyrillicLookalikes = strings.NewReplacer(
 	"Г", "I", "г", "r",
 	"ﬁ", "fi", "ﬂ", "fl", "ﬀ", "ff", "ﬃ", "ffi", "ﬄ", "ffl",
 	"‘‘", "“", "’’", "”", "``", "“", "''", "\"",
-	"_", "", "|", " ", "~", "", "^", "", "¬", "-", "­", "-",
+	"_", "", "|", " ", "~", "", "^", "", "¬", "-", "\u00ad", "-",
 )
 
 var (
@@ -287,20 +288,21 @@ func endsSentence(p string) bool {
 
 func startsSentence(p string) bool {
 	rest := strings.TrimLeft(p, `"“‘'(—- `)
-	for i, r := range rest {
-		if !unicode.IsUpper(r) && !unicode.IsDigit(r) {
+	if rest == "" {
+		return false
+	}
+	r, size := utf8.DecodeRuneInString(rest)
+	if !unicode.IsUpper(r) && !unicode.IsDigit(r) {
+		return false
+	}
+	// A lone capital that is not a word (a big first letter that was a
+	// picture, or a stray mark): "X be given increased longevity".
+	if unicode.IsUpper(r) && !strings.ContainsRune("AIO", r) {
+		if tail := rest[size:]; strings.HasPrefix(tail, " ") && len(tail) > 1 && unicode.IsLower([]rune(tail[1:])[0]) {
 			return false
 		}
-		// A lone capital that is not a word (a big first letter that was a
-		// picture, or a stray mark): "X be given increased longevity".
-		if unicode.IsUpper(r) && !strings.ContainsRune("AIO", r) {
-			if tail := rest[i+len(string(r)):]; strings.HasPrefix(tail, " ") && len(tail) > 1 && unicode.IsLower([]rune(tail[1:])[0]) {
-				return false
-			}
-		}
-		return true
 	}
-	return false
+	return true
 }
 
 // wordRuns are the words of a text: runs of letters, with the apostrophes

@@ -82,7 +82,7 @@ var smallWordsOK = func() map[string]bool {
 	return m
 }()
 
-var reOddWord = regexp.MustCompile("[«»°^*~|_\\\\{}\\[\\]<>#@]")
+var reOddWord = regexp.MustCompile(`[«»°^*~|_\\{}\[\]<>#@]`)
 var reDigitLetter = regexp.MustCompile(`[A-Za-z]\d|\d[A-Za-z]`)
 var reOrdinal = regexp.MustCompile(`^\d+(?:st|nd|rd|th|s|d|x)$`)
 
