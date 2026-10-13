@@ -8,12 +8,14 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 )
 
 // archiveServer plays the Internet Archive: the scrape API gives two items,
 // one of which has no text file; the text of the other is an issue.
 func archiveServer(t *testing.T, queries *[]string) *httptest.Server {
 	t.Helper()
+	xml := columnsXML(3)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/services/search/v1/scrape":
@@ -21,14 +23,15 @@ func archiveServer(t *testing.T, queries *[]string) *httptest.Server {
 			fmt.Fprint(w, `{"items":[{"identifier":"no-text-item","title":"A scan of pictures","year":1950},
 {"identifier":"weird-tales-v-22-n-01-1933-07","title":"Weird Tales v22 n01 [1933-07]","year":1933}],"count":2,"total":28411}`)
 		case r.URL.Path == "/metadata/weird-tales-v-22-n-01-1933-07/files":
-			// The text keeps the name it was uploaded with, not the identifier.
-			fmt.Fprint(w, `{"result":[{"name":"cover.jpg","format":"JPEG","size":"900"},
+			// The files keep the names they were uploaded with, not the identifier.
+			fmt.Fprintf(w, `{"result":[{"name":"cover.jpg","format":"JPEG","size":"900"},
 {"name":"Weird Tales v22 n01 (1933-07)_djvu.txt","format":"DjVuTXT","size":"600000"},
-{"name":"Weird Tales v22 n01 (1933-07)_supplement_djvu.txt","format":"DjVuTXT","size":"4000"}]}`)
+{"name":"Weird Tales v22 n01 (1933-07)_djvu.xml","format":"Djvu XML","size":"%d"},
+{"name":"Weird Tales v22 n01 (1933-07)_supplement_djvu.txt","format":"DjVuTXT","size":"4000"}]}`, len(xml))
 		case r.URL.Path == "/metadata/no-text-item/files":
 			fmt.Fprint(w, `{"result":[{"name":"pictures.pdf","format":"Text PDF","size":"900"}]}`)
-		case r.URL.Path == "/download/weird-tales-v-22-n-01-1933-07/Weird Tales v22 n01 (1933-07)_djvu.txt":
-			fmt.Fprint(w, issueText(150))
+		case r.URL.Path == "/download/weird-tales-v-22-n-01-1933-07/Weird Tales v22 n01 (1933-07)_djvu.xml":
+			http.ServeContent(w, r, "x_djvu.xml", time.Time{}, strings.NewReader(xml))
 		default:
 			http.NotFound(w, r)
 		}
@@ -51,10 +54,10 @@ func TestPrintDrawsAWindowOntoAnArchiveItemThatHasText(t *testing.T) {
 			t.Fatalf("draw: %+v", d)
 		}
 		q, _ := url.ParseQuery(strings.TrimPrefix(d.Target, "w5f:discover/window?"))
-		if u, _ := url.Parse(q.Get("u")); u == nil || u.Path != "/download/weird-tales-v-22-n-01-1933-07/Weird Tales v22 n01 (1933-07)_djvu.txt" {
-			t.Fatalf("source text %q: an item with no text must be passed over", q.Get("u"))
+		if u, _ := url.Parse(q.Get("u")); u == nil || u.Path != "/download/weird-tales-v-22-n-01-1933-07/Weird Tales v22 n01 (1933-07)_djvu.xml" || q.Get("r") == "" {
+			t.Fatalf("source %q, range %q: an item with no text must be passed over, the window cut from pages of the XML", q.Get("u"), q.Get("r"))
 		}
-		if page, err := Route(context.Background(), d.Target, Env{Fetcher: testFetcher()}); err != nil || len(page.Blocks) < 3 {
+		if page, err := Route(context.Background(), d.Target, Env{Fetcher: testFetcher()}); err != nil || len(page.Blocks) < 2 {
 			t.Fatalf("the window opens: %v", err)
 		}
 	}
@@ -111,5 +114,52 @@ func TestArchiveSearchReportsAFailingBackend(t *testing.T) {
 	}
 	if _, err := (printFamily{}).Draw(context.Background(), Env{Fetcher: testFetcher()}); err == nil || strings.Contains(err.Error(), "nothing found") {
 		t.Errorf("print: %v", err)
+	}
+}
+
+func TestPrintPassesOverAnItemWithTextButNoLayout(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/services/search/v1/scrape":
+			fmt.Fprint(w, `{"items":[{"identifier":"plain","title":"Plain","year":1900}],"count":1,"total":1}`)
+		case "/metadata/plain/files":
+			fmt.Fprint(w, `{"result":[{"name":"plain_djvu.txt","format":"DjVuTXT","size":"600000"}]}`)
+		case "/download/plain/plain_djvu.txt":
+			fmt.Fprint(w, issueText(150))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	swap(t, &archiveAPI, srv.URL)
+	if _, err := (printFamily{}).Draw(context.Background(), Env{Fetcher: testFetcher()}); err == nil || !strings.Contains(err.Error(), "no layout file") {
+		t.Errorf("the plain text reads across the columns, so the item is passed over: %v", err)
+	}
+}
+
+func TestPrintMovesOnToAnotherItemWhenTheFileCannotBeHad(t *testing.T) {
+	hits := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/services/search/v1/scrape":
+			fmt.Fprint(w, `{"items":[{"identifier":"x","title":"X","year":1900}],"count":1,"total":1}`)
+		case "/metadata/x/files":
+			fmt.Fprint(w, `{"result":[{"name":"x_djvu.xml","format":"Djvu XML","size":"9000000"}]}`)
+		case "/download/x/x_djvu.xml":
+			hits++
+			http.Error(w, "node down", http.StatusServiceUnavailable)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	swap(t, &archiveAPI, srv.URL)
+	_, err := (printFamily{}).Draw(context.Background(), Env{Fetcher: testFetcher()})
+	if err == nil || !strings.Contains(err.Error(), "cannot be had") {
+		t.Errorf("a file that cannot be had: %v", err)
+	}
+	// one place per item, four items for each of the three sources tried: not two places in each
+	if hits > 12 || hits == 0 {
+		t.Errorf("%d requests for the file", hits)
 	}
 }
