@@ -998,6 +998,7 @@ func loadArchived(ctx context.Context, u *url.URL) (*doc.Document, error) {
 		when = t.Format("2006-01-02")
 	}
 	d.Origin = "archive"
+	d.Searches = nil // the live site they would ask is gone
 	d.Meta = append(d.Meta, doc.KV{Key: "archived", Value: when})
 	d.Blocks = append([]doc.Block{doc.Notice{Kind: "archive",
 		Text: "Archived copy from " + when + " (Wayback Machine) — the live page is gone."}}, d.Blocks...)
@@ -1091,6 +1092,21 @@ func wikidotOrigin(data []byte) *url.URL {
 }
 
 func convertHTML(body []byte, u *url.URL) (*doc.Document, error) {
+	d, err := convertPage(body, u)
+	if err == nil && d.Searches == nil {
+		d.Searches = htmlconv.SearchForms(body, u.String())
+		// Wikidot's own box works only with its script; these wikis are
+		// searched through Crom, as g → scp <words> does.
+		if d.Searches == nil && cromWikis[strings.ToLower(u.Hostname())] {
+			d.Searches = []doc.Search{{Action: "w5f:search/wikis", Field: "q", Label: "Words (the SCP Wiki, Wanderers' Library, the Backrooms)"}}
+		}
+	}
+	return d, err
+}
+
+var cromWikis = map[string]bool{"scp-wiki.wikidot.com": true, "wanderers-library.wikidot.com": true, "backrooms-wiki.wikidot.com": true}
+
+func convertPage(body []byte, u *url.URL) (*doc.Document, error) {
 	if htmlconv.IsEksi(u) {
 		return htmlconv.Eksi(body, u.String())
 	}

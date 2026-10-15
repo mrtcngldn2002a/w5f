@@ -277,7 +277,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if strings.HasPrefix(target, "w5f:") && msg.doc.URL != "" {
 			target = msg.doc.URL // e.g. a random page: remember where we landed
 		}
-		np := newPage(target, msg.doc)
+		np := newPage(target, withSiteSearch(msg.doc))
 		if !msg.replace {
 			m.leavePage()
 		}
@@ -310,7 +310,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.focusFirstVisible()
 		}
-		return m, record(target, np.doc)
+		return m, record(target, msg.doc) // without the search line
 	case recordedMsg:
 		if msg.err != nil && m.status == "" {
 			m.status = "error: search index: " + msg.err.Error()
@@ -837,6 +837,9 @@ func (m Model) follow(href string) (tea.Model, tea.Cmd) {
 		m.loading = href
 		return m, load(href, false)
 	case "w5f":
+		if href == siteSearchHref {
+			return m.openSiteSearch()
+		}
 		if href == "w5f:themes" {
 			return m.openThemes(false)
 		}
@@ -1419,6 +1422,7 @@ func (m Model) helpLines() []string {
 		{"g → theme", "choose a theme: amber, day, cold, night, green (g → theme day puts one on)"},
 		{"g → reddit-login browser", "take your Reddit (or ao3-login browser: AO3) session from Chromium or Firefox, where you signed in"},
 		{"/", "search everything you have read (feeds, wikis, web pages, books, notes)"},
+		{"→ search this site", "the first line of a page with a search box: enter, type the words, the site's results open"},
 		{"a / e", "add this page / enqueue the selected link: the reading queue (g → queue)"},
 		{"n", "write a note about this page"}, {"y", "clip paragraphs (↑↓ choose, shift+↑↓ extend, enter save)"},
 		{"s", "save a Markdown copy of this page"},

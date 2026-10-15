@@ -166,7 +166,7 @@ func (m Model) findKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 // savePage writes the Markdown copy of the current page.
 func (m *Model) savePage() tea.Cmd {
-	path, err := personal.SavePage(pageSource(m.cur), m.cur.doc, time.Now())
+	path, err := personal.SavePage(pageSource(m.cur), withoutSiteSearch(m.cur.doc), time.Now())
 	if err != nil {
 		m.status = "error: " + err.Error()
 		return nil
