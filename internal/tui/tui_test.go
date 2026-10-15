@@ -361,6 +361,7 @@ func TestWelcomeShowsYourPlaces(t *testing.T) {
 	t.Setenv("APPDATA", dir)
 	t.Setenv("XDG_DATA_HOME", dir)
 	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir) // a Mac keeps its data under ~/Library
 	if _, err := places.Route("w5f:places/add?url=https%3A%2F%2Ftdv.example%2F&name=TDV"); err != nil {
 		t.Fatal(err)
 	}

@@ -17,6 +17,7 @@ func ownDataDir(t *testing.T) {
 	t.Setenv("APPDATA", d)
 	t.Setenv("XDG_DATA_HOME", d)
 	t.Setenv("XDG_CONFIG_HOME", d)
+	t.Setenv("HOME", d) // a Mac keeps its data under ~/Library
 }
 
 func plain(d *doc.Document) string {

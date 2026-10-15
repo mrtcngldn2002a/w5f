@@ -60,6 +60,7 @@ func TestAddPageOffersEveryPlace(t *testing.T) {
 	t.Setenv("APPDATA", dir)
 	t.Setenv("XDG_DATA_HOME", dir)
 	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir) // a Mac keeps its data under ~/Library
 	db, err := store.Open(filepath.Join(t.TempDir(), "t.db"))
 	if err != nil {
 		t.Fatal(err)
