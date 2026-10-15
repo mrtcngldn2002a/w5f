@@ -94,7 +94,7 @@ func TestDailyPacket(t *testing.T) {
 		t.Fatalf("saved: %v %s", matches, flatText(s))
 	}
 	b, _ := os.ReadFile(matches[0])
-	if !strings.Contains(string(b), "Gospel of Philip") || !strings.Contains(string(b), "body") {
+	if !strings.Contains(string(b), "Gospel of Philip") || !strings.Contains(string(b), "quick brown fox") {
 		t.Errorf("issue file:\n%.400s", b)
 	}
 	// Reshuffle rebuilds today's issue with the same number.

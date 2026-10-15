@@ -1,6 +1,8 @@
 package discover
 
 import (
+	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -8,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode"
@@ -41,21 +44,24 @@ func windowPagesTarget(src, title string, from, to, size int) string {
 // pagesText reads the bytes of r ("from-to/size") of the DjVu XML at src and
 // makes the text of the pages in them, columns in order. The cache key of a
 // range is the address with the range after a #, which is not sent.
-func pagesText(ctx context.Context, f *fetch.Fetcher, src *url.URL, r string) (text string, from, to, size int, err error) {
+// The byte just past the last whole page, next, is where the text that
+// follows begins.
+func pagesText(ctx context.Context, f *fetch.Fetcher, src *url.URL, r string) (text string, from, to, size, next int, err error) {
 	if _, err = fmt.Sscanf(r, "%d-%d/%d", &from, &to, &size); err != nil || from < 0 || to < from || size < to {
-		return "", 0, 0, 0, errors.New("window: bad range")
+		return "", 0, 0, 0, 0, errors.New("window: bad range")
 	}
 	u := *src
 	u.Fragment = "range=" + r
 	resp, err := f.Get(ctx, &u, fetch.Options{Header: http.Header{"Range": {fmt.Sprintf("bytes=%d-%d", from, to)}}})
 	if err != nil {
-		return "", 0, 0, 0, fmt.Errorf("%w: %v", errFetch, err)
+		return "", 0, 0, 0, 0, fmt.Errorf("%w: %v", errFetch, err)
 	}
 	pages := djvuPages(string(resp.Body))
 	if len(pages) == 0 {
-		return "", 0, 0, 0, errNoPage
+		return "", 0, 0, 0, 0, errNoPage
 	}
-	return reflowPages(pages), from, to, size, nil
+	next = from + bytes.LastIndex(resp.Body, []byte("</OBJECT>")) + len("</OBJECT>")
+	return reflowPages(pages), from, to, size, next, nil
 }
 
 var (
@@ -152,6 +158,37 @@ func dropCapLost(p string) bool {
 		return false
 	}
 	return !englishWords()[strings.ToLower(w)]
+}
+
+// opening tells a paragraph that begins a story, a chapter or an article:
+// magazines set its first word or words in capitals ("THE ship came down",
+// "A STRANGE thing"). A shout ("NO!" he cried) is not one, nor a line of
+// capitals; a first word in capitals that is no word (a big first letter the
+// OCR lost) was dropped already (dropCapLost).
+func opening(p string) bool {
+	words := strings.Fields(p)
+	if len(words) < 8 || strings.Contains(strings.ToLower(p), "next issue") { // the magazine's own notices
+		return false
+	}
+	long := false
+	for i, w := range words[:5] {
+		if strings.ContainsAny(w, "!?") {
+			return false
+		}
+		w = strings.TrimFunc(w, func(r rune) bool { return !unicode.IsLetter(r) })
+		if w == "" {
+			return false
+		}
+		if strings.ToUpper(w) != w {
+			// the first word that is not in capitals ends the run: it is
+			// the text going on, in lower case
+			return i > 0 && long && startsLower(w)
+		}
+		if len([]rune(w)) >= 2 {
+			long = true
+		}
+	}
+	return false
 }
 
 // wholeSentences cuts away from a paragraph the head that begins in the
@@ -290,9 +327,14 @@ func pickWindow(paras []string, seed int64) (win []string, from int) {
 	}
 	rng := rand.New(rand.NewPCG(uint64(seed), 7))
 	rng.Shuffle(len(found), func(a, b int) { found[a], found[b] = found[b], found[a] })
-	best, checked := 0.0, 0
+	// Runs that start where a story or a chapter does come first: a window
+	// opened in the middle of a scene is a page torn out of a book.
+	slices.SortStableFunc(found, func(a, b candidate) int {
+		return cmp.Compare(b2i(!opening(paras[a.start])), b2i(!opening(paras[b.start])))
+	})
+	best, checked, opened := 0.0, 0, false
 	for _, c := range found {
-		if checked == 16 {
+		if checked == 16 || opened && !opening(paras[c.start]) {
 			break
 		}
 		if text := strings.Join(paras[c.start:c.end], " "); !readable(text) || !proseOK(text) {
@@ -301,9 +343,38 @@ func pickWindow(paras []string, seed int64) (win []string, from int) {
 		checked++
 		if c.score > best {
 			best, win, from = c.score, paras[c.start:c.end], c.start
+			opened = opening(paras[c.start])
 		}
 	}
+	if opened { // it reads on to the end of the chapter
+		win = paras[from:readOn(paras, from)]
+	}
 	return win, from
+}
+
+func b2i(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+// windowLong is how far a window that starts at an opening reads: to the
+// next opening (the chapter or the story is over), or about this far.
+const windowLong = 16000
+
+// readOn is the end of the window that starts at paragraph from and reads
+// on: to the next opening once it has windowMin, or windowLong at most.
+func readOn(paras []string, from int) int {
+	size, end := 0, from
+	for end < len(paras) && size < windowLong {
+		if end > from && size >= windowMin && opening(paras[end]) {
+			break
+		}
+		size += len(paras[end])
+		end++
+	}
+	return end
 }
 
 // errFetch is the answer when the Archive's file cannot be had (a data node
@@ -342,9 +413,9 @@ func buildWindow(ctx context.Context, f *fetch.Fetcher, target string) (*doc.Doc
 	}
 	seed, _ := strconv.ParseInt(q.Get("k"), 10, 64)
 	var text string
-	rFrom, rTo, rSize := 0, 0, 0
+	rFrom, rTo, rSize, rNext := 0, 0, 0, 0
 	if r := q.Get("r"); r != "" {
-		if text, rFrom, rTo, rSize, err = pagesText(ctx, f, src, r); err != nil {
+		if text, rFrom, rTo, rSize, rNext, err = pagesText(ctx, f, src, r); err != nil {
 			return nil, err
 		}
 	} else {
@@ -355,7 +426,18 @@ func buildWindow(ctx context.Context, f *fetch.Fetcher, target string) (*doc.Doc
 		text = string(resp.Body)
 	}
 	paras := paragraphs(text)
-	win, from := pickWindow(paras, seed)
+	var win []string
+	var from int
+	// "p": reading on from paragraph p (the "read on" of the window before).
+	readingOn := q.Has("p")
+	if readingOn {
+		if from, err = strconv.Atoi(q.Get("p")); err != nil || from < 0 || from >= len(paras) {
+			return nil, errors.New("window: nothing more to read here")
+		}
+		win = paras[from:readOn(paras, from)]
+	} else {
+		win, from = pickWindow(paras, seed)
+	}
 	if len(win) == 0 {
 		kept := 0
 		for _, p := range paras {
@@ -376,12 +458,36 @@ func buildWindow(ctx context.Context, f *fetch.Fetcher, target string) (*doc.Doc
 	if title == "" {
 		title = "A passage"
 	}
+	what := "a passage"
+	if readingOn {
+		what = "read on"
+	} else if opening(win[0]) {
+		what = "from the start of a story or chapter"
+	}
 	d := &doc.Document{URL: target, Title: title, Lang: "en", Origin: "archive",
-		Byline: fmt.Sprintf("a passage, %d%% into the text", percent)}
+		Byline: fmt.Sprintf("%s, %d%% into the text", what, percent)}
 	d.Links = []doc.Link{{Href: whole, Text: "The whole text"}}
 	for _, p := range win {
 		d.Blocks = append(d.Blocks, doc.Paragraph{Text: doc.Inline{{Text: p}}})
 	}
-	d.Blocks = append(d.Blocks, doc.Paragraph{Text: doc.Inline{{Text: "The whole text", Link: 1}}})
+	// What follows: the rest of these pages, or the pages after them.
+	v := url.Values{"u": {q.Get("u")}, "t": {q.Get("t")}, "k": {q.Get("k")}}
+	if end := from + len(win); end < len(paras) {
+		if r := q.Get("r"); r != "" {
+			v.Set("r", r)
+		}
+		v.Set("p", strconv.Itoa(end))
+		d.Next = "w5f:discover/window?" + v.Encode()
+	} else if rSize > 0 && rNext < rSize-1 {
+		v.Set("r", fmt.Sprintf("%d-%d/%d", rNext, min(rNext+rTo-rFrom, rSize-1), rSize))
+		v.Set("p", "0")
+		d.Next = "w5f:discover/window?" + v.Encode()
+	}
+	foot := doc.Inline{{Text: "The whole text", Link: 1}}
+	if d.Next != "" {
+		d.Links = append(d.Links, doc.Link{Href: d.Next, Text: "Read on"})
+		foot = append(foot, doc.Span{Text: "  ·  "}, doc.Span{Text: "Read on ›", Link: 2})
+	}
+	d.Blocks = append(d.Blocks, doc.Paragraph{Text: foot})
 	return d, nil
 }

@@ -35,7 +35,7 @@ func testEnv(t *testing.T, fams ...Family) Env {
 	}
 	t.Cleanup(func() { db.Close() })
 	return Env{DB: db, Load: func(ctx context.Context, target string) (*doc.Document, error) {
-		return &doc.Document{URL: target, Title: target, Blocks: []doc.Block{doc.Paragraph{Text: doc.Inline{{Text: "body"}}}}}, nil
+		return &doc.Document{URL: target, Title: target, Blocks: []doc.Block{doc.Paragraph{Text: doc.Inline{{Text: fakeBody}}}}}, nil
 	}}
 }
 
@@ -81,3 +81,6 @@ func TestAllFamiliesFailing(t *testing.T) {
 		t.Error("no family worked: an error is expected")
 	}
 }
+
+// fakeBody is a page's text long enough to be shown (see thin).
+var fakeBody = strings.Repeat("The quick brown fox jumps over the lazy dog. ", 12)

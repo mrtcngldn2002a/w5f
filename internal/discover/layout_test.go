@@ -138,7 +138,7 @@ func TestWindowOnPagesOfTheXML(t *testing.T) {
 	if !strings.HasPrefix(gotRange, "bytes=") {
 		t.Errorf("asked for a range, got %q", gotRange)
 	}
-	if len(d.Links) != 1 || d.Links[0].Href != strings.Replace(src, "_djvu.xml", "_djvu.txt", 1) {
+	if len(d.Links) == 0 || d.Links[0].Href != strings.Replace(src, "_djvu.xml", "_djvu.txt", 1) {
 		t.Errorf("the whole text is the Archive's text file: %+v", d.Links)
 	}
 	var all strings.Builder

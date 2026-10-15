@@ -94,7 +94,18 @@ func (weird) Draw(ctx context.Context, env Env) (Draw, error) {
 		return Draw{}, errors.New("no worlds")
 	}
 	w := pickWorld(ws)
-	return Draw{Target: w.URL, Why: fmt.Sprintf("weird/archived worlds · %s (tier %d)", w.Name, w.Tier)}, nil
+	why := fmt.Sprintf("weird/archived worlds · %s (tier %d)", w.Name, w.Tier)
+	// A world's front door is a page of links: a page of its own is shown,
+	// found by walking in (the door itself when the walk finds none).
+	if env.Fetcher != nil {
+		if target, title, err := descend(ctx, env.Fetcher, w.URL, 3); err == nil {
+			if title != "" {
+				why += " · " + title
+			}
+			return Draw{Target: target, Why: why}, nil
+		}
+	}
+	return Draw{Target: w.URL, Why: why}, nil
 }
 
 // fiction: a story from several places: a top-of-all-time post of a few

@@ -126,7 +126,10 @@ func Next(ctx context.Context, env Env) (Draw, *doc.Document, error) {
 		d, err := drawUnseen(ctx, env, f)
 		if err == nil {
 			var page *doc.Document
-			if page, err = env.Load(ctx, d.Target); err == nil {
+			if page, err = env.Load(ctx, d.Target); err == nil && thin(page) {
+				err = errThin
+			}
+			if err == nil {
 				d.Family = f.Name()
 				_ = env.DB.Set(lastKey, d.Family)
 				markSeen(env.DB, d.Target)
@@ -148,6 +151,60 @@ func Next(ctx context.Context, env Env) (Draw, *doc.Document, error) {
 		errs = append(errs, fmt.Sprintf("%s: %v", f.Name(), err))
 	}
 	return Draw{}, nil, errors.New("Deep random found nothing this time (" + strings.Join(errs, "; ") + ")")
+}
+
+// thinWords is the least prose a drawn page shows: less is a page of
+// pictures, a site's front door or a page that did not really open.
+const thinWords = 80
+
+var errThin = errors.New("the page has hardly any text")
+
+// thin tells a page with less than thinWords words of prose (link text
+// does not count: a page of links is not reading matter).
+func thin(d *doc.Document) bool { return proseWords(d.Blocks, thinWords) < thinWords }
+
+// proseWords counts the words of prose in blocks, stopping at enough.
+func proseWords(bs []doc.Block, enough int) int {
+	n := 0
+	for _, b := range bs {
+		if n >= enough {
+			break
+		}
+		switch b := b.(type) {
+		case doc.Paragraph:
+			for _, s := range b.Text {
+				if s.Link == 0 {
+					n += len(strings.Fields(s.Text))
+				}
+			}
+		case doc.Pre:
+			n += len(strings.Fields(b.Text))
+		case doc.Heading:
+		case doc.List:
+			for _, it := range b.Items {
+				n += proseWords(it, enough-n)
+			}
+		case doc.Quote:
+			n += proseWords(b.Blocks, enough-n)
+		case doc.Collapsible:
+			n += proseWords(b.Blocks, enough-n)
+		case doc.Columns:
+			for _, c := range b.Cols {
+				n += proseWords(c, enough-n)
+			}
+		case doc.Table:
+			for _, r := range b.Rows {
+				for _, c := range r {
+					for _, s := range c {
+						if s.Link == 0 {
+							n += len(strings.Fields(s.Text))
+						}
+					}
+				}
+			}
+		}
+	}
+	return n
 }
 
 // drawUnseen draws from a family, drawing again (twice at most) when the page

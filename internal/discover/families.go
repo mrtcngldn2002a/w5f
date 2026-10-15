@@ -65,8 +65,9 @@ var (
 
 func pick[T any](xs []T) T { return xs[rand.IntN(len(xs))] }
 
-// reNotContent: shop, donation, search and site pages are not reading matter.
-var reNotContent = regexp.MustCompile(`(?i)/(\w*shop|store|cart|buy|donat\w*|search|help|contact|about|faq|login|privacy|links?|cgi-bin|advert\w*|subscribe)(/|\.|$)`)
+// reNotContent: shop, donation, search and site pages are not reading matter
+// (nor a society's own pages of lectures and events: gnosis.org/gnostsoc).
+var reNotContent = regexp.MustCompile(`(?i)/(\w*shop|store|cart|buy|donat\w*|search|help|contact|about|faq|login|privacy|links?|cgi-bin|advert\w*|subscribe|events?|calendar|schedule|gnostsoc)(/|\.|$)`)
 
 var skipExt = map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".gif": true, ".pdf": true, ".zip": true,
 	".mp3": true, ".css": true, ".js": true, ".ico": true, ".svg": true, ".webp": true, ".tmp": true, ".mid": true, ".wav": true,
@@ -108,7 +109,7 @@ func descendIn(ctx context.Context, f *fetch.Fetcher, start, scope string, depth
 			u.Fragment = ""
 			if skipExt[strings.ToLower(path.Ext(u.Path))] || visited[u.String()] || seen[u.String()] || !strings.HasPrefix(u.Path, scope) ||
 				u.Path == "/" || strings.HasSuffix(u.Path, "/index.html") && path.Dir(u.Path) == "/" ||
-				reNotContent.MatchString(u.Path) || u.RawQuery != "" {
+				reNotContent.MatchString(u.Path) || reWikidotSystem.MatchString(u.Path) || !inSiteScope(u) || u.RawQuery != "" {
 				return
 			}
 			seen[u.String()] = true
@@ -118,7 +119,8 @@ func descendIn(ctx context.Context, f *fetch.Fetcher, start, scope string, depth
 		// Sacred Texts book/section indexes contain long introductions; keep
 		// walking instead of returning their table of contents as a text.
 		name := strings.ToLower(path.Base(base.Path))
-		indexPage := name == "index.htm" || name == "index.html"
+		indexPage := name == "index.htm" || name == "index.html" ||
+			len(links) >= 20 && linkText*2 > textLen // a listing: its texts are behind its links
 		if level > 0 && !indexPage && (prose >= 1500 || len(links) == 0 && prose >= 200) {
 			title := strings.TrimSpace(gq.Find("title").First().Text())
 			if title == "" {
@@ -310,6 +312,8 @@ func (encyclopedic) Draw(ctx context.Context, env Env) (Draw, error) {
 			target, title, err = britannicaPick(ctx, env.Fetcher, s.start)
 		} else if s.name == "Internet Encyclopedia of Philosophy" {
 			target, title, err = iepPick(ctx, env.Fetcher)
+		} else if s.name == "Wikipedia (EN)" {
+			target, err = wikipediaArticle(ctx, env.Fetcher, s.start)
 		} else {
 			target, err = resolveRandom(ctx, env.Fetcher, s.start)
 		}
@@ -348,4 +352,77 @@ func resolveRandom(ctx context.Context, f *fetch.Fetcher, raw string) (string, e
 		return "", errors.New("the random address did not lead anywhere")
 	}
 	return resp.URL.String(), nil
+}
+
+// wikiMinProse is the prose a random Wikipedia page must have to be shown:
+// most random pages are stubs of a few lines, lists or name pages.
+const wikiMinProse = 2500
+
+// wikipediaArticle draws random Wikipedia pages until one is an article
+// worth reading: not a list, not a name or disambiguation page, not a stub
+// (up to six tries; the last one is kept if none is).
+func wikipediaArticle(ctx context.Context, f *fetch.Fetcher, random string) (string, error) {
+	u, err := url.Parse(random)
+	if err != nil {
+		return "", err
+	}
+	last := ""
+	for range 6 {
+		resp, err := f.Get(ctx, u, fetch.Options{NoStore: true})
+		if err != nil {
+			if last != "" {
+				return last, nil
+			}
+			return "", err
+		}
+		if resp.URL == nil || resp.URL.String() == random {
+			return "", errors.New("the random address did not lead anywhere")
+		}
+		last = resp.URL.String()
+		if wikiWorthReading(resp.URL, resp.Body) {
+			return last, nil
+		}
+	}
+	return last, nil
+}
+
+func wikiWorthReading(u *url.URL, body []byte) bool {
+	name, _ := url.PathUnescape(path.Base(u.Path))
+	if strings.HasPrefix(name, "List_of_") || strings.HasPrefix(name, "Lists_of_") || strings.Contains(name, "(disambiguation)") ||
+		strings.Contains(name, "(surname)") || strings.Contains(name, "(given_name)") {
+		return false
+	}
+	gq, err := goquery.NewDocumentFromReader(bytes.NewReader(body))
+	if err != nil {
+		return true
+	}
+	if gq.Find("#disambigbox, .disambig, #setindexbox").Length() > 0 {
+		return false
+	}
+	prose := 0
+	gq.Find("#mw-content-text p").Each(func(_ int, p *goquery.Selection) {
+		prose += len(strings.Join(strings.Fields(p.Text()), " "))
+	})
+	return prose >= wikiMinProse
+}
+
+// reWikidotSystem: a Wikidot site's own pages (recent changes, forum, side
+// bar, members) are not its writing.
+var reWikidotSystem = regexp.MustCompile(`(?i)^/(system|forum|nav|admin|search|user|component|theme|css|deleted|fragment|old|_\w*):`)
+
+// siteScopes keeps the walk on a site to where its texts are: gnosis.org is
+// also the Gnostic Society's church, lectures and shop.
+var siteScopes = map[string][]string{"gnosis.org": {"/library/", "/naghamm/"}}
+
+func inSiteScope(u *url.URL) bool {
+	scopes, ok := siteScopes[strings.TrimPrefix(u.Host, "www.")]
+	if !ok {
+		return true
+	}
+	for _, s := range scopes {
+		if strings.HasPrefix(u.Path, s) {
+			return true
+		}
+	}
+	return false
 }

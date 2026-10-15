@@ -1141,6 +1141,12 @@ func plainText(s, u, origin string) *doc.Document {
 		}
 		d.Blocks = append(d.Blocks, doc.Paragraph{Text: in})
 	}
+	// A text file has no title of its own: its name is one ("quickfix.txt").
+	if pu, err := url.Parse(u); d.Title == "" && err == nil && strings.HasPrefix(pu.Scheme, "http") && pu.Path != "" && !strings.HasSuffix(pu.Path, "/") {
+		if name, err := url.PathUnescape(pu.Path[strings.LastIndex(pu.Path, "/")+1:]); err == nil {
+			d.Title = name
+		}
+	}
 	return d
 }
 

@@ -222,8 +222,8 @@ func nextKinds(db *store.DB, n int, exclude []string) []string {
 	return out
 }
 
-// drawFresh draws a section up to three times for something not shown in
-// the last 30 days.
+// drawFresh draws a section up to three times for something that opens, has
+// something to read and was not shown in the last 30 days.
 func drawFresh(ctx context.Context, env Env, kind string, m *memory) (Draw, error) {
 	var err error
 	for range 3 {
@@ -234,10 +234,25 @@ func drawFresh(ctx context.Context, env Env, kind string, m *memory) (Draw, erro
 			}
 			continue
 		}
-		if !m.targets[d.Target] {
-			return d, nil
+		if m.targets[d.Target] {
+			err = errors.New("only things shown lately")
+			continue
 		}
-		err = errors.New("only things shown lately")
+		// The page is opened now (and cached), so that an issue never
+		// holds a section that does not open or has nothing to read.
+		if env.Load != nil {
+			page, lerr := env.Load(ctx, d.Target)
+			if lerr == nil && thin(page) {
+				lerr = errThin
+			}
+			if lerr != nil {
+				if err = lerr; ctx.Err() != nil {
+					return Draw{}, err
+				}
+				continue
+			}
+		}
+		return d, nil
 	}
 	return Draw{}, err
 }
