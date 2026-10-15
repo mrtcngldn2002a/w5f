@@ -349,3 +349,21 @@ func TestKeysReadWithoutCase(t *testing.T) {
 		t.Errorf("Q closed to %q", m.cur.target)
 	}
 }
+
+// v opens the page's own address even with a link selected (the arrows
+// always rest on one); on a room W5F builds, the selected link.
+func TestVOpensThePageNotTheSelectedLink(t *testing.T) {
+	m := open(sized(New("", "test")), "https://site.example/story", linksPage("Story", 5))
+	m = press(m, "down", "down")
+	if m.focused() == nil {
+		t.Fatal("no link selected")
+	}
+	if got := m.browserTarget(); got != "https://site.example/story" {
+		t.Errorf("web page: v opens %q", got)
+	}
+	m = open(sized(New("", "test")), "w5f:room", linksPage("Room", 5))
+	m = press(m, "down", "down")
+	if got, want := m.browserTarget(), m.cur.doc.Links[m.focused().Link-1].Href; got != want {
+		t.Errorf("room: v opens %q, want the selected link %q", got, want)
+	}
+}

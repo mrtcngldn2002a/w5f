@@ -517,13 +517,7 @@ func (m Model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.loading = target
 		return m, load(target, false)
 	case "v":
-		// This page (or the selected link) viewed in the browser.
-		target := p.target
-		if f := m.focused(); f != nil && f.Kind == render.FocusLink && strings.HasPrefix(p.doc.Links[f.Link-1].Href, "http") {
-			target = p.doc.Links[f.Link-1].Href
-		} else if !strings.HasPrefix(target, "http") {
-			target = p.doc.URL
-		}
+		target := m.browserTarget()
 		if err := browser.Open(target); err != nil {
 			m.status = "error: " + err.Error()
 		} else {
@@ -670,6 +664,23 @@ func (m *Model) lynxMove(dir int) {
 	default:
 		p.focus = m.visibleFocus(dir)
 	}
+}
+
+// browserTarget is what v opens: the page's own web address. The selected
+// link only stands in on a page with none (a room W5F builds): the arrows
+// always rest on some link, so a web page's links came first and its own
+// address was never reached (owner's report, 2026-10-15).
+func (m *Model) browserTarget() string {
+	p := m.cur
+	for _, a := range []string{p.target, p.doc.URL} {
+		if strings.HasPrefix(a, "http") {
+			return a
+		}
+	}
+	if f := m.focused(); f != nil && f.Kind == render.FocusLink && strings.HasPrefix(p.doc.Links[f.Link-1].Href, "http") {
+		return p.doc.Links[f.Link-1].Href
+	}
+	return p.doc.URL
 }
 
 func (m *Model) focused() *render.Focusable {
@@ -1396,7 +1407,7 @@ func (m Model) helpLines() []string {
 		{"g → ia", "the Internet Archive's texts by collection (ia <words>, ia @collection <words>, subject:alchemy)"},
 		{"enter / g → ? text", "answer a page that asks for input (g → smallweb, g → worlds)"},
 		{"+ / -", "expand / fold all sections"}, {"o", "show link address"}, {"ctrl+r", "reload"},
-		{"v", "view this page (or the selected link) in the browser · g → browser <address>"},
+		{"v", "view this page in the browser (a link: open it with enter, then v; in rooms: the selected link) · g → browser <address>"},
 		{"c · i", "draw a tarot card · cast an I Ching hexagram (kept: the texts come once from sacred-texts)"},
 		{"1 … 9, 0", "the rooms of the library: 1 Reading Room (home) · 2 Periodical Gallery (periodicals) · 3 The Stacks (books) · 4 The Serial Hall (internet fiction) · 5 The Picture Vault (comics) · 6 The Gaming Table (solo RPG) · 7 The Newsroom (Usenet) · 8 Curiosity Cabinet (discovery) · 9 The Lectern (queue) · 0 The Scriptorium (notes)"},
 		{"h · l · w", "The Register (your history) · Ultan's Ledger (your reading, counted) · The Weeding Room (what is kept, and what can go)"},
