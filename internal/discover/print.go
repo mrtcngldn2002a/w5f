@@ -84,11 +84,17 @@ func pagesWindowRange(size, span int) (from, to int) {
 // reads a page across its columns, so an item with no XML is passed over.
 func printDraw(ctx context.Context, env Env, s printSource) (Draw, error) {
 	var errs []string
-	for range 4 {
+	tried := map[string]bool{} // an item found wanting is not tried again in the same draw
+	for picks, items := 0, 0; items < 4 && picks < 12; picks++ {
 		d, err := archivePick(ctx, env.Fetcher, s.query)
 		if err != nil {
 			return Draw{}, err
 		}
+		if tried[d.Identifier] {
+			continue
+		}
+		tried[d.Identifier] = true
+		items++
 		_, xml, xmlSize, err := archiveFiles(ctx, env.Fetcher, d.Identifier)
 		if err != nil {
 			if ctx.Err() != nil {

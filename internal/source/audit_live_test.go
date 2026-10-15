@@ -97,7 +97,7 @@ func TestSourceAuditLive(t *testing.T) {
 				mark = "!"
 				bad++
 			}
-			t.Logf("%s %-12s %-5s %5dw %s\n      %s\n      %q %s", mark, name, took, words, d.Why, d.Target, clip(first, 90), strings.Join(faults, "; "))
+			t.Logf("%s %-12s %-5s %5dw %s\n      %s\n      %s\n      %q %s", mark, name, took, words, d.Why, d.Target, page.Byline, clip(first, 90), strings.Join(faults, "; "))
 		}
 	}
 	t.Logf("%d draws with something wrong, %d thin pages passed over", bad, passed)

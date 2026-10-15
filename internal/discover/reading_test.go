@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"w5f/internal/doc"
 )
@@ -96,9 +97,11 @@ func TestWindowReadsOn(t *testing.T) {
 	if !strings.HasPrefix(next.Byline, "read on") || !opening(first) || first == last {
 		t.Errorf("read on: %q, starts %.60q after %.60q", next.Byline, first, last)
 	}
-	foot := next.Blocks[len(next.Blocks)-1].(doc.Paragraph).Text
-	if foot[0].Text != "The whole text" || foot[len(foot)-1].Text != "Read on ›" {
-		t.Errorf("foot %+v", foot)
+	for _, page := range []*doc.Document{d, next} {
+		foot := page.Blocks[len(page.Blocks)-1].(doc.Paragraph).Text
+		if foot[0].Text != "The whole text" || (page.Next != "") != (foot[len(foot)-1].Text == "Read on ›") {
+			t.Errorf("foot %+v, next %q", foot, page.Next)
+		}
 	}
 }
 
@@ -175,5 +178,110 @@ func TestTidyPagesDropsATitleCaseRunningHead(t *testing.T) {
 	}
 	if !strings.Contains(got, "the river which flows from the mountains") {
 		t.Errorf("a line of the text is not a running head: %q", got)
+	}
+}
+
+func TestDropCapMended(t *testing.T) {
+	for in, want := range map[string]string{
+		"HEY went down to the river at dawn.":        "THEY went down to the river at dawn.",
+		"ITH a cry the gulls rose.":                  "ITH a cry the gulls rose.", // "ith" is in the list: left
+		"HE ship came down in the dark.":             "THE ship came down in the dark.",
+		"HE international exchange has brought him.": "THE international exchange has brought him.",
+		"HE was tired of the long road.":             "HE was tired of the long road.",
+		"HE suddenly turned to the door.":            "HE suddenly turned to the door.",
+		"HE knew the road well enough.":              "HE knew the road well enough.",
+		"HE swore under his breath.":                 "HE swore under his breath.",
+		"HIS is a believe-it-or-not story.":          "THIS is a believe-it-or-not story.",
+		"HIS hand was cold on the latch.":            "HIS hand was cold on the latch.",
+		"HERE at the edge of the map he lay.":        "HERE at the edge of the map he lay.",
+		"NO light was left.":                         "NO light was left.",
+		"OR ME, discovering it was a joy.":           "FOR ME, discovering it was a joy.",
+		"HEY! You there.":                            "HEY! You there.",
+	} {
+		if got := mendDropCap(in); got != want {
+			t.Errorf("%q: %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestBylineMarksAStoryStart(t *testing.T) {
+	text := "THE TRIAL\nby Brian Stableford\n\n" + goodText + " " + goodText + "\n\n" + goodText + " " + goodText + "\n\n" +
+		"Asimov's SF, July 2007\nby Dell Magazine Authors\n\n" + goodText + " " + goodText + "\n"
+	paras := paragraphs(text)
+	if len(paras) != 3 || !opening(paras[0]) || opening(paras[1]) || opening(paras[2]) {
+		t.Fatalf("the paragraph after a title and byline opens a story, no other: %q", paras)
+	}
+	if shown(paras[0]) != goodText+" "+goodText {
+		t.Errorf("the mark is not shown: %q", shown(paras[0]))
+	}
+}
+
+// logXML is the DjVu XML of a log of numbered entries, one column a page,
+// every entry of eleven words: a page ends in the middle of one.
+func logXML(pages int) (string, []string) {
+	names := strings.Fields("tide bird boat stone wind rain shell fish cloud sand reed crab gull wave moon star")
+	var entries, words []string
+	for i := 0; len(words) < pages*320; i++ {
+		e := fmt.Sprintf("The log of the %s and the %s tells the weather.", names[i%16], names[i/16%16])
+		entries = append(entries, e)
+		words = append(words, strings.Fields(e)...)
+	}
+	var xml strings.Builder
+	xml.WriteString("<?xml version=\"1.0\"?>\n<DjVuXML><BODY>\n")
+	for p := 0; p < pages; p++ {
+		var page []lword
+		for i := 0; i < 40; i++ {
+			page = append(page, columnLine(100, 200+i*48, words[p*320+i*8:p*320+i*8+8])...)
+		}
+		xml.WriteString(xmlPage(page))
+	}
+	xml.WriteString("</BODY></DjVuXML>\n")
+	return xml.String(), entries
+}
+
+func TestReadOnAcrossPagesLosesNoSentence(t *testing.T) {
+	body, entries := logXML(12)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.ServeContent(w, r, "x_djvu.xml", time.Time{}, strings.NewReader(body))
+	}))
+	defer srv.Close()
+	env := Env{Fetcher: testFetcher()}
+	target := windowPagesTarget(srv.URL+"/download/x/x_djvu.xml", "The log", 0, len(body)/4, len(body))
+	var read strings.Builder
+	ranges := map[string]bool{}
+	for hop := 0; hop < 30 && target != "" && len(ranges) < 3; hop++ {
+		d, err := Route(context.Background(), target, env)
+		if err != nil {
+			t.Fatalf("hop %d: %v", hop, err)
+		}
+		q, _ := url.ParseQuery(strings.TrimPrefix(target, "w5f:discover/window?"))
+		ranges[q.Get("r")] = true
+		for _, b := range d.Blocks[:len(d.Blocks)-1] {
+			read.WriteString(b.(doc.Paragraph).Text[0].Text + " ")
+		}
+		target = d.Next
+	}
+	if len(ranges) < 3 {
+		t.Fatalf("read on into the pages after: %v", ranges)
+	}
+	text := read.String()
+	first := -1
+	for i, e := range entries {
+		if strings.Contains(text, e) {
+			first = i
+			break
+		}
+	}
+	last, at := first, 0
+	for i := first; i < len(entries); i++ {
+		j := strings.Index(text[at:], entries[i])
+		if j < 0 {
+			break
+		}
+		at += j + len(entries[i])
+		last = i
+	}
+	if rest := strings.TrimSpace(text[at:]); first < 0 || rest != "" {
+		t.Errorf("entries %d to %d read in order, then %.120q", first, last, rest)
 	}
 }
