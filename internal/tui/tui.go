@@ -341,6 +341,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tea.KeyPressMsg:
 		return m.key(msg)
+	case tea.MouseWheelMsg:
+		m.wheel(msg.Button)
+		return m, nil
 	}
 	return m, nil
 }
@@ -1250,6 +1253,7 @@ func (m Model) View() tea.View {
 	b.WriteString(m.bottomBar())
 	v := tea.NewView(b.String())
 	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion // the wheel and two-finger touchpad scroll
 	v.BackgroundColor = m.theme.Page.BG
 	v.ForegroundColor = m.theme.Page.FG
 	title := "W5F"

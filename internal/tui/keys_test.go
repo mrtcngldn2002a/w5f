@@ -367,3 +367,37 @@ func TestVOpensThePageNotTheSelectedLink(t *testing.T) {
 		t.Errorf("room: v opens %q, want the selected link %q", got, want)
 	}
 }
+
+func TestMouseWheelScrollsThePage(t *testing.T) {
+	m := open(sized(New("", "test")), "https://site.example/long", linksPage("Long", 80))
+	if m.View().MouseMode != tea.MouseModeCellMotion {
+		t.Fatal("mouse is not enabled: the wheel would do nothing")
+	}
+	wheel := func(m Model, b tea.MouseButton) Model {
+		next, _ := m.Update(tea.MouseWheelMsg{Button: b})
+		return next.(Model)
+	}
+	m = wheel(m, tea.MouseWheelDown)
+	if m.cur.offset != wheelLines {
+		t.Errorf("one wheel step down: offset %d, want %d", m.cur.offset, wheelLines)
+	}
+	if m.cur.focus != 0 && !m.onScreen(m.cur.focus) {
+		t.Errorf("selection %d left off screen", m.cur.focus)
+	}
+	m = wheel(wheel(m, tea.MouseWheelUp), tea.MouseWheelUp)
+	if m.cur.offset != 0 {
+		t.Errorf("wheel up past the top: offset %d, want 0", m.cur.offset)
+	}
+	for i := 0; i < 200; i++ {
+		m = wheel(m, tea.MouseWheelDown)
+	}
+	if max := len(m.cur.layout.Lines) - m.bodyHeight(); m.cur.offset != max {
+		t.Errorf("wheel past the end: offset %d, want %d", m.cur.offset, max)
+	}
+	m = press(m, "?") // help is open: the wheel leaves the page alone
+	before := m.cur.offset
+	m = wheel(m, tea.MouseWheelUp)
+	if m.cur.offset != before {
+		t.Error("wheel moved the page behind the help screen")
+	}
+}
