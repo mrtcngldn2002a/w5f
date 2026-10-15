@@ -241,3 +241,38 @@ func flatText(d *doc.Document) string {
 	}
 	return b.String()
 }
+
+// The owner's sites marked for the Daily Packet have a section of every
+// issue, after the rotating ones; without such sites there is none.
+func TestPacketHasYourSites(t *testing.T) {
+	env := packetEnv(t)
+	ctx := context.Background()
+	env.SitesPath = filepath.Join(t.TempDir(), "random.toml")
+	n := 0
+	packetDraws["yours"] = func(context.Context, Env) (Draw, error) {
+		n++
+		return Draw{Target: fmt.Sprintf("https://tdv.example/madde/%d", n), Why: "yours/TDV · Madde " + fmt.Sprint(n)}, nil
+	}
+	without := buildPacket(ctx, env, "2026-10-01", 1)
+	if slices.ContainsFunc(without.Entries, func(e Entry) bool { return e.Kind == "yours" }) {
+		t.Fatalf("a section of your sites with none in the packet: %+v", without.Entries)
+	}
+	SaveSites(env.SitesPath, []Site{{Name: "TDV", URL: "https://tdv.example/", Packet: true}, {Name: "Only random", URL: "https://other.example/"}})
+	with := buildPacket(ctx, env, "2026-10-02", 2)
+	i := slices.IndexFunc(with.Entries, func(e Entry) bool { return e.Kind == "yours" })
+	if i < 0 || with.Entries[i].Title != "Madde 1" || with.Entries[len(with.Entries)-2].Kind != "yours" {
+		t.Fatalf("your sites come last before the queue: %+v", with.Entries)
+	}
+	rotating := 0
+	for _, e := range with.Entries {
+		if e.Kind != "periodical" && e.Kind != "queue" && e.Kind != "yours" {
+			rotating++
+		}
+	}
+	if rotating > issueDraws {
+		t.Errorf("your section took a rotating place: %d", rotating)
+	}
+	if got := packetSites(env); len(got) != 1 || got[0].Name != "TDV" {
+		t.Errorf("packet sites: %+v", got)
+	}
+}

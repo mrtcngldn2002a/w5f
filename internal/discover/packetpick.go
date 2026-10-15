@@ -286,8 +286,19 @@ func drawSections(ctx context.Context, env Env, m *memory) []Entry {
 		}
 		wg.Wait()
 	}
-	run(kinds)
-	for extra := 0; extra < 2 && len(got) < len(kinds) && ctx.Err() == nil; extra++ {
+	// The owner's own sites have a section of every issue, drawn alongside.
+	if packetDraws["yours"] != nil && len(packetSites(env)) > 0 {
+		run(append(slices.Clone(kinds), "yours"))
+	} else {
+		run(kinds)
+	}
+	rotating := func() int {
+		if _, ok := got["yours"]; ok {
+			return len(got) - 1
+		}
+		return len(got)
+	}
+	for extra := 0; extra < 2 && rotating() < len(kinds) && ctx.Err() == nil; extra++ {
 		more := nextKinds(env.DB, 1, kinds)
 		if len(more) == 0 {
 			break
@@ -296,7 +307,7 @@ func drawSections(ctx context.Context, env Env, m *memory) []Entry {
 		run(more)
 	}
 	var out []Entry
-	for _, k := range packetPool {
+	for _, k := range append(slices.Clone(packetPool), "yours") {
 		if e, ok := got[k]; ok {
 			out = append(out, e)
 		}

@@ -1054,20 +1054,30 @@ func (m Model) gotoKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				target = t
 			}
 		}
-		if source.FoldCommand(strings.TrimSpace(m.gotoBuf)) == "random-add" {
-			// g → random-add alone: this page's site into Deep random.
-			addr := ""
+		if cmd := source.FoldCommand(strings.TrimSpace(m.gotoBuf)); cmd == "random-add" || cmd == "add" {
+			// g → random-add alone: this page's site into Deep random; g →
+			// add alone: this page, to wherever it is to go.
+			addr, name := "", ""
 			if m.cur != nil {
 				addr = m.cur.target
 				if !strings.Contains(addr, "://") && m.cur.doc != nil {
 					addr = m.cur.doc.URL
 				}
+				if m.cur.doc != nil {
+					name = m.cur.doc.Title
+				}
 			}
-			if !strings.Contains(addr, "://") {
+			switch {
+			case strings.Contains(addr, "://") && cmd == "add":
+				target = source.AddTarget(addr, name)
+			case strings.Contains(addr, "://"):
+				target = source.RandomAddTarget(addr, "")
+			case cmd == "add":
+				target = "w5f:add" // a page of W5F's own: what has been added
+			default:
 				m.status = "random-add: this page is not on the web · g → random-add <address>"
 				return m, nil
 			}
-			target = source.RandomAddTarget(addr, "")
 		}
 		if target == "" {
 			return m, nil
@@ -1410,6 +1420,7 @@ func (m Model) helpLines() []string {
 		{"* / m", "star · mark read/unread (feed items)"},
 		{"u", "follow / unfollow this serial or Reddit series, for its updates (g → fiction, g → following)"},
 		{"x / p", "deep random (eight families of sources, and your sites) · today's Daily Packet"},
+		{"g → add", "put this page anywhere: Deep random, the Daily Packet, the Periodical Gallery, the Worlds, the Reading Room, a catalog, a serial (g → add <address> [name]) · g → additions lists them"},
 		{"g → random-add", "add a site to deep random (alone: this page's site; g → random-add <address> [shelf]) · g → random-sites lists them"},
 		{"g → ia", "the Internet Archive's texts by collection (ia <words>, ia @collection <words>, subject:alchemy)"},
 		{"enter / g → ? text", "answer a page that asks for input (g → smallweb, g → worlds)"},

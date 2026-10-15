@@ -31,7 +31,7 @@ type room struct {
 
 // The rooms of Ultan's library (named with the owner, 2026-10-01).
 var rooms = []room{
-	{"1", "The Reading Room", "w5f:welcome", []string{"w5f:desk"}},
+	{"1", "The Reading Room", "w5f:welcome", []string{"w5f:desk", "w5f:places"}},
 	{"2", "Periodical Gallery", "w5f:feeds", []string{"w5f:feed", "w5f:item/"}},
 	{"3", "The Stacks", "w5f:books", []string{"w5f:book/", "w5f:catalog"}},
 	{"4", "The Serial Hall", "w5f:fiction", []string{"w5f:serial/", "w5f:following"}},
@@ -253,6 +253,7 @@ func cabinetDoc() *doc.Document {
 		{"p", "The Daily Packet", "w5f:packet", "today's issue: periodicals, a weird world, an esoteric text, an old-internet relic, your queue"},
 		{"x", "Deep random", "w5f:discover/random", "a page from one of eight families of sources, with Ultan's note on its shelf"},
 		{"", "Your sites in Deep random", "w5f:discover/sites", "any site you add (g → random-add <address>), on a shelf of yours or a family's"},
+		{"", "What you have added", "w5f:add", "any site, anywhere: g → add on its page puts it in Deep random, the Packet, the gallery, the worlds or the Reading Room"},
 		{"c", "A tarot card", "w5f:discover/tarot", "Waite's Pictorial Key, the card drawn upright or reversed"},
 		{"i", "An I Ching cast", "w5f:discover/iching", "three coins six times, Legge's translation"},
 		{"", "On this day", "w5f:almanac", "Chambers's Book of Days (1864) and the day's events"},

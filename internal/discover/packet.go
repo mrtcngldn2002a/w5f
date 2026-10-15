@@ -48,6 +48,31 @@ var packetDraws = map[string]func(context.Context, Env) (Draw, error){
 	"public":       publicDomainDraw,
 	"archive":      textfiles{}.Draw,
 	"smallweb":     smallwebFamily{}.Draw,
+	"yours":        packetSitesDraw, // not in the rotation: every issue has it when there are such sites
+}
+
+// packetSites are the owner's sites marked for the Daily Packet.
+func packetSites(env Env) []Site {
+	if env.SitesPath == "" {
+		return nil
+	}
+	sites, _ := LoadSites(env.SitesPath)
+	var out []Site
+	for _, s := range sites {
+		if s.Packet {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// packetSitesDraw draws a page from one of the owner's Daily Packet sites.
+func packetSitesDraw(ctx context.Context, env Env) (Draw, error) {
+	sites := packetSites(env)
+	if len(sites) == 0 {
+		return Draw{}, errors.New("no sites of yours in the Daily Packet")
+	}
+	return drawSites(ctx, env, "yours", sites)
 }
 
 var roman = []string{"I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"}
@@ -231,7 +256,7 @@ func almanacList(items []AlmanacItem, kind string, link func(href, text string) 
 
 var kindLabel = map[string]string{"periodical": "Periodicals", "weird": "Weird Worlds", "fiction": "Fiction", "esoteric": "Esoterica", "sufism": "Sufism",
 	"folklore": "Folklore", "knowledge": "Essays & classics", "encyclopedic": "Encyclopedias", "public": "Public domain",
-	"archive": "Old internet", "smallweb": "Small web", "queue": "From your queue"}
+	"archive": "Old internet", "smallweb": "Small web", "yours": "Your sites", "queue": "From your queue"}
 
 func packetHref(date string, rest string) string {
 	if rest == "" {

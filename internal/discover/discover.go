@@ -262,7 +262,9 @@ func Route(ctx context.Context, target string, env Env) (*doc.Document, error) {
 		page.Blocks = append([]doc.Block{doc.Notice{Kind: "info", Text: dd.label + " · " + detail + " · open it again from Small Web for another"}}, page.Blocks...)
 		return page, nil
 	case target == "w5f:worlds":
-		return worldsDoc()
+		return worldsDoc("")
+	case strings.HasPrefix(target, "w5f:worlds/add?"), strings.HasPrefix(target, "w5f:worlds/remove?"):
+		return worldsRoute(target)
 	case target == "w5f:packet" || strings.HasPrefix(target, "w5f:packet/"):
 		return packetRoute(ctx, target, env)
 	}

@@ -257,6 +257,10 @@ w5f catalogs                             manage site catalogs (re-check, remove)
 
 # discovery
 w5f x                    deep random (also: packet, tarot, iching, almanac)
+w5f "add <address> [name]"   put any site anywhere: deep random, the daily packet, the
+                                    periodical gallery, the worlds, the reading room, a catalog,
+                                    a serial (in the reader, g → add alone takes the page)
+w5f additions            what you have added, place by place
 w5f "random-add <address> [shelf]"  add any site to deep random (checks it first; in the reader,
                                     g → random-add alone adds the page's site)
 w5f random-sites         your sites in deep random (try, check again, remove)
@@ -319,7 +323,10 @@ how = "walk"        # walk, feed, random or links
 scope = "/library/" # walk and links: stay under this path (unset: the address's folder)
 depth = 4           # walk: levels down at most
 family = "occult"   # unset: yours; a family's name joins it
+packet = true       # the Daily Packet has a page of it too, under "Your sites"
 ```
+
+**Any site, anywhere.** `g → add` on a page (or `g → add <address> [name]`) asks where it should go, and each place tries it first and asks before it keeps anything: **Deep random** on a shelf (the check above); **the Daily Packet**, where every issue gets a page of it under *Your sites*, besides the four rotating sections; **the Periodical Gallery**, which finds the page's RSS or Atom feed, offers a shelf (*Your feeds* unless another is chosen) and fetches it at once — written to `feeds.toml`, and a feed's page has *stop following this feed*, which appends a `disabled = true` entry (built-in feeds too); **the Archived Worlds**, as containment fiction, a Backrooms offshoot or other fiction, kept in `worlds.toml` and walked into by Deep random like the others; **the Reading Room**, pinned under *Your places* (`places.toml`; `g → w5f:places` moves them up or unpins them); **the Stacks**, inspected as a site catalog; **the Serial Hall**, opened as a serial to follow with `u`. The page says where the site already is. `g → additions` lists everything added, place by place. Every removal asks first.
 
 `p` opens today's **Daily Packet**: three unread periodicals from three different shelves (shelves and feeds not in a recent issue first), four sections that take turns through a shuffle bag — weird worlds, fiction, esoterica, folklore, essays and classics, encyclopedias, a public-domain discovery (Public Domain Review, Project Gutenberg or an old curious book of the Biodiversity Heritage Library, whose own site refuses W5F, through its Internet Archive copy), an old-internet text, the small web — and the next item of your queue. Nothing an issue showed in the last 30 days comes back, a reshuffled one's pages included — the same issue all day, `]`/`[` through it, "reshuffle", "save this issue" (Markdown in `Saved/`). Its cover carries two columns: *On this day* (the day's chapter of Chambers's *Book of Days*, 1864, opened in a clean reader page with `g → almanac`; Britannica's *On This Day*: the day's story, the featured event, two more and three birthdays; and *Today in Science History*: a scientist born that day, one who died, an event in science) and *The oracle*.
 

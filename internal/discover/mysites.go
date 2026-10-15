@@ -44,6 +44,9 @@ type Site struct {
 	// Family is the shelf it is drawn on: "yours" when unset, a built-in
 	// family's name to join it, any other name for a shelf of that name.
 	Family string `toml:"family,omitempty"`
+	// Packet puts it in the Daily Packet too, in a section of the owner's
+	// sites that every issue has (2026-10-15).
+	Packet bool   `toml:"packet,omitempty"`
 	Added  string `toml:"added,omitempty"`
 }
 
@@ -109,6 +112,7 @@ const sitesHeader = `# Your sites in Deep random (x). W5F writes this file when 
 #   family  the shelf: unset is "yours"; a built-in family's name (esoteric,
 #           folklore, textfiles, encyclopedic, knowledge, smallweb, weird,
 #           fiction) joins it; any other name makes a shelf of its own
+#   packet  true: the Daily Packet (p) has a page of it too, in "Your sites"
 
 `
 
@@ -411,12 +415,15 @@ func siteQuery(s Site) url.Values {
 	if s.Depth > 0 {
 		v.Set("depth", strconv.Itoa(s.Depth))
 	}
+	if s.Packet {
+		v.Set("packet", "1")
+	}
 	return v
 }
 
 func siteOf(q url.Values) Site {
 	s := Site{URL: withScheme(q.Get("url")), How: q.Get("how"), Family: strings.ToLower(strings.TrimSpace(q.Get("family"))),
-		Name: strings.TrimSpace(q.Get("name")), Scope: q.Get("scope")}
+		Name: strings.TrimSpace(q.Get("name")), Scope: q.Get("scope"), Packet: q.Get("packet") == "1"}
 	s.Depth, _ = strconv.Atoi(q.Get("depth"))
 	if s.Family == YoursFamily {
 		s.Family = ""
@@ -466,6 +473,9 @@ func sitesRoute(ctx context.Context, env Env, target string) (*doc.Document, err
 		}
 		s.Added = time.Now().Format("2006-01-02")
 		note := "Added “" + s.Name + "” to the shelf " + s.family() + ". Deep random (x) now draws from it."
+		if s.Packet {
+			note = "Added “" + s.Name + "” to the shelf " + s.family() + " and to the Daily Packet. Deep random (x) draws from it, and every issue (p) has a page of it."
+		}
 		if i := find(s.URL); i >= 0 {
 			s.Added = sites[i].Added
 			sites[i] = s
@@ -579,8 +589,12 @@ func sitesDoc(sites []Site, loadErr error, p, note string) *doc.Document {
 		var items [][]doc.Block
 		for _, s := range byFamily[n] {
 			v := url.Values{"url": {s.URL}}
+			how := "  · " + s.how() + " · "
+			if s.Packet {
+				how = "  · " + s.how() + " · in the Daily Packet · "
+			}
 			in := doc.Inline{{Text: s.label(), Style: doc.Bold, Link: link(s.URL, s.label())},
-				{Text: "  · " + s.how() + " · ", Style: doc.Italic},
+				{Text: how, Style: doc.Italic},
 				{Text: "try one", Link: link("w5f:discover/sites/try?"+v.Encode(), "try "+s.label())}, {Text: " · "},
 				{Text: "check again", Link: link("w5f:discover/sites/check?"+siteQuery(s).Encode(), "check "+s.label())}, {Text: " · "},
 				{Text: "remove", Link: link("w5f:discover/sites/remove?"+v.Encode(), "remove "+s.label())}}
@@ -618,6 +632,9 @@ func checkSiteDoc(ctx context.Context, env Env, s Site, have bool) *doc.Document
 		d.Blocks = append(d.Blocks, doc.Notice{Kind: "warn", Text: "No page could be drawn from it now (" + strings.Join(errs, "; ") + "). It can be added anyway, or tried another way."})
 	}
 	verb := "Add it to Deep random"
+	if found.Packet {
+		verb = "Add it to Deep random and the Daily Packet"
+	}
 	if have {
 		verb = "Keep it this way"
 	}
@@ -656,6 +673,7 @@ func checkSiteDoc(ctx context.Context, env Env, s Site, have bool) *doc.Document
 			x.Family = ""
 		}
 	})
+	row("in the Daily Packet too", []string{"no", "yes"}, map[bool]string{false: "no", true: "yes"}[found.Packet], func(x *Site, o string) { x.Packet = o == "yes" })
 	d.Blocks = append(d.Blocks, doc.Paragraph{Text: doc.Inline{{Text: "A shelf of another name: g → random-add " + s.URL + " <name>", Style: doc.Italic}}},
 		doc.Rule{}, doc.Paragraph{Text: doc.Inline{{Text: "your sites", Link: link("w5f:discover/sites", "your sites")}}})
 	return d

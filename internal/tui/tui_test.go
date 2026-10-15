@@ -8,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"w5f/internal/doc"
+	"w5f/internal/places"
 	"w5f/internal/reddit"
 	"w5f/internal/render"
 	"w5f/internal/smallweb"
@@ -330,4 +331,54 @@ func laidOut(m Model) string {
 		b.WriteString(l.Text() + "\n")
 	}
 	return b.String()
+}
+
+// g → add alone takes the page being read, with its title; on a page of
+// W5F's own it shows what has been added.
+func TestAddTakesThisPage(t *testing.T) {
+	typed := func(m Model, s string) Model {
+		m = press(m, "g")
+		for _, r := range s {
+			m = press(m, string(r))
+		}
+		next, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+		return next.(Model)
+	}
+	m := sized(New("", "test"))
+	if m = typed(m, "add"); m.loading != "w5f:add" && (m.cur == nil || m.cur.target != "w5f:add") {
+		t.Errorf("add on the Reading Room: loading %q", m.loading)
+	}
+	m = open(sized(New("", "test")), "https://tdv.example/madde/abadile", &doc.Document{Title: "ABÂDİLE", URL: "https://tdv.example/madde/abadile",
+		Blocks: []doc.Block{doc.Paragraph{Text: doc.Inline{{Text: "text"}}}}})
+	if m = typed(m, "ADD"); m.loading != "w5f:add?name=AB%C3%82D%C4%B0LE&url=https%3A%2F%2Ftdv.example%2Fmadde%2Fabadile" {
+		t.Errorf("add on a web page: loading %q", m.loading)
+	}
+}
+
+// Pinned places stand on the Reading Room under "Your places".
+func TestWelcomeShowsYourPlaces(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("APPDATA", dir)
+	t.Setenv("XDG_DATA_HOME", dir)
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	if _, err := places.Route("w5f:places/add?url=https%3A%2F%2Ftdv.example%2F&name=TDV"); err != nil {
+		t.Fatal(err)
+	}
+	d := welcomeDoc("t")
+	var b strings.Builder
+	doc.ReplaceBlocks(d.Blocks, func(x doc.Block) ([]doc.Block, bool) {
+		switch x := x.(type) {
+		case doc.Paragraph:
+			b.WriteString(x.Text.PlainText() + "\n")
+		case doc.Heading:
+			b.WriteString(x.Text.PlainText() + "\n")
+		}
+		return nil, false
+	})
+	if !strings.Contains(b.String(), "Your places\nTDV\narrange them…") {
+		t.Errorf("welcome:\n%s", b.String())
+	}
+	if r := roomFor("w5f:places"); r == nil || r.key != "1" {
+		t.Errorf("the places page belongs to the Reading Room: %+v", r)
+	}
 }

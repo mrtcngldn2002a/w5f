@@ -188,30 +188,39 @@ func Import(c *Catalog, opmlPath string) (ImportReport, error) {
 	if len(rep.Added) == 0 {
 		return rep, nil
 	}
+	comment := fmt.Sprintf("Imported from %s on %s", filepath.Base(opmlPath), time.Now().Format("2006-01-02"))
+	return rep, appendUser("the import", comment, Catalog{Shelves: rep.Shelves, Feeds: rep.Added})
+}
+
+// appendUser adds entries to the user catalog (feeds.toml) under a comment.
+// The file is appended to, never rewritten, and restored if the result does
+// not load.
+func appendUser(what, comment string, add Catalog) error {
+	file := UserCatalogPath()
 	var buf bytes.Buffer
-	fmt.Fprintf(&buf, "\n# Imported from %s on %s\n", filepath.Base(opmlPath), time.Now().Format("2006-01-02"))
-	if err := toml.NewEncoder(&buf).Encode(Catalog{Shelves: rep.Shelves, Feeds: rep.Added}); err != nil {
-		return rep, err
+	fmt.Fprintf(&buf, "\n# %s\n", comment)
+	if err := toml.NewEncoder(&buf).Encode(add); err != nil {
+		return err
 	}
-	old, err := os.ReadFile(rep.File)
+	old, err := os.ReadFile(file)
 	if err != nil && !os.IsNotExist(err) {
-		return rep, err
+		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(rep.File), 0o755); err != nil {
-		return rep, err
+	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+		return err
 	}
-	if err := os.WriteFile(rep.File, append(append([]byte{}, old...), buf.Bytes()...), 0o644); err != nil {
-		return rep, err
+	if err := os.WriteFile(file, append(append([]byte{}, old...), buf.Bytes()...), 0o644); err != nil {
+		return err
 	}
 	if _, err := LoadCatalog(); err != nil {
 		if old == nil {
-			os.Remove(rep.File)
+			os.Remove(file)
 		} else {
-			os.WriteFile(rep.File, old, 0o644)
+			os.WriteFile(file, old, 0o644)
 		}
-		return rep, fmt.Errorf("the catalog would not load after the import, nothing was changed: %v", err)
+		return fmt.Errorf("the catalog would not load after %s, nothing was changed: %v", what, err)
 	}
-	return rep, nil
+	return nil
 }
 
 // Export writes the catalog as OPML 2.0, one folder per shelf. A feed is

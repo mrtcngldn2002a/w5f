@@ -36,6 +36,7 @@ import (
 	"w5f/internal/htmlconv"
 	"w5f/internal/index"
 	"w5f/internal/personal"
+	"w5f/internal/places"
 	"w5f/internal/reddit"
 	"w5f/internal/search"
 	"w5f/internal/sitecat"
@@ -104,6 +105,12 @@ func load(ctx context.Context, target string, opts Options) (*doc.Document, erro
 	}
 	if strings.HasPrefix(target, "w5f:random/") {
 		return loadRandom(ctx, strings.TrimPrefix(target, "w5f:random/"))
+	}
+	if isAddTarget(target) {
+		return addRoute(target)
+	}
+	if places.IsTarget(target) {
+		return places.Route(target)
 	}
 	if strings.HasPrefix(target, "w5f:search/") {
 		return loadSearch(ctx, target)
@@ -277,6 +284,7 @@ var (
 //	r/name, reddit <words>     a subreddit, or a Reddit search
 //	gut <words>, se <words>    search Project Gutenberg / Standard Ebooks
 //	ia [@collection] [words]   the Internet Archive's texts
+//	add [address], additions   put a site anywhere: Deep random, the Packet, …
 //	random-add <address> [shelf], random-sites   your sites in Deep random
 //	books, feeds               the Library / Periodicals
 //	?<words> or several words  web search
@@ -315,6 +323,11 @@ func resolve(input string) string {
 		return "w5f:catalog/check?" + v.Encode()
 	case lower == "catalogs":
 		return "w5f:catalogs"
+	case strings.HasPrefix(lower, "add ") && strings.ContainsAny(strings.Fields(s)[1], ".:/"):
+		fields := strings.Fields(s)[1:] // an address, then the name it is given
+		return AddTarget(fields[0], strings.Join(fields[1:], " "))
+	case lower == "additions" || lower == "my additions":
+		return "w5f:add"
 	case strings.HasPrefix(lower, "random-add ") && len(strings.Fields(s)) > 1:
 		fields := strings.Fields(s[len("random-add "):])
 		return RandomAddTarget(fields[0], strings.Join(fields[1:], " "))
