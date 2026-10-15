@@ -79,11 +79,16 @@ func TestWindowReadsOn(t *testing.T) {
 		fmt.Fprint(w, storyText(12, 30))
 	}))
 	defer srv.Close()
-	target := windowTarget(srv.URL+"/x/x_djvu.txt", "Weird Tales")
 	env := Env{Fetcher: testFetcher()}
-	d, err := Route(context.Background(), target, env)
-	if err != nil {
-		t.Fatal(err)
+	var d *doc.Document
+	for range 20 { // the seed picks a scene: the last has nothing after it
+		var err error
+		if d, err = Route(context.Background(), windowTarget(srv.URL+"/x/x_djvu.txt", "Weird Tales"), env); err != nil {
+			t.Fatal(err)
+		}
+		if d.Next != "" {
+			break
+		}
 	}
 	if !strings.HasPrefix(d.Byline, "from the start of a story or chapter") || d.Next == "" {
 		t.Fatalf("byline %q, next %q", d.Byline, d.Next)
@@ -194,6 +199,9 @@ func TestDropCapMended(t *testing.T) {
 		"HIS is a believe-it-or-not story.":          "THIS is a believe-it-or-not story.",
 		"HIS hand was cold on the latch.":            "HIS hand was cold on the latch.",
 		"HERE at the edge of the map he lay.":        "HERE at the edge of the map he lay.",
+		"“HEY went down to the river.":               "“THEY went down to the river.",
+		"“TI crept up to their guard, killed him.":   "“I crept up to their guard, killed him.",
+		"“WHAT do you want?” he asked.":              "“WHAT do you want?” he asked.",
 		"NO light was left.":                         "NO light was left.",
 		"OR ME, discovering it was a joy.":           "FOR ME, discovering it was a joy.",
 		"HEY! You there.":                            "HEY! You there.",

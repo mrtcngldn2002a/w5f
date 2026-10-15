@@ -228,7 +228,16 @@ func shown(p string) string {
 // first word, in capitals, is no word, or one that hardly begins a story,
 // and one letter only before it makes one of the commonest words, or it is
 // no word and one letter only makes a word at all.
+//
+// A quotation mark before the word is kept ("“HEY went" for "“THEY
+// went"), and a letter the OCR read in front of a lone word is taken away
+// ("“TI crept" for "“I crept").
 func mendDropCap(p string) string {
+	body := strings.TrimLeft(p, "“\"‘'")
+	return p[:len(p)-len(body)] + mendFirstWord(body)
+}
+
+func mendFirstWord(p string) string {
 	first := firstWord(p)
 	w := strings.TrimRightFunc(first, func(r rune) bool { return !unicode.IsLetter(r) })
 	if len(w) < 2 || strings.ToUpper(w) != w || !strings.HasPrefix(first, w) {
@@ -272,6 +281,8 @@ func mendDropCap(p string) string {
 		}
 	}
 	switch {
+	case !known[lw] && smallWords[lw[1:]]: // "TI crept": the OCR read a letter in front of "I"
+		return p[1:]
 	case len(common) == 1:
 		return string(unicode.ToUpper(common[0])) + p
 	case len(common) == 0 && len(any) == 1 && !known[lw]:
