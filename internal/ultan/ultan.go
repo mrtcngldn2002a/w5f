@@ -355,6 +355,11 @@ var shelves = map[string][]string{
 		"From the cases with no labels on their spines. The binders feared what a label might summon.",
 		"From behind the grille. I keep the key; no one has told me what it is for.",
 	},
+	"sufism": {
+		"From the dervishes' shelf. Listen to the reed: it complains of separations, and the book was cut from the same bed.",
+		"From the shelf of the lovers of God, where the wine is not wine and the tavern is not a tavern.",
+		"From the alcove by the window, where the mystics left their books. The birds in them are still flying to the mountain.",
+	},
 	"folklore": {
 		"From the cabinet of tales: none of them happened, all of them are true.",
 		"From the tellers' corner, where each story has outlived everyone who first heard it.",
@@ -473,6 +478,7 @@ var kindWords = map[string][2]string{
 	"periodical":   {"a periodical", "%s periodicals"},
 	"weird":        {"a world that never was", "%s worlds that never were"},
 	"esoteric":     {"an esoteric text", "%s esoteric texts"},
+	"sufism":       {"a Sufi text", "%s Sufi texts"},
 	"fiction":      {"a story still being written", "%s stories still being written"},
 	"folklore":     {"a tale", "%s tales"},
 	"knowledge":    {"an essay from the essayists' desks", "%s essays"},
@@ -483,7 +489,7 @@ var kindWords = map[string][2]string{
 	"queue":        {"a page from your queue", "%s pages from your queue"},
 }
 
-var kindOrder = []string{"periodical", "weird", "fiction", "esoteric", "folklore", "knowledge", "encyclopedic", "public", "archive", "smallweb", "queue"}
+var kindOrder = []string{"periodical", "weird", "fiction", "esoteric", "sufism", "folklore", "knowledge", "encyclopedic", "public", "archive", "smallweb", "queue"}
 
 // Cover is the note on the Daily Packet's cover: what the issue holds,
 // and the oracle's draw.

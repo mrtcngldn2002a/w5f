@@ -3,10 +3,12 @@ package htmlconv
 import (
 	"bytes"
 	"net/url"
+	"regexp"
 	"strings"
 
 	readability "codeberg.org/readeck/go-readability/v2"
 	"golang.org/x/net/html"
+	"golang.org/x/net/html/atom"
 
 	"w5f/internal/doc"
 )
@@ -22,6 +24,7 @@ const minArticleText = 200
 func Article(body []byte, pageURL string) (*doc.Document, error) {
 	u, _ := url.Parse(pageURL)
 	body = stripBritannicaAI(body, u)
+	body = reCSSInClass.ReplaceAll(body, []byte("$1"))
 	art, err := readability.FromReader(bytes.NewReader(body), u)
 	if err != nil || art.Node == nil {
 		return Generic(bytes.NewReader(body), pageURL)
@@ -29,7 +32,7 @@ func Article(body []byte, pageURL string) (*doc.Document, error) {
 	d := &doc.Document{
 		URL:    pageURL,
 		Origin: "live",
-		Title:  collapseSpace(art.Title()),
+		Title:  collapseSpace(unescapeTwice(art.Title())),
 		Byline: collapseSpace(art.Byline()),
 		Lang:   strings.ToLower(art.Language()),
 	}
@@ -44,6 +47,7 @@ func Article(body []byte, pageURL string) (*doc.Document, error) {
 	}
 	c := newConverter(d, u)
 	c.skip = func(n *html.Node) bool { return isHidden(n) }
+	syncAtoms(art.Node)
 	d.Blocks = c.blocks(art.Node)
 	dropRepeatedTitle(d)
 	d.Renumber()
@@ -59,6 +63,34 @@ func Article(body []byte, pageURL string) (*doc.Document, error) {
 		}
 	}
 	return d, nil
+}
+
+// reCSSInClass finds a class attribute with a style rule pasted into it
+// (`class="et_pb_text comment {margin-left: 40px; ..."` on the Ibn Arabi
+// Society's papers); it keeps the classes before the rule. Readability reads
+// "comment" as a reader's comment and dropped the paper, keeping its notes.
+var reCSSInClass = regexp.MustCompile(`(class="[^"{]*?)\s*[^\s"{]*\s*\{[^"]*`)
+
+// unescapeTwice decodes a title escaped twice at its source ("Sal&amp;aacute;m"
+// on Sacred Texts arrives as "Sal&aacute;m").
+func unescapeTwice(s string) string {
+	if strings.Contains(s, "&") && strings.Contains(s, ";") {
+		return html.UnescapeString(s)
+	}
+	return s
+}
+
+// syncAtoms gives every element the atom of its tag name. Readability makes
+// new elements and renames old ones by name alone (a <br><br> chain becomes
+// a <p>, the <p> around it a <div>), and the converter knows elements by
+// their atom: without this, a poem's stanzas ran together into one block.
+func syncAtoms(n *html.Node) {
+	walk(n, func(x *html.Node) bool {
+		if x.Type == html.ElementNode {
+			x.DataAtom = atom.Lookup([]byte(x.Data))
+		}
+		return true
+	})
 }
 
 // dropRepeatedTitle removes a leading heading that repeats the title.

@@ -31,7 +31,7 @@ const (
 )
 
 // packetPool is the order the rotating sections appear in on the cover.
-var packetPool = []string{"weird", "fiction", "esoteric", "folklore", "knowledge", "encyclopedic", "public", "archive", "smallweb"}
+var packetPool = []string{"weird", "fiction", "esoteric", "sufism", "folklore", "knowledge", "encyclopedic", "public", "archive", "smallweb"}
 
 // seenEntry is one thing an issue showed.
 type seenEntry struct {

@@ -41,6 +41,7 @@ var packetDraws = map[string]func(context.Context, Env) (Draw, error){
 	"weird":        weird{}.Draw,
 	"fiction":      fiction{}.Draw,
 	"esoteric":     esoteric{}.Draw,
+	"sufism":       sufism{}.Draw,
 	"folklore":     folklore{}.Draw,
 	"knowledge":    knowledge{}.Draw,
 	"encyclopedic": encyclopedic{}.Draw,
@@ -228,7 +229,7 @@ func almanacList(items []AlmanacItem, kind string, link func(href, text string) 
 	return &doc.List{Items: out}
 }
 
-var kindLabel = map[string]string{"periodical": "Periodicals", "weird": "Weird Worlds", "fiction": "Fiction", "esoteric": "Esoterica",
+var kindLabel = map[string]string{"periodical": "Periodicals", "weird": "Weird Worlds", "fiction": "Fiction", "esoteric": "Esoterica", "sufism": "Sufism",
 	"folklore": "Folklore", "knowledge": "Essays & classics", "encyclopedic": "Encyclopedias", "public": "Public domain",
 	"archive": "Old internet", "smallweb": "Small web", "queue": "From your queue"}
 

@@ -69,7 +69,8 @@ func pick[T any](xs []T) T { return xs[rand.IntN(len(xs))] }
 var reNotContent = regexp.MustCompile(`(?i)/(\w*shop|store|cart|buy|donat\w*|search|help|contact|about|faq|login|privacy|links?|cgi-bin|advert\w*|subscribe)(/|\.|$)`)
 
 var skipExt = map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".gif": true, ".pdf": true, ".zip": true,
-	".mp3": true, ".css": true, ".js": true, ".ico": true, ".svg": true, ".webp": true, ".tmp": true, ".mid": true, ".wav": true}
+	".mp3": true, ".css": true, ".js": true, ".ico": true, ".svg": true, ".webp": true, ".tmp": true, ".mid": true, ".wav": true,
+	".gz": true} // Sacred Texts offers every book as a zipped text too
 
 // descend walks from an index page down random internal links until a page
 // with real text (at most depth levels), staying in the start page's folder;
