@@ -216,6 +216,24 @@ func (db *DB) SetFollowed(id int64, on bool) error {
 	return err
 }
 
+// ForgetSerial takes a serial out of "Your serials": its known chapters,
+// its progress and its following go. Nothing on the web is touched; the
+// serial comes back, from the start, when opened again.
+func (db *DB) ForgetSerial(id int64) error {
+	tx, err := db.sql.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`DELETE FROM serial_chapters WHERE serial_id=?`, id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM serials WHERE id=?`, id); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 // MarkSeen records that every known chapter has been seen.
 func (db *DB) MarkSeen(id int64) error {
 	_, err := db.sql.Exec(`UPDATE serials SET seen=(SELECT count(*) FROM serial_chapters WHERE serial_id=?) WHERE id=?`, id, id)

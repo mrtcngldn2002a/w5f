@@ -486,6 +486,9 @@ func sitesRoute(ctx context.Context, env Env, target string) (*doc.Document, err
 			return sitesDoc(sites, nil, env.SitesPath, "That site is not in Deep random."), nil
 		}
 		name := sites[i].label()
+		if q.Get("sure") != "yes" { // every removal asks first, as in the Weeding Room
+			return askRemoveSite(sites[i]), nil
+		}
 		sites = append(sites[:i], sites[i+1:]...)
 		if err := SaveSites(env.SitesPath, sites); err != nil {
 			return nil, err
@@ -514,6 +517,25 @@ func sitesRoute(ctx context.Context, env Env, target string) (*doc.Document, err
 		return page, nil
 	}
 	return nil, errors.New("unknown address: " + target)
+}
+
+// askRemoveSite asks before a site leaves Deep random; "No" comes first,
+// where the selection starts.
+func askRemoveSite(s Site) *doc.Document {
+	v := url.Values{"url": {s.URL}}
+	d := &doc.Document{Title: "Remove this site?", URL: "w5f:discover/sites/remove?" + v.Encode(), Origin: "local", Lang: "en"}
+	link := func(href, text string) int {
+		d.Links = append(d.Links, doc.Link{Href: href, Text: text})
+		return len(d.Links)
+	}
+	v.Set("sure", "yes")
+	d.Blocks = []doc.Block{
+		doc.Paragraph{Text: doc.Inline{{Text: s.label() + " · " + s.URL}}},
+		doc.Paragraph{Text: doc.Inline{{Text: "It leaves Deep random and random.toml; g → random-add brings it back.", Style: doc.Italic}}},
+		doc.Paragraph{Text: doc.Inline{{Text: "No, keep it", Link: link("w5f:discover/sites", "keep")}, {Text: " · "},
+			{Text: "Yes, remove it", Style: doc.Bold, Link: link("w5f:discover/sites/remove?"+v.Encode(), "remove")}}},
+	}
+	return d
 }
 
 // sitesDoc lists the owner's sites by shelf.

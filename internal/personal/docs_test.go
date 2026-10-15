@@ -98,3 +98,32 @@ func TestClearHistoryStartsOnNo(t *testing.T) {
 		t.Errorf("first link: %+v", d.Links)
 	}
 }
+
+// One page can be forgotten from The Register, the others stay (2026-10-15).
+func TestForgetOnePage(t *testing.T) {
+	useDir(t)
+	db, _ := store.Open(filepath.Join(t.TempDir(), "t.db"))
+	defer db.Close()
+	db.Visit("https://a.example/x", "X", "web", "")
+	db.Visit("https://a.example/y", "Y", "web", "")
+	d, _ := Route("w5f:history", db)
+	var href string
+	for _, l := range d.Links {
+		if l.Text == "forget X" {
+			href = l.Href
+		}
+	}
+	if href == "" {
+		t.Fatalf("no forget link: %+v", d.Links)
+	}
+	d, err := Route(href, db)
+	if err != nil || !strings.Contains(flat(d), "[N] Forgotten") {
+		t.Fatalf("forgot: %v\n%s", err, flat(d))
+	}
+	if vs, _ := db.History(0, 0); len(vs) != 1 || vs[0].Target != "https://a.example/y" {
+		t.Errorf("left: %+v", vs)
+	}
+	if !IsTarget(href) {
+		t.Errorf("not routed here: %s", href)
+	}
+}
