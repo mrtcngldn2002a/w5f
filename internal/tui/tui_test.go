@@ -82,7 +82,7 @@ func TestViewBeforeWindowSize(t *testing.T) {
 
 func TestWelcomeFoldToggle(t *testing.T) {
 	m := sized(New("", "test"))
-	if strings.Contains(m.View().Content, "of which you hold the only card") {
+	if strings.Contains(laidOut(m), "hold the only card") {
 		t.Fatal("collapsible content visible before opening")
 	}
 	// The first link is selected on load; ↓ walks down to the collapsible.
@@ -99,15 +99,15 @@ func TestWelcomeFoldToggle(t *testing.T) {
 		t.Fatalf("focus = %+v", f)
 	}
 	m = press(m, "right")
-	if strings.Contains(m.View().Content, "of which you hold the only card") {
+	if strings.Contains(laidOut(m), "hold the only card") {
 		t.Error("→ opened the section: only enter opens")
 	}
 	m = press(m, "enter")
-	if !strings.Contains(m.View().Content, "of which you hold the only card") {
+	if !strings.Contains(laidOut(m), "hold the only card") {
 		t.Error("collapsible did not open")
 	}
 	m = press(m, "enter")
-	if strings.Contains(m.View().Content, "of which you hold the only card") {
+	if strings.Contains(laidOut(m), "hold the only card") {
 		t.Error("collapsible did not close again")
 	}
 }
@@ -320,4 +320,14 @@ func TestDiscoveryKeysAndInputPage(t *testing.T) {
 	if m.mode != modeGoto || m.gotoBuf != "? " {
 		t.Errorf("enter on an input page: mode %v buf %q", m.mode, m.gotoBuf)
 	}
+}
+
+// laidOut is the whole laid-out page, not only the part on screen: earlier
+// tests leave things on the desk that push the welcome's fold down.
+func laidOut(m Model) string {
+	var b strings.Builder
+	for _, l := range m.cur.layout.Lines {
+		b.WriteString(l.Text() + "\n")
+	}
+	return b.String()
 }

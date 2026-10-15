@@ -86,6 +86,14 @@ type Options struct {
 
 // Load resolves and converts target.
 func Load(ctx context.Context, target string, opts Options) (*doc.Document, error) {
+	d, err := load(ctx, target, opts)
+	if err == nil {
+		doc.TidyGutenberg(d)
+	}
+	return d, err
+}
+
+func load(ctx context.Context, target string, opts Options) (*doc.Document, error) {
 	target = strings.TrimSpace(target)
 	if solver.IsTarget(target) {
 		db, e := store.Default()

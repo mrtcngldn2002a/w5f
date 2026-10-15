@@ -101,6 +101,9 @@ type Layout struct {
 type Options struct {
 	Width int          // text column width in cells
 	Open  map[int]bool // collapsible ID -> open; missing = document default
+	// Book sets running prose as a printed book does: a paragraph that
+	// follows another starts with an indent instead of a blank line.
+	Book bool
 }
 
 type renderer struct {
@@ -198,10 +201,19 @@ func (r *renderer) header() {
 
 func (r *renderer) blocks(bs []doc.Block, c ctx) {
 	for i, b := range bs {
+		indent := r.o.Book && i > 0 && isPara(bs[i-1]) && isPara(b)
 		if i > 0 {
-			r.blank(c)
+			if !indent {
+				r.blank(c)
+			}
 			// Only the first block gets the lead prefix (list marker etc.).
 			c.first = c.rest
+		}
+		if indent {
+			ic := c
+			ic.first = append(append([]Seg{}, c.first...), Seg{Text: bookIndent})
+			r.block(b, ic)
+			continue
 		}
 		r.block(b, c)
 	}
@@ -754,4 +766,12 @@ func paraText(b doc.Block) string {
 		return strings.Join(rows, "\n")
 	}
 	return ""
+}
+
+// bookIndent opens a paragraph that follows another in Book layout.
+const bookIndent = "   "
+
+func isPara(b doc.Block) bool {
+	_, ok := b.(doc.Paragraph)
+	return ok
 }

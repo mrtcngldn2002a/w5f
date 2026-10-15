@@ -17,6 +17,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	xterm "github.com/charmbracelet/x/term"
 
+	"w5f/internal/catalog"
 	"w5f/internal/comics"
 	"w5f/internal/config"
 	"w5f/internal/dict"
@@ -298,7 +299,7 @@ func cacheDir() string {
 
 func dump(args []string) int {
 	fs := flag.NewFlagSet("dump", flag.ContinueOnError)
-	width := fs.Int("w", 72, "text column width")
+	width := fs.Int("w", 64, "text column width")
 	open := fs.String("open", "", `"all" to expand every collapsible`)
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -317,7 +318,7 @@ func dump(args []string) int {
 		fmt.Fprintln(os.Stderr, "w5f:", err)
 		return 1
 	}
-	opts := render.Options{Width: *width, Open: map[int]bool{}}
+	opts := render.Options{Width: *width, Open: map[int]bool{}, Book: catalog.Prose(fs.Arg(0), d)}
 	if *open == "all" {
 		for i := 1; i <= d.Collapsibles; i++ {
 			opts.Open[i] = true

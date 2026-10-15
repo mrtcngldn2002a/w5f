@@ -35,7 +35,7 @@ import (
 	"w5f/internal/theme"
 )
 
-const maxMeasure = 72 // reading column width (see 02 Dizayn Planı §4)
+const maxMeasure = 64 // reading column width (02 Dizayn Planı §4; 72 until 2026-10-15, narrowed for easier reading)
 
 type mode uint8
 
@@ -227,7 +227,7 @@ func (m *Model) relayout() {
 	if p == nil {
 		return
 	}
-	p.layout = render.Render(p.doc, render.Options{Width: m.textWidth(), Open: p.open})
+	p.layout = render.Render(p.doc, render.Options{Width: m.textWidth(), Open: p.open, Book: catalog.Prose(p.target, p.doc)})
 	if p.focus > len(p.layout.Focus) {
 		p.focus = 0
 	}
