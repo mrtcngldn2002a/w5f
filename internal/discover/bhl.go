@@ -90,9 +90,15 @@ func bhlPassage(ctx context.Context, f *fetch.Fetcher, leaves []bhlLeaf, i int) 
 			break
 		}
 	}
-	paras := tidyPages(pages)
+	// A paragraph the OCR garbled ("(liftbroiit (liHtrictH, but will just
+	// ^ivo ytni") is dropped; a passage left with too little gives way.
+	var paras []string
 	size := 0
-	for _, p := range paras {
+	for _, p := range tidyPages(pages) {
+		if score, n := cleanliness(p); n >= 8 && score < paragraphMin {
+			continue
+		}
+		paras = append(paras, p)
 		size += len(p)
 	}
 	if size < bhlPassageOK {
@@ -246,6 +252,20 @@ func tidyPages(pages []string) []string {
 				lines[i] = ""
 			}
 		}
+		// A running head in ordinary letters (the book's title, "In the
+		// Heart of Africa"): a short first line, no sentence, and the text
+		// going on in lower case on the next.
+		if first >= 0 && lines[first] != "" {
+			head := strings.TrimSpace(lines[first])
+			for j := first + 1; j < len(lines); j++ {
+				if next := strings.TrimSpace(lines[j]); next != "" {
+					if len([]rune(head)) <= 60 && !strings.ContainsAny(head, ".,;:!?") && setAsTitle(head) && continues(next) {
+						lines[first] = ""
+					}
+					break
+				}
+			}
+		}
 		var cur []string
 		flush := func() {
 			if len(cur) == 0 {
@@ -303,6 +323,23 @@ func tidyPages(pages []string) []string {
 		}
 	}
 	return paras
+}
+
+// setAsTitle tells a line set as a title: two or more words in capitals, and
+// the others the small words a title keeps in lower case.
+func setAsTitle(line string) bool {
+	caps := 0
+	for _, w := range strings.Fields(line) {
+		w = strings.TrimFunc(w, func(r rune) bool { return !unicode.IsLetter(r) })
+		switch {
+		case w == "":
+		case unicode.IsUpper([]rune(w)[0]):
+			caps++
+		case !titleWords[w]:
+			return false
+		}
+	}
+	return caps >= 2
 }
 
 // lastRune is the last rune of s and its width in bytes.

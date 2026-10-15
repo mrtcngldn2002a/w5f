@@ -96,7 +96,7 @@ func TestWindowRoute(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.Title != "Weird Tales v22 (1933)" || len(d.Blocks) < 3 || len(d.Links) != 1 || d.Links[0].Href != src {
+	if d.Title != "Weird Tales v22 (1933)" || len(d.Blocks) < 3 || len(d.Links) == 0 || d.Links[0].Href != src {
 		t.Fatalf("document: %+v", d)
 	}
 	last := d.Blocks[len(d.Blocks)-1].(doc.Paragraph)

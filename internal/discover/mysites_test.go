@@ -218,7 +218,11 @@ func TestOwnSitesPages(t *testing.T) {
 	if sites, _ := LoadSites(env.SitesPath); len(sites) != 1 || !strings.Contains(text(kept), "Changed") {
 		t.Errorf("kept: %+v\n%s", sites, text(kept))
 	}
-	gone := open(href(kept, "remove 127.0.0.1"))
+	ask := open(href(kept, "remove 127.0.0.1"))
+	if sites, _ := LoadSites(env.SitesPath); len(sites) != 1 || !strings.Contains(text(ask), "No, keep it · Yes, remove it") {
+		t.Errorf("remove asks first: %+v\n%s", sites, text(ask))
+	}
+	gone := open(href(ask, "remove"))
 	if sites, _ := LoadSites(env.SitesPath); len(sites) != 0 || !strings.Contains(text(gone), "Removed “127.0.0.1”") {
 		t.Errorf("removed: %+v\n%s", sites, text(gone))
 	}

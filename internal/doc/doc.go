@@ -3,6 +3,11 @@
 // it reaches the reader, so the reader only ever deals with one format.
 package doc
 
+import (
+	"net/url"
+	"strings"
+)
+
 // Document is a normalized, source-independent piece of readable content.
 type Document struct {
 	URL    string
@@ -26,6 +31,27 @@ type Document struct {
 	// Collapsibles is the number of Collapsible blocks; their IDs are 1..n.
 	Collapsibles int
 	Origin       string // "live", "cache", "file", "archive"
+	// Searches are the page's own search boxes, the likeliest first.
+	Searches []Search
+}
+
+// Search is a site's search box (a GET form): the reader asks for the words
+// and opens the address the form would have sent a browser to.
+type Search struct {
+	Action string // http(s) address the form goes to, without a query
+	Field  string // the name of the box the words go in
+	Params []KV   // the form's fixed values (hidden fields, defaults), in order
+	Label  string // the box's own wording ("Search articles"), if any
+}
+
+// URL is the address of the results for words.
+func (s Search) URL(words string) string {
+	var q []string
+	for _, p := range s.Params {
+		q = append(q, url.QueryEscape(p.Key)+"="+url.QueryEscape(p.Value))
+	}
+	q = append(q, url.QueryEscape(s.Field)+"="+url.QueryEscape(words))
+	return s.Action + "?" + strings.Join(q, "&")
 }
 
 // KV is an ordered metadata pair (object class, rating, tags...).

@@ -14,10 +14,11 @@ import (
 )
 
 // TestNewSourcesLive draws a few times from every source of the print,
-// nature, literature and fiction families against the real sites, and opens
-// what was drawn the way the reader does (a window onto a scan is built by
-// Route). It needs the network, so it runs only with W5F_LIVE=1
-// (W5F_SOLVER=<url> names a bot-check helper, which Poetry Foundation needs).
+// nature, literature, fiction and sufism families against the real sites, and
+// opens what was drawn the way the reader does (a window onto a scan is built
+// by Route). It needs the network, so it runs only with W5F_LIVE=1
+// (W5F_SOLVER=<url> names a bot-check helper, which Poetry Foundation needs;
+// W5F_LIVE_ONLY=<family> keeps to one family).
 func TestNewSourcesLive(t *testing.T) {
 	if os.Getenv("W5F_LIVE") == "" {
 		t.Skip("set W5F_LIVE=1 to draw from the real sites")
@@ -57,7 +58,13 @@ func TestNewSourcesLive(t *testing.T) {
 	for _, s := range fictionWeb {
 		picks = append(picks, pick{"fiction/" + s.name, func(ctx context.Context) (string, string, error) { return s.pick(ctx, env) }})
 	}
+	for _, s := range sufiSources {
+		picks = append(picks, pick{"sufism/" + s.name, func(ctx context.Context) (string, string, error) { return s.pick(ctx, env) }})
+	}
 	for _, p := range picks {
+		if only := os.Getenv("W5F_LIVE_ONLY"); only != "" && !strings.HasPrefix(p.name, only+"/") {
+			continue
+		}
 		for range 3 {
 			ctx, cancel := context.WithTimeout(context.Background(), 150*time.Second)
 			target, title, err := p.do(ctx)

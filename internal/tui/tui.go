@@ -35,7 +35,7 @@ import (
 	"w5f/internal/theme"
 )
 
-const maxMeasure = 72 // reading column width (see 02 Dizayn Planı §4)
+const maxMeasure = 64 // reading column width (02 Dizayn Planı §4; 72 until 2026-10-15, narrowed for easier reading)
 
 type mode uint8
 
@@ -227,7 +227,7 @@ func (m *Model) relayout() {
 	if p == nil {
 		return
 	}
-	p.layout = render.Render(p.doc, render.Options{Width: m.textWidth(), Open: p.open})
+	p.layout = render.Render(p.doc, render.Options{Width: m.textWidth(), Open: p.open, Book: catalog.Prose(p.target, p.doc)})
 	if p.focus > len(p.layout.Focus) {
 		p.focus = 0
 	}
@@ -277,7 +277,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if strings.HasPrefix(target, "w5f:") && msg.doc.URL != "" {
 			target = msg.doc.URL // e.g. a random page: remember where we landed
 		}
-		np := newPage(target, msg.doc)
+		np := newPage(target, withSiteSearch(msg.doc))
 		if !msg.replace {
 			m.leavePage()
 		}
@@ -310,7 +310,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.focusFirstVisible()
 		}
-		return m, record(target, np.doc)
+		return m, record(target, msg.doc) // without the search line
 	case recordedMsg:
 		if msg.err != nil && m.status == "" {
 			m.status = "error: search index: " + msg.err.Error()
@@ -341,6 +341,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tea.KeyPressMsg:
 		return m.key(msg)
+	case tea.MouseWheelMsg:
+		m.wheel(msg.Button)
+		return m, nil
 	}
 	return m, nil
 }
@@ -517,13 +520,7 @@ func (m Model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.loading = target
 		return m, load(target, false)
 	case "v":
-		// This page (or the selected link) viewed in the browser.
-		target := p.target
-		if f := m.focused(); f != nil && f.Kind == render.FocusLink && strings.HasPrefix(p.doc.Links[f.Link-1].Href, "http") {
-			target = p.doc.Links[f.Link-1].Href
-		} else if !strings.HasPrefix(target, "http") {
-			target = p.doc.URL
-		}
+		target := m.browserTarget()
 		if err := browser.Open(target); err != nil {
 			m.status = "error: " + err.Error()
 		} else {
@@ -670,6 +667,23 @@ func (m *Model) lynxMove(dir int) {
 	default:
 		p.focus = m.visibleFocus(dir)
 	}
+}
+
+// browserTarget is what v opens: the page's own web address. The selected
+// link only stands in on a page with none (a room W5F builds): the arrows
+// always rest on some link, so a web page's links came first and its own
+// address was never reached (owner's report, 2026-10-15).
+func (m *Model) browserTarget() string {
+	p := m.cur
+	for _, a := range []string{p.target, p.doc.URL} {
+		if strings.HasPrefix(a, "http") {
+			return a
+		}
+	}
+	if f := m.focused(); f != nil && f.Kind == render.FocusLink && strings.HasPrefix(p.doc.Links[f.Link-1].Href, "http") {
+		return p.doc.Links[f.Link-1].Href
+	}
+	return p.doc.URL
 }
 
 func (m *Model) focused() *render.Focusable {
@@ -823,6 +837,9 @@ func (m Model) follow(href string) (tea.Model, tea.Cmd) {
 		m.loading = href
 		return m, load(href, false)
 	case "w5f":
+		if href == siteSearchHref {
+			return m.openSiteSearch()
+		}
 		if href == "w5f:themes" {
 			return m.openThemes(false)
 		}
@@ -1037,20 +1054,30 @@ func (m Model) gotoKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				target = t
 			}
 		}
-		if source.FoldCommand(strings.TrimSpace(m.gotoBuf)) == "random-add" {
-			// g → random-add alone: this page's site into Deep random.
-			addr := ""
+		if cmd := source.FoldCommand(strings.TrimSpace(m.gotoBuf)); cmd == "random-add" || cmd == "add" {
+			// g → random-add alone: this page's site into Deep random; g →
+			// add alone: this page, to wherever it is to go.
+			addr, name := "", ""
 			if m.cur != nil {
 				addr = m.cur.target
 				if !strings.Contains(addr, "://") && m.cur.doc != nil {
 					addr = m.cur.doc.URL
 				}
+				if m.cur.doc != nil {
+					name = m.cur.doc.Title
+				}
 			}
-			if !strings.Contains(addr, "://") {
+			switch {
+			case strings.Contains(addr, "://") && cmd == "add":
+				target = source.AddTarget(addr, name)
+			case strings.Contains(addr, "://"):
+				target = source.RandomAddTarget(addr, "")
+			case cmd == "add":
+				target = "w5f:add" // a page of W5F's own: what has been added
+			default:
 				m.status = "random-add: this page is not on the web · g → random-add <address>"
 				return m, nil
 			}
-			target = source.RandomAddTarget(addr, "")
 		}
 		if target == "" {
 			return m, nil
@@ -1239,6 +1266,7 @@ func (m Model) View() tea.View {
 	b.WriteString(m.bottomBar())
 	v := tea.NewView(b.String())
 	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion // the wheel and two-finger touchpad scroll
 	v.BackgroundColor = m.theme.Page.BG
 	v.ForegroundColor = m.theme.Page.FG
 	title := "W5F"
@@ -1392,11 +1420,12 @@ func (m Model) helpLines() []string {
 		{"* / m", "star · mark read/unread (feed items)"},
 		{"u", "follow / unfollow this serial or Reddit series, for its updates (g → fiction, g → following)"},
 		{"x / p", "deep random (eight families of sources, and your sites) · today's Daily Packet"},
+		{"g → add", "put this page anywhere: Deep random, the Daily Packet, the Periodical Gallery, the Worlds, the Reading Room, a catalog, a serial (g → add <address> [name]) · g → additions lists them"},
 		{"g → random-add", "add a site to deep random (alone: this page's site; g → random-add <address> [shelf]) · g → random-sites lists them"},
 		{"g → ia", "the Internet Archive's texts by collection (ia <words>, ia @collection <words>, subject:alchemy)"},
 		{"enter / g → ? text", "answer a page that asks for input (g → smallweb, g → worlds)"},
 		{"+ / -", "expand / fold all sections"}, {"o", "show link address"}, {"ctrl+r", "reload"},
-		{"v", "view this page (or the selected link) in the browser · g → browser <address>"},
+		{"v", "view this page in the browser (a link: open it with enter, then v; in rooms: the selected link) · g → browser <address>"},
 		{"c · i", "draw a tarot card · cast an I Ching hexagram (kept: the texts come once from sacred-texts)"},
 		{"1 … 9, 0", "the rooms of the library: 1 Reading Room (home) · 2 Periodical Gallery (periodicals) · 3 The Stacks (books) · 4 The Serial Hall (internet fiction) · 5 The Picture Vault (comics) · 6 The Gaming Table (solo RPG) · 7 The Newsroom (Usenet) · 8 Curiosity Cabinet (discovery) · 9 The Lectern (queue) · 0 The Scriptorium (notes)"},
 		{"h · l · w", "The Register (your history) · Ultan's Ledger (your reading, counted) · The Weeding Room (what is kept, and what can go)"},
@@ -1404,6 +1433,7 @@ func (m Model) helpLines() []string {
 		{"g → theme", "choose a theme: amber, day, cold, night, green (g → theme day puts one on)"},
 		{"g → reddit-login browser", "take your Reddit (or ao3-login browser: AO3) session from Chromium or Firefox, where you signed in"},
 		{"/", "search everything you have read (feeds, wikis, web pages, books, notes)"},
+		{"→ search this site", "the first line of a page with a search box: enter, type the words, the site's results open"},
 		{"a / e", "add this page / enqueue the selected link: the reading queue (g → queue)"},
 		{"n", "write a note about this page"}, {"y", "clip paragraphs (↑↓ choose, shift+↑↓ extend, enter save)"},
 		{"s", "save a Markdown copy of this page"},

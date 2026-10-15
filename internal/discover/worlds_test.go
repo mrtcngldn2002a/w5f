@@ -7,6 +7,7 @@ import (
 )
 
 func TestWorldsCatalog(t *testing.T) {
+	ownDataDir(t) // the built-in catalog alone
 	ws, err := Worlds()
 	if err != nil || len(ws) < 20 {
 		t.Fatalf("worlds: %v %d", err, len(ws))

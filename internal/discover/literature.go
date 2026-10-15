@@ -47,8 +47,14 @@ func (literature) Name() string { return "literature" }
 func (literature) sources() int { return len(litSources) }
 
 func (literature) Draw(ctx context.Context, env Env) (Draw, error) {
-	w := make([]int, len(litSources))
-	for i, s := range litSources {
+	return drawWeighted(ctx, env, "literature", litSources)
+}
+
+// drawWeighted tries up to three of a family's sources, the heavier first
+// more often.
+func drawWeighted(ctx context.Context, env Env, family string, sources []litSource) (Draw, error) {
+	w := make([]int, len(sources))
+	for i, s := range sources {
 		w[i] = s.weight
 	}
 	var errs []string
@@ -56,7 +62,7 @@ func (literature) Draw(ctx context.Context, env Env) (Draw, error) {
 		if n == 3 {
 			break
 		}
-		s := litSources[i]
+		s := sources[i]
 		target, title, err := s.pick(ctx, env)
 		if err != nil {
 			if ctx.Err() != nil {
@@ -65,7 +71,7 @@ func (literature) Draw(ctx context.Context, env Env) (Draw, error) {
 			errs = append(errs, s.name+": "+err.Error())
 			continue
 		}
-		why := "literature/" + s.name
+		why := family + "/" + s.name
 		if title != "" {
 			why += " · " + title
 		}

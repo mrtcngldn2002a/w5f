@@ -95,7 +95,14 @@ func Route(ctx context.Context, target string, env Env) (*doc.Document, error) {
 		if fd == nil {
 			return nil, errors.New("unknown feed " + id)
 		}
-		return listDoc(env, fd.Name, "w5f:feeds/feed/"+id, store.Query{Feeds: []string{id}}, page, ""), nil
+		d := listDoc(env, fd.Name, "w5f:feeds/feed/"+id, store.Query{Feeds: []string{id}}, page, "")
+		d.Blocks = append(d.Blocks, doc.Rule{}, doc.Paragraph{Text: doc.Inline{
+			{Text: "stop following this feed", Link: link(d, "w5f:feeds/remove?"+url.Values{"id": {id}}.Encode(), "stop following")}}})
+		return d, nil
+	case path == "feeds/add":
+		return addRoute(ctx, env, u.Query())
+	case path == "feeds/remove":
+		return removeRoute(env, u.Query())
 	}
 	return nil, errors.New("unknown periodicals address: " + target)
 }

@@ -3,6 +3,7 @@ package store
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -70,5 +71,43 @@ func TestClearHistoryAndAside(t *testing.T) {
 	db.Visit("https://c", "C", "web", "")
 	if log, _ := db.VisitLog(time.Time{}); len(log) != 1 {
 		t.Errorf("a new log begins: %+v", log)
+	}
+}
+
+// Forgetting a page takes it (and, asked, the pages under it) out of the
+// history, and a history rebuilt from the log leaves it out until it is
+// opened again (2026-10-15).
+func TestForgetVisits(t *testing.T) {
+	db := tmpDB(t)
+	for _, v := range []string{"https://a", "https://a/b", "w5f:book/1", "w5f:book/1/ch/2", "w5f:book/10/ch/0", "https://c"} {
+		db.Visit(v, v, "web", "")
+	}
+	db.ForgetVisits("https://a", false)
+	db.ForgetVisits("w5f:book/1", true)
+	left := func() string {
+		vs, _ := db.History(0, 0)
+		var ts []string
+		for _, v := range vs {
+			ts = append(ts, v.Target)
+		}
+		sort.Strings(ts)
+		return strings.Join(ts, " ")
+	}
+	want := "https://a/b https://c w5f:book/10/ch/0"
+	if got := left(); got != want {
+		t.Fatalf("after forgetting: %q, want %q", got, want)
+	}
+	db.sql.Exec(`DELETE FROM history`) // the database lost: rebuilt from the log
+	if _, err := db.RestoreHistory(); err != nil {
+		t.Fatal(err)
+	}
+	if got := left(); got != want {
+		t.Errorf("restored: %q, want %q", got, want)
+	}
+	db.Visit("https://a", "A", "web", "")
+	db.sql.Exec(`DELETE FROM history`)
+	db.RestoreHistory()
+	if got := left(); got != "https://a "+want {
+		t.Errorf("opened again after forgetting: %q", got)
 	}
 }

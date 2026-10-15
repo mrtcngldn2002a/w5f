@@ -69,6 +69,35 @@ type logEntry struct {
 	Kind    string `json:"k"`
 	Catalog string `json:"c,omitempty"`
 	At      int64  `json:"at"`
+	// Forget marks a removal, not a visit: the page leaves the history
+	// (with the pages under it, "target/…", when Under), so RestoreHistory
+	// does not bring it back.
+	Forget bool `json:"f,omitempty"`
+	Under  bool `json:"u,omitempty"`
+}
+
+// ForgetVisits takes a page out of the reading history; under takes the
+// pages under it too (target/…: a removed book's chapters, a serial's
+// pages). The removal is written to history.log as well, so a rebuilt
+// history leaves it out; a later visit brings the page back as usual.
+func (db *DB) ForgetVisits(target string, under bool) error {
+	if target == "" {
+		return nil
+	}
+	if err := db.forgetAt(target, under); err != nil {
+		return err
+	}
+	return db.logVisit(logEntry{Target: target, At: stamp(), Forget: true, Under: under})
+}
+
+func (db *DB) forgetAt(target string, under bool) error {
+	if !under {
+		_, err := db.sql.Exec(`DELETE FROM history WHERE target=?`, target)
+		return err
+	}
+	sub := target + "/"
+	_, err := db.sql.Exec(`DELETE FROM history WHERE target=? OR substr(target,1,?)=?`, target, len(sub), sub)
+	return err
 }
 
 var logMu sync.Mutex
@@ -127,6 +156,12 @@ func (db *DB) RestoreHistory() (int, error) {
 		var e logEntry
 		if json.Unmarshal(sc.Bytes(), &e) != nil || e.Target == "" {
 			continue // a torn last line after a crash
+		}
+		if e.Forget {
+			if err := db.forgetAt(e.Target, e.Under); err != nil {
+				return 0, err
+			}
+			continue
 		}
 		if err := db.visitAt(e.Target, e.Title, e.Kind, e.Catalog, e.At); err != nil {
 			return 0, err

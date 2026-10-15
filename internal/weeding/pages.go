@@ -71,6 +71,15 @@ func Route(ctx context.Context, target string, env Env) (*doc.Document, error) {
 	case "/comic":
 		id, _ := strconv.ParseInt(q.Get("id"), 10, 64)
 		return env.comic(ctx, id, sure)
+	case "/serials":
+		return env.serials(""), nil
+	case "/serial":
+		id, _ := strconv.ParseInt(q.Get("id"), 10, 64)
+		return env.serial(id, sure)
+	case "/logs":
+		return env.logs(""), nil
+	case "/log":
+		return env.oldLog(q.Get("f"), sure)
 	}
 	return nil, errors.New("unknown address in the Weeding Room: " + target)
 }
@@ -204,7 +213,10 @@ func (env Env) room(note string) *doc.Document {
 		item(Target+"/notes", "Remove a note…", "a note, a clipping or a saved page, one at a time"),
 		item(Target+"/books", "Remove a book…", "a book of The Stacks and its file, one at a time"),
 		item(Target+"/comics", "Remove a comic…", "an issue or a chapter you downloaded, one at a time"),
+		item(Target+"/serials", "Remove a serial…", "a serial from Your serials, with its progress; nothing on the web is touched"),
 		item("w5f:history/clear", "Clear the history…", "The Register and Ultan's Ledger start again; the old log is kept"),
+		item("w5f:history", "Forget one page…", "in The Register, forget beside each page"),
+		item(Target+"/logs", "Remove an old log…", "the history logs and Gaming Table days put aside when they were cleared"),
 		item("w5f:desk", "Clear the desk…", "pages left open are set aside"),
 		item("w5f:solo/log/clear", "Clear the Gaming Table's log…", "for a new campaign; the old days are kept"),
 	}})
@@ -326,6 +338,7 @@ func (env Env) note(rel string, sure bool) (*doc.Document, error) {
 	}
 	if env.DB != nil {
 		_ = env.DB.DeleteDocs(personal.FileURL(path))
+		_ = env.DB.ForgetVisits(personal.FileURL(path), false)
 	}
 	return env.notes("Removed: " + rel), nil
 }
@@ -383,6 +396,7 @@ func (env Env) book(id int64, sure bool) (*doc.Document, error) {
 	}
 	_ = env.DB.DeleteDocs(fmt.Sprintf("w5f:book/%d/", id))
 	_ = env.DB.ForgetBook(id)
+	_ = env.DB.ForgetVisits(fmt.Sprintf("w5f:book/%d", id), true) // the desk and The Register no longer offer it
 	return env.books("Removed: " + b.Title), nil
 }
 
@@ -477,6 +491,7 @@ func (env Env) comic(ctx context.Context, id int64, sure bool) (*doc.Document, e
 		}
 	}
 	_ = env.DB.ForgetComic(id)
+	_ = env.DB.ForgetVisits(fmt.Sprintf("w5f:comics/open/%d", id), true)
 	return env.comics("Removed: " + c.Series + " · " + c.Title), nil
 }
 

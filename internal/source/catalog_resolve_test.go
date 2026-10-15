@@ -13,6 +13,7 @@ func TestResolveCatalogShortcuts(t *testing.T) {
 	t.Setenv("APPDATA", dir)
 	t.Setenv("XDG_DATA_HOME", dir)
 	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir) // a Mac keeps its data under ~/Library
 	ps := []sitecat.Profile{{ID: "gutenberg-org", Name: "Project Gutenberg"}, {ID: "fadedpage-com", Name: "Faded Page"}}
 	if err := sitecat.SaveAll(sitecat.Path(), ps); err != nil {
 		t.Fatal(err)

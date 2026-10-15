@@ -36,6 +36,7 @@ import (
 	"w5f/internal/htmlconv"
 	"w5f/internal/index"
 	"w5f/internal/personal"
+	"w5f/internal/places"
 	"w5f/internal/reddit"
 	"w5f/internal/search"
 	"w5f/internal/sitecat"
@@ -86,6 +87,14 @@ type Options struct {
 
 // Load resolves and converts target.
 func Load(ctx context.Context, target string, opts Options) (*doc.Document, error) {
+	d, err := load(ctx, target, opts)
+	if err == nil {
+		doc.TidyGutenberg(d)
+	}
+	return d, err
+}
+
+func load(ctx context.Context, target string, opts Options) (*doc.Document, error) {
 	target = strings.TrimSpace(target)
 	if solver.IsTarget(target) {
 		db, e := store.Default()
@@ -96,6 +105,12 @@ func Load(ctx context.Context, target string, opts Options) (*doc.Document, erro
 	}
 	if strings.HasPrefix(target, "w5f:random/") {
 		return loadRandom(ctx, strings.TrimPrefix(target, "w5f:random/"))
+	}
+	if isAddTarget(target) {
+		return addRoute(target)
+	}
+	if places.IsTarget(target) {
+		return places.Route(target)
 	}
 	if strings.HasPrefix(target, "w5f:search/") {
 		return loadSearch(ctx, target)
@@ -269,6 +284,7 @@ var (
 //	r/name, reddit <words>     a subreddit, or a Reddit search
 //	gut <words>, se <words>    search Project Gutenberg / Standard Ebooks
 //	ia [@collection] [words]   the Internet Archive's texts
+//	add [address], additions   put a site anywhere: Deep random, the Packet, …
 //	random-add <address> [shelf], random-sites   your sites in Deep random
 //	books, feeds               the Library / Periodicals
 //	?<words> or several words  web search
@@ -307,6 +323,11 @@ func resolve(input string) string {
 		return "w5f:catalog/check?" + v.Encode()
 	case lower == "catalogs":
 		return "w5f:catalogs"
+	case strings.HasPrefix(lower, "add ") && strings.ContainsAny(strings.Fields(s)[1], ".:/"):
+		fields := strings.Fields(s)[1:] // an address, then the name it is given
+		return AddTarget(fields[0], strings.Join(fields[1:], " "))
+	case lower == "additions" || lower == "my additions":
+		return "w5f:add"
 	case strings.HasPrefix(lower, "random-add ") && len(strings.Fields(s)) > 1:
 		fields := strings.Fields(s[len("random-add "):])
 		return RandomAddTarget(fields[0], strings.Join(fields[1:], " "))
@@ -990,6 +1011,7 @@ func loadArchived(ctx context.Context, u *url.URL) (*doc.Document, error) {
 		when = t.Format("2006-01-02")
 	}
 	d.Origin = "archive"
+	d.Searches = nil // the live site they would ask is gone
 	d.Meta = append(d.Meta, doc.KV{Key: "archived", Value: when})
 	d.Blocks = append([]doc.Block{doc.Notice{Kind: "archive",
 		Text: "Archived copy from " + when + " (Wayback Machine) — the live page is gone."}}, d.Blocks...)
@@ -1083,6 +1105,21 @@ func wikidotOrigin(data []byte) *url.URL {
 }
 
 func convertHTML(body []byte, u *url.URL) (*doc.Document, error) {
+	d, err := convertPage(body, u)
+	if err == nil && d.Searches == nil {
+		d.Searches = htmlconv.SearchForms(body, u.String())
+		// Wikidot's own box works only with its script; these wikis are
+		// searched through Crom, as g → scp <words> does.
+		if d.Searches == nil && cromWikis[strings.ToLower(u.Hostname())] {
+			d.Searches = []doc.Search{{Action: "w5f:search/wikis", Field: "q", Label: "Words (the SCP Wiki, Wanderers' Library, the Backrooms)"}}
+		}
+	}
+	return d, err
+}
+
+var cromWikis = map[string]bool{"scp-wiki.wikidot.com": true, "wanderers-library.wikidot.com": true, "backrooms-wiki.wikidot.com": true}
+
+func convertPage(body []byte, u *url.URL) (*doc.Document, error) {
 	if htmlconv.IsEksi(u) {
 		return htmlconv.Eksi(body, u.String())
 	}
@@ -1116,6 +1153,12 @@ func plainText(s, u, origin string) *doc.Document {
 			in = append(in, doc.Span{Text: ln})
 		}
 		d.Blocks = append(d.Blocks, doc.Paragraph{Text: in})
+	}
+	// A text file has no title of its own: its name is one ("quickfix.txt").
+	if pu, err := url.Parse(u); d.Title == "" && err == nil && strings.HasPrefix(pu.Scheme, "http") && pu.Path != "" && !strings.HasSuffix(pu.Path, "/") {
+		if name, err := url.PathUnescape(pu.Path[strings.LastIndex(pu.Path, "/")+1:]); err == nil {
+			d.Title = name
+		}
 	}
 	return d
 }

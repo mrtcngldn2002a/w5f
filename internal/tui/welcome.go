@@ -6,6 +6,7 @@ import (
 
 	"w5f/internal/discover"
 	"w5f/internal/doc"
+	"w5f/internal/places"
 	"w5f/internal/store"
 	"w5f/internal/ultan"
 )
@@ -33,6 +34,14 @@ func welcomeDoc(version string) *doc.Document {
 			doc.Paragraph{Text: doc.Inline{{Text: "clear the desk…", Style: doc.Italic, Link: link("w5f:desk", "the desk")}}})
 	} else {
 		left = append(left, doc.Paragraph{Text: doc.Inline{{Text: "Nothing lies open on the desk.", Style: doc.Italic}}})
+	}
+	if ps, _ := places.Load(); len(ps) > 0 { // pinned with g → add (2026-10-15)
+		var items [][]doc.Block
+		for _, p := range ps {
+			items = append(items, []doc.Block{doc.Paragraph{Text: doc.Inline{{Text: p.Name, Link: link(p.URL, p.Name)}}}})
+		}
+		left = append(left, doc.Heading{Level: 2, Text: doc.Inline{{Text: "Your places"}}}, doc.List{Items: items},
+			doc.Paragraph{Text: doc.Inline{{Text: "arrange them…", Style: doc.Italic, Link: link("w5f:places", "your places")}}})
 	}
 	left = append(left, doc.Heading{Level: 2, Text: doc.Inline{{Text: "New on the shelves"}}})
 	if items := shelfItems(db, link); len(items) > 0 {

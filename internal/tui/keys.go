@@ -160,6 +160,33 @@ func (m *Model) pageMove(dir int) {
 	}
 }
 
+// wheelLines is how far one wheel step (or one touchpad scroll tick) moves.
+const wheelLines = 3
+
+// wheel scrolls the page under the mouse wheel or a two-finger touchpad
+// scroll. Only the reading screen scrolls. The selection stays put unless it
+// leaves the screen; then it goes to the nearest visible line.
+func (m *Model) wheel(b tea.MouseButton) {
+	if m.cur == nil || m.cur.layout == nil || m.mode != modeRead {
+		return
+	}
+	dir := 0
+	switch b {
+	case tea.MouseWheelDown:
+		dir = 1
+	case tea.MouseWheelUp:
+		dir = -1
+	default:
+		return
+	}
+	p := m.cur
+	p.offset += dir * wheelLines
+	m.clamp()
+	if p.focus > 0 && !m.onScreen(p.focus) {
+		p.focus = m.visibleFocus(dir)
+	}
+}
+
 // jumpEnd goes to the top of the page and its first line (dir -1) or to the
 // bottom and its last line (dir 1).
 func (m *Model) jumpEnd(dir int) {

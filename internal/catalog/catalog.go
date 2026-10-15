@@ -120,3 +120,35 @@ func code(s string, n int) string {
 	}, s)
 	return cut(strings.ToUpper(s), n)
 }
+
+// proseHosts are sites whose pages are stories and books.
+var proseHosts = map[string]bool{
+	"gutenberg.org": true, "standardebooks.org": true, "en.wikisource.org": true,
+	"archiveofourown.org": true, "royalroad.com": true, "wanderinginn.com": true,
+	"parahumans.net": true, "unsongbook.com": true, "creepypasta.com": true,
+}
+
+// Prose reports whether a page is a book or a story, to be set as a book
+// is (the owner's choice, 2026-10-15): a book's chapters, fiction wikis'
+// tales and the story sites. SCP items stay as they are: they are filed
+// reports, not running prose.
+func Prose(target string, d *doc.Document) bool {
+	if d != nil && d.Origin == "book" {
+		return true
+	}
+	n := Number(target, d)
+	switch {
+	case strings.HasPrefix(n, "BK·"):
+		return true
+	case strings.HasPrefix(n, "FIC·SCP·"):
+		return !reSCPItem.MatchString(n)
+	case strings.HasPrefix(n, "FIC·"):
+		return true
+	}
+	if u, err := url.Parse(target); err == nil {
+		return proseHosts[strings.TrimPrefix(strings.ToLower(u.Hostname()), "www.")]
+	}
+	return false
+}
+
+var reSCPItem = regexp.MustCompile(`^FIC·SCP·\d+$`)

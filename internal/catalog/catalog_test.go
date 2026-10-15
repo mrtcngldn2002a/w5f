@@ -49,3 +49,24 @@ func TestFeedBookLabel(t *testing.T) {
 		t.Error("labels")
 	}
 }
+
+func TestProse(t *testing.T) {
+	for _, c := range []struct {
+		target string
+		d      *doc.Document
+		want   bool
+	}{
+		{"w5f:book/3/2", &doc.Document{Origin: "book"}, true},
+		{"https://www.gutenberg.org/files/1952/1952-h/1952-h.htm", nil, true},
+		{"https://www.royalroad.com/fiction/1/chapter/2", nil, true},
+		{"https://scp-wiki.wikidot.com/the-dreaming", nil, true},
+		{"https://wanderers-library.wikidot.com/a-tale", nil, true},
+		{"https://scp-wiki.wikidot.com/scp-173", nil, false},
+		{"https://en.wikipedia.org/wiki/Moth", nil, false},
+		{"w5f:home", nil, false},
+	} {
+		if got := Prose(c.target, c.d); got != c.want {
+			t.Errorf("Prose(%q) = %v, want %v", c.target, got, c.want)
+		}
+	}
+}

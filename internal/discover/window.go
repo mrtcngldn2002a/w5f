@@ -1,6 +1,8 @@
 package discover
 
 import (
+	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -8,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode"
@@ -41,21 +44,29 @@ func windowPagesTarget(src, title string, from, to, size int) string {
 // pagesText reads the bytes of r ("from-to/size") of the DjVu XML at src and
 // makes the text of the pages in them, columns in order. The cache key of a
 // range is the address with the range after a #, which is not sent.
-func pagesText(ctx context.Context, f *fetch.Fetcher, src *url.URL, r string) (text string, from, to, size int, err error) {
+// The text that follows begins at next: the last whole page of these, read
+// again, for the sentence it ends on goes on in the pages after it (or, when
+// there is one page only, the byte just past it).
+func pagesText(ctx context.Context, f *fetch.Fetcher, src *url.URL, r string) (text string, from, to, size, next int, err error) {
 	if _, err = fmt.Sscanf(r, "%d-%d/%d", &from, &to, &size); err != nil || from < 0 || to < from || size < to {
-		return "", 0, 0, 0, errors.New("window: bad range")
+		return "", 0, 0, 0, 0, errors.New("window: bad range")
 	}
 	u := *src
 	u.Fragment = "range=" + r
 	resp, err := f.Get(ctx, &u, fetch.Options{Header: http.Header{"Range": {fmt.Sprintf("bytes=%d-%d", from, to)}}})
 	if err != nil {
-		return "", 0, 0, 0, fmt.Errorf("%w: %v", errFetch, err)
+		return "", 0, 0, 0, 0, fmt.Errorf("%w: %v", errFetch, err)
 	}
 	pages := djvuPages(string(resp.Body))
 	if len(pages) == 0 {
-		return "", 0, 0, 0, errNoPage
+		return "", 0, 0, 0, 0, errNoPage
 	}
-	return reflowPages(pages), from, to, size, nil
+	end := bytes.LastIndex(resp.Body, []byte("</OBJECT>"))
+	next = from + end + len("</OBJECT>")
+	if len(pages) > 1 {
+		next = from + bytes.LastIndex(resp.Body[:end], []byte("<OBJECT "))
+	}
+	return reflowPages(pages), from, to, size, next, nil
 }
 
 var (
@@ -74,11 +85,11 @@ var (
 // is dropped, as are scraps such as page numbers and running heads.
 func paragraphs(text string) []string {
 	text = cyrillicLookalikes.Replace(strings.ReplaceAll(text, "\r\n", "\n"))
-	text = mendLines(text)
+	text = mendLines(markBylines(text))
 	var scraps []string
 	for _, p := range reParagraphBreak.Split(text, -1) {
 		p = mendMarks(strings.TrimSpace(reBlanks.ReplaceAllString(p, " ")))
-		if len([]rune(p)) >= 40 || fragment(p) {
+		if len([]rune(p)) >= 40 || fragment(p) || p == openMark {
 			scraps = append(scraps, p)
 		}
 	}
@@ -86,20 +97,28 @@ func paragraphs(text string) []string {
 	// next paragraph, in lower case.
 	var joined []string
 	for _, p := range scraps {
-		if n := len(joined); n > 0 && !endsSentence(joined[n-1]) && continues(p) {
+		if n := len(joined); n > 0 && joined[n-1] != openMark && !endsSentence(joined[n-1]) && continues(p) {
 			joined[n-1] += " " + p
 			continue
 		}
 		joined = append(joined, p)
 	}
 	var out []string
+	opens := false // the next paragraph kept is the first of a story (it follows a title and a byline)
 	for _, whole := range joined {
+		if whole == openMark {
+			opens = true
+			continue
+		}
 		for _, p := range splitJunk(whole) {
-			if p = wholeSentences(p); len([]rune(p)) < 60 || dropCapLost(p) || boilerplate(p) || advertisement(p) {
+			if p = mendDropCap(wholeSentences(p)); len([]rune(p)) < 60 || dropCapLost(p) || boilerplate(p) || advertisement(p) {
 				continue
 			}
 			if score, n := cleanliness(p); n >= 8 && score < paragraphMin {
 				continue
+			}
+			if opens {
+				p, opens = openMark+" "+p, false
 			}
 			out = append(out, p)
 		}
@@ -152,6 +171,202 @@ func dropCapLost(p string) bool {
 		return false
 	}
 	return !englishWords()[strings.ToLower(w)]
+}
+
+// openMark begins a paragraph that follows a story's title and byline
+// ("THE TRIAL" / "by Brian Stableford"): magazines of later years set no
+// capitals at a story's start, but they name it and its writer. It is taken
+// off before the paragraph is shown (shown).
+const openMark = "\uE000"
+
+var reByline = regexp.MustCompile(`^(?i:by)\s+\p{Lu}[\p{L}'’.-]*(?:\s+\p{Lu}[\p{L}'’.-]*){0,3}$`)
+
+// markBylines puts an openMark between the title and byline of a story and
+// what follows them: a byline is a line "by" and a name of up to four words,
+// after a line in capitals (the title).
+func markBylines(text string) string {
+	lines := strings.Split(text, "\n")
+	prev := "" // the last line that was not blank
+	for i, ln := range lines {
+		ln = strings.TrimSpace(ln)
+		if ln == "" {
+			continue
+		}
+		if len([]rune(ln)) <= 50 && reByline.MatchString(ln) && titleLine(prev) {
+			lines[i] = "\n" + openMark + "\n"
+		}
+		prev = ln
+	}
+	return strings.Join(lines, "\n")
+}
+
+// titleLine tells a line set in capitals, as a title is: short, and of its
+// letters (two words at least) all but a few upper case.
+func titleLine(ln string) bool {
+	if n := len([]rune(ln)); n == 0 || n > 80 {
+		return false
+	}
+	upper, letters := 0, 0
+	for _, r := range ln {
+		if unicode.IsLetter(r) {
+			letters++
+			if unicode.IsUpper(r) {
+				upper++
+			}
+		}
+	}
+	return letters >= 3 && upper*10 >= letters*9
+}
+
+// shown is a paragraph as it is shown, without its openMark.
+func shown(p string) string {
+	return strings.TrimPrefix(strings.TrimPrefix(p, openMark), " ")
+}
+
+// mendDropCap gives back the big first letter of a story's opening that the
+// OCR lost because it was a picture ("HEY went" for "THEY went"): when the
+// first word, in capitals, is no word, or one that hardly begins a story,
+// and one letter only before it makes one of the commonest words, or it is
+// no word and one letter only makes a word at all.
+//
+// A quotation mark before the word is kept ("“HEY went" for "“THEY
+// went"), and a letter the OCR read in front of a lone word is taken away
+// ("“TI crept" for "“I crept").
+func mendDropCap(p string) string {
+	body := strings.TrimLeft(p, "“\"‘'")
+	return p[:len(p)-len(body)] + mendFirstWord(body)
+}
+
+func mendFirstWord(p string) string {
+	first := firstWord(p)
+	w := strings.TrimRightFunc(first, func(r rune) bool { return !unicode.IsLetter(r) })
+	if len(w) < 2 || strings.ToUpper(w) != w || !strings.HasPrefix(first, w) {
+		return p
+	}
+	goesOn, next := false, "" // after the run of capitals the text goes on in lower case: an opening
+	rest := strings.Fields(strings.TrimPrefix(p, first))
+	for i, n := range rest[:min(4, len(rest))] {
+		if strings.ContainsAny(n, "!?") {
+			break
+		}
+		if n = strings.TrimFunc(n, func(r rune) bool { return !unicode.IsLetter(r) && r != '\'' && r != '’' }); strings.ToUpper(n) != n {
+			goesOn = startsLower(n)
+			if i == 0 {
+				next = n
+			}
+			break
+		}
+	}
+	if !goesOn || strings.ContainsAny(first, "!?") {
+		return p
+	}
+	lw := strings.ToLower(w)
+	// "HE" and "HIS" are words, and what is left of "THE" and "THIS": the
+	// word after them tells which ("HE international exchange", "HIS is").
+	switch {
+	case lw == "he" && next != "" && !heGoesOn(next), lw == "his" && auxiliaries[next]:
+		return "T" + p
+	}
+	known := englishWords()
+	if known[lw] && !rareOpeners[lw] {
+		return p
+	}
+	var common, any []rune
+	for c := 'a'; c <= 'z'; c++ {
+		if smallWords[string(c)+lw] || openers[string(c)+lw] {
+			common = append(common, c)
+		}
+		if known[string(c)+lw] {
+			any = append(any, c)
+		}
+	}
+	switch {
+	case !known[lw] && smallWords[lw[1:]]: // "TI crept": the OCR read a letter in front of "I"
+		return p[1:]
+	case len(common) == 1:
+		return string(unicode.ToUpper(common[0])) + p
+	case len(common) == 0 && len(any) == 1 && !known[lw]:
+		return string(unicode.ToUpper(any[0])) + p
+	}
+	return p
+}
+
+// auxiliaries are the verbs that go with "this" and not with "his".
+var auxiliaries = map[string]bool{"is": true, "was": true, "has": true, "had": true, "will": true, "would": true, "could": true,
+	"may": true, "might": true, "must": true, "should": true, "can": true, "does": true, "did": true, "seemed": true, "seems": true}
+
+// heGoesOn tells a word that may follow "he": a verb or an adverb (or one
+// that looks like one: -ed, -s, -ly, -n't), not a noun or an adjective as
+// after "the".
+func heGoesOn(w string) bool {
+	if auxiliaries[w] || heWords[w] {
+		return true
+	}
+	for _, end := range []string{"ed", "s", "ly", "n't", "n’t"} {
+		if strings.HasSuffix(w, end) {
+			return true
+		}
+	}
+	return false
+}
+
+var heWords = func() map[string]bool {
+	m := map[string]bool{}
+	for _, w := range strings.Fields(`said came went saw knew thought felt stood sat took made found got told began
+		shall never always also only just still then now too himself ran lay kept left heard put gave held let set read
+		wrote spoke shook drew grew threw rose woke fell fought brought bought caught taught sought meant sent spent built
+		felt slept swept wept dug hung struck stuck swung won wore tore bore broke chose froze spoke stole drove rode wrote
+		hid bit lit led fed fled met sang rang sank swam began knew blew flew drew threw saw ate forgot understood
+		would could should might must can will may did do had has is was ought dared once often seldom rarely even
+		almost hardly barely looked turned walked stopped smiled laughed nodded opened and alone who
+		arose awoke bade beheld bent bled bred burnt clung crept dealt dove dreamt drank dwelt flung forbade forgave
+		forsook gave ground hurt knelt laid leant leapt lent lost overcame paid quit shed shone shot shrank shut slew slid
+		slung slunk smote sped spat split spread sprang stank strode strove swore thrust trod upset wove wrung wound`) {
+		m[w] = true
+	}
+	return m
+}()
+
+// rareOpeners are words that hardly begin a story, but are what is left of
+// one that does when its first letter is lost.
+var rareOpeners = map[string]bool{"hey": true, "or": true}
+
+// openers are words that often begin a story besides the commonest ones.
+var openers = map[string]bool{"why": true, "where": true, "while": true, "once": true, "every": true, "never": true,
+	"even": true, "still": true, "just": true, "yes": true, "nobody": true, "everyone": true, "somewhere": true}
+
+// opening tells a paragraph that begins a story, a chapter or an article:
+// magazines set its first word or words in capitals ("THE ship came down",
+// "A STRANGE thing"). A shout ("NO!" he cried) is not one, nor a line of
+// capitals; a first word in capitals that is no word (a big first letter the
+// OCR lost) was dropped already (dropCapLost).
+func opening(p string) bool {
+	if strings.HasPrefix(p, openMark) {
+		return true
+	}
+	words := strings.Fields(p)
+	if len(words) < 8 || strings.Contains(strings.ToLower(p), "next issue") { // the magazine's own notices
+		return false
+	}
+	long := false
+	for i, w := range words[:5] {
+		if strings.ContainsAny(w, "!?") {
+			return false
+		}
+		w = strings.TrimFunc(w, func(r rune) bool { return !unicode.IsLetter(r) })
+		if w == "" {
+			return false
+		}
+		if strings.ToUpper(w) != w {
+			// the first word that is not in capitals ends the run: it is
+			// the text going on, in lower case
+			return i > 0 && long && startsLower(w)
+		}
+		if len([]rune(w)) >= 2 {
+			long = true
+		}
+	}
+	return false
 }
 
 // wholeSentences cuts away from a paragraph the head that begins in the
@@ -290,7 +505,15 @@ func pickWindow(paras []string, seed int64) (win []string, from int) {
 	}
 	rng := rand.New(rand.NewPCG(uint64(seed), 7))
 	rng.Shuffle(len(found), func(a, b int) { found[a], found[b] = found[b], found[a] })
-	best, checked := 0.0, 0
+	// Runs that start where a story or a chapter does come first: a window
+	// opened in the middle of a scene is a page torn out of a book.
+	slices.SortStableFunc(found, func(a, b candidate) int {
+		return cmp.Compare(b2i(!opening(paras[a.start])), b2i(!opening(paras[b.start])))
+	})
+	// Of the openings the first that reads is taken, so that the seed picks
+	// one story of the issue and not always the cleanest; of other runs the
+	// cleanest of 16.
+	best, checked, opened := 0.0, 0, false
 	for _, c := range found {
 		if checked == 16 {
 			break
@@ -299,11 +522,56 @@ func pickWindow(paras []string, seed int64) (win []string, from int) {
 			continue
 		}
 		checked++
+		if opening(paras[c.start]) {
+			win, from, opened = paras[c.start:c.end], c.start, true
+			break
+		}
 		if c.score > best {
 			best, win, from = c.score, paras[c.start:c.end], c.start
 		}
 	}
+	if opened { // it reads on to the end of the chapter
+		win = paras[from:readOn(paras, from)]
+	}
 	return win, from
+}
+
+// lastWords are the last words of a paragraph, enough to find it again.
+func lastWords(p string) string {
+	r := []rune(p)
+	if len(r) <= 40 {
+		return p
+	}
+	cut := string(r[len(r)-40:])
+	if i := strings.IndexByte(cut, ' '); i >= 0 {
+		cut = cut[i+1:]
+	}
+	return cut
+}
+
+func b2i(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+// windowLong is how far a window that starts at an opening reads: to the
+// next opening (the chapter or the story is over), or about this far.
+const windowLong = 16000
+
+// readOn is the end of the window that starts at paragraph from and reads
+// on: to the next opening once it has windowMin, or windowLong at most.
+func readOn(paras []string, from int) int {
+	size, end := 0, from
+	for end < len(paras) && size < windowLong {
+		if end > from && size >= windowMin && opening(paras[end]) {
+			break
+		}
+		size += len(paras[end])
+		end++
+	}
+	return end
 }
 
 // errFetch is the answer when the Archive's file cannot be had (a data node
@@ -342,9 +610,9 @@ func buildWindow(ctx context.Context, f *fetch.Fetcher, target string) (*doc.Doc
 	}
 	seed, _ := strconv.ParseInt(q.Get("k"), 10, 64)
 	var text string
-	rFrom, rTo, rSize := 0, 0, 0
+	rFrom, rTo, rSize, rNext := 0, 0, 0, 0
 	if r := q.Get("r"); r != "" {
-		if text, rFrom, rTo, rSize, err = pagesText(ctx, f, src, r); err != nil {
+		if text, rFrom, rTo, rSize, rNext, err = pagesText(ctx, f, src, r); err != nil {
 			return nil, err
 		}
 	} else {
@@ -355,7 +623,41 @@ func buildWindow(ctx context.Context, f *fetch.Fetcher, target string) (*doc.Doc
 		text = string(resp.Body)
 	}
 	paras := paragraphs(text)
-	win, from := pickWindow(paras, seed)
+	var win []string
+	var from int
+	// "p": reading on from paragraph p (the "read on" of the window before).
+	readingOn := q.Has("p")
+	if readingOn {
+		if from, err = strconv.Atoi(q.Get("p")); err != nil || from < 0 || from >= len(paras) {
+			return nil, errors.New("window: nothing more to read here")
+		}
+		win = paras[from:readOn(paras, from)]
+		// "a": the pages after the window before, which ended on these
+		// words: they are read on from just after them.
+		if a := q.Get("a"); a != "" {
+			for i, p := range paras {
+				j := strings.Index(shown(p), a)
+				if j < 0 {
+					continue
+				}
+				from = i
+				rest := strings.TrimSpace(shown(p)[j+len(a):])
+				if rest == "" {
+					from = i + 1
+				}
+				if from >= len(paras) {
+					return nil, errors.New("window: nothing more to read here")
+				}
+				win = slices.Clone(paras[from:readOn(paras, from)])
+				if rest != "" {
+					win[0] = rest
+				}
+				break
+			}
+		}
+	} else {
+		win, from = pickWindow(paras, seed)
+	}
 	if len(win) == 0 {
 		kept := 0
 		for _, p := range paras {
@@ -376,12 +678,37 @@ func buildWindow(ctx context.Context, f *fetch.Fetcher, target string) (*doc.Doc
 	if title == "" {
 		title = "A passage"
 	}
+	what := "a passage"
+	if readingOn {
+		what = "read on"
+	} else if opening(win[0]) {
+		what = "from the start of a story or chapter"
+	}
 	d := &doc.Document{URL: target, Title: title, Lang: "en", Origin: "archive",
-		Byline: fmt.Sprintf("a passage, %d%% into the text", percent)}
+		Byline: fmt.Sprintf("%s, %d%% into the text", what, percent)}
 	d.Links = []doc.Link{{Href: whole, Text: "The whole text"}}
 	for _, p := range win {
-		d.Blocks = append(d.Blocks, doc.Paragraph{Text: doc.Inline{{Text: p}}})
+		d.Blocks = append(d.Blocks, doc.Paragraph{Text: doc.Inline{{Text: shown(p)}}})
 	}
-	d.Blocks = append(d.Blocks, doc.Paragraph{Text: doc.Inline{{Text: "The whole text", Link: 1}}})
+	// What follows: the rest of these pages, or the pages after them.
+	v := url.Values{"u": {q.Get("u")}, "t": {q.Get("t")}, "k": {q.Get("k")}}
+	if end := from + len(win); end < len(paras) {
+		if r := q.Get("r"); r != "" {
+			v.Set("r", r)
+		}
+		v.Set("p", strconv.Itoa(end))
+		d.Next = "w5f:discover/window?" + v.Encode()
+	} else if rSize > 0 && rNext < rSize-1 {
+		v.Set("r", fmt.Sprintf("%d-%d/%d", rNext, min(rNext+rTo-rFrom, rSize-1), rSize))
+		v.Set("p", "0")
+		v.Set("a", lastWords(shown(win[len(win)-1])))
+		d.Next = "w5f:discover/window?" + v.Encode()
+	}
+	foot := doc.Inline{{Text: "The whole text", Link: 1}}
+	if d.Next != "" {
+		d.Links = append(d.Links, doc.Link{Href: d.Next, Text: "Read on"})
+		foot = append(foot, doc.Span{Text: "  ·  "}, doc.Span{Text: "Read on ›", Link: 2})
+	}
+	d.Blocks = append(d.Blocks, doc.Paragraph{Text: foot})
 	return d, nil
 }

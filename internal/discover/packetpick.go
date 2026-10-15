@@ -31,7 +31,7 @@ const (
 )
 
 // packetPool is the order the rotating sections appear in on the cover.
-var packetPool = []string{"weird", "fiction", "esoteric", "folklore", "knowledge", "encyclopedic", "public", "archive", "smallweb"}
+var packetPool = []string{"weird", "fiction", "esoteric", "sufism", "folklore", "knowledge", "encyclopedic", "public", "archive", "smallweb"}
 
 // seenEntry is one thing an issue showed.
 type seenEntry struct {
@@ -222,8 +222,8 @@ func nextKinds(db *store.DB, n int, exclude []string) []string {
 	return out
 }
 
-// drawFresh draws a section up to three times for something not shown in
-// the last 30 days.
+// drawFresh draws a section up to three times for something that opens, has
+// something to read and was not shown in the last 30 days.
 func drawFresh(ctx context.Context, env Env, kind string, m *memory) (Draw, error) {
 	var err error
 	for range 3 {
@@ -234,10 +234,25 @@ func drawFresh(ctx context.Context, env Env, kind string, m *memory) (Draw, erro
 			}
 			continue
 		}
-		if !m.targets[d.Target] {
-			return d, nil
+		if m.targets[d.Target] {
+			err = errors.New("only things shown lately")
+			continue
 		}
-		err = errors.New("only things shown lately")
+		// The page is opened now (and cached), so that an issue never
+		// holds a section that does not open or has nothing to read.
+		if env.Load != nil {
+			page, lerr := env.Load(ctx, d.Target)
+			if lerr == nil && thin(page) {
+				lerr = errThin
+			}
+			if lerr != nil {
+				if err = lerr; ctx.Err() != nil {
+					return Draw{}, err
+				}
+				continue
+			}
+		}
+		return d, nil
 	}
 	return Draw{}, err
 }
@@ -271,8 +286,19 @@ func drawSections(ctx context.Context, env Env, m *memory) []Entry {
 		}
 		wg.Wait()
 	}
-	run(kinds)
-	for extra := 0; extra < 2 && len(got) < len(kinds) && ctx.Err() == nil; extra++ {
+	// The owner's own sites have a section of every issue, drawn alongside.
+	if packetDraws["yours"] != nil && len(packetSites(env)) > 0 {
+		run(append(slices.Clone(kinds), "yours"))
+	} else {
+		run(kinds)
+	}
+	rotating := func() int {
+		if _, ok := got["yours"]; ok {
+			return len(got) - 1
+		}
+		return len(got)
+	}
+	for extra := 0; extra < 2 && rotating() < len(kinds) && ctx.Err() == nil; extra++ {
 		more := nextKinds(env.DB, 1, kinds)
 		if len(more) == 0 {
 			break
@@ -281,7 +307,7 @@ func drawSections(ctx context.Context, env Env, m *memory) []Entry {
 		run(more)
 	}
 	var out []Entry
-	for _, k := range packetPool {
+	for _, k := range append(slices.Clone(packetPool), "yours") {
 		if e, ok := got[k]; ok {
 			out = append(out, e)
 		}

@@ -100,3 +100,21 @@ func TestSavedPageOffersEmbedLink(t *testing.T) {
 		t.Errorf("saved page should offer the embed link:\n%s", text(d))
 	}
 }
+
+// A site's search box sits in its header, which Readability drops; the
+// page still knows it has one.
+func TestLivePageKeepsItsSearchBox(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprint(w, `<html><body><header><form role="search" action="/"><input type="search" name="s"></form></header>
+			<article><h1>Post</h1><p>`+strings.Repeat("A long paragraph of the post. ", 20)+`</p></article></body></html>`)
+	}))
+	defer srv.Close()
+	d, err := Load(context.Background(), srv.URL+"/post", Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(d.Searches) != 1 || d.Searches[0].URL("ghosts") != srv.URL+"/?s=ghosts" {
+		t.Errorf("searches = %+v", d.Searches)
+	}
+}

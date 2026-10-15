@@ -20,7 +20,8 @@ import (
 // IsTarget reports whether target is one of the personal pages.
 func IsTarget(t string) bool {
 	return t == "w5f:queue" || strings.HasPrefix(t, "w5f:queue/") || t == "w5f:notes" ||
-		t == "w5f:history" || strings.HasPrefix(t, "w5f:history?") || t == "w5f:history/clear" || strings.HasPrefix(t, "w5f:history/clear?")
+		t == "w5f:history" || strings.HasPrefix(t, "w5f:history?") || t == "w5f:history/clear" || strings.HasPrefix(t, "w5f:history/clear?") ||
+		strings.HasPrefix(t, "w5f:history/forget?")
 }
 
 func link(d *doc.Document, href, text string) int {
@@ -29,8 +30,9 @@ func link(d *doc.Document, href, text string) int {
 }
 
 // Route builds the queue, notes and history pages and applies queue
-// actions (w5f:queue/done|undone|move|remove?u=…) and the clearing of the
-// history (w5f:history/clear asks first; ?sure=yes clears).
+// actions (w5f:queue/done|undone|move|remove?u=…), the clearing of the
+// history (w5f:history/clear asks first; ?sure=yes clears) and the
+// forgetting of one page of it (w5f:history/forget?u=…&page=…).
 func Route(target string, db *store.DB) (*doc.Document, error) {
 	u, err := url.Parse(target)
 	if err != nil {
@@ -43,6 +45,20 @@ func Route(target string, db *store.DB) (*doc.Document, error) {
 	case p == "history":
 		page, _ := strconv.Atoi(q.Get("page"))
 		return historyDoc(db, max(page, 1))
+	case p == "history/forget":
+		t := q.Get("u")
+		if t == "" {
+			return nil, errors.New("which page? w5f:history/forget?u=<address>")
+		}
+		if err := db.ForgetVisits(t, false); err != nil {
+			return nil, err
+		}
+		page, _ := strconv.Atoi(q.Get("page"))
+		d, err := historyDoc(db, max(page, 1))
+		if err == nil {
+			d.Blocks = append([]doc.Block{doc.Notice{Kind: "info", Text: "Forgotten: it leaves the history and the desk. Opening it again brings it back."}}, d.Blocks...)
+		}
+		return d, err
 	case p == "history/clear":
 		if q.Get("sure") != "yes" {
 			return clearHistoryDoc(db)
@@ -245,7 +261,8 @@ func historyDoc(db *store.DB, page int) (*doc.Document, error) {
 		}
 		items = append(items, []doc.Block{
 			doc.Paragraph{Text: doc.Inline{{Text: v.Title, Link: link(d, v.Target, v.Title)}}},
-			doc.Paragraph{Text: doc.Inline{{Text: sub, Style: doc.Italic}}},
+			doc.Paragraph{Text: doc.Inline{{Text: sub + "   ", Style: doc.Italic},
+				{Text: "forget", Link: link(d, "w5f:history/forget?"+url.Values{"u": {v.Target}, "page": {strconv.Itoa(page)}}.Encode(), "forget "+v.Title)}}},
 		})
 	}
 	d.Blocks = append(d.Blocks, doc.List{Items: items})
