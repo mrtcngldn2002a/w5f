@@ -97,6 +97,7 @@ func TestJudgeTitles(t *testing.T) {
 		"Week in Review",
 		"ENCYCLOPEDIA P - Greek Gods, Spirits & Monsters",
 		"Twilit Grotto -- Esoteric Archives: site map",
+		"Z - Greek Gods, Spirits & Monsters",
 	}
 	for _, title := range turnedAway {
 		d := story(12, 80)
@@ -107,7 +108,8 @@ func TestJudgeTitles(t *testing.T) {
 	}
 	kept := []string{"The Library of Babel", "1984", "Twelve Angry Men", "Good News from Outer Space", "The Garden of Forking Paths", "A Report to an Academy",
 		"Popular Science Monthly/Volume 10/December 1876/The Laws of Health - Wikisource, the free online library",
-		"Kingdoms | Theoi Greek Mythology"}
+		"Kingdoms | Theoi Greek Mythology",
+		"P | A | Jaffray: Introduction to the Kitab al-isfar | Muhyiddin Ibn Arabi Society"}
 	for _, title := range kept {
 		d := story(12, 80)
 		d.Title = title
@@ -148,6 +150,18 @@ func TestJudgeCutOut(t *testing.T) {
 	}
 	if v := Judge(d, "smallweb"); !v.OK() {
 		t.Errorf("a writer in small letters: %s", reasons(v))
+	}
+	// A leaf of a book that opens on its page number and mid-sentence.
+	d = story(12, 80)
+	d.Blocks[0] = para("723 sections made with a sharp razor ; the ovule should not " + sentences(80))
+	if v := Judge(d, "nature"); !slices.Contains(v.Reasons, whyMidStart) {
+		t.Errorf("a leaf opening mid-sentence after its page number passed: %s", reasons(v))
+	}
+	// Ashliman opens on who edited it, in small letters.
+	d = story(12, 80)
+	d.Blocks = append([]doc.Block{para("folktales of Aarne-Thompson-Uther type 1176 translated and edited by D. L. Ashliman")}, d.Blocks...)
+	if v := Judge(d, "folklore"); !v.OK() {
+		t.Errorf("an editor's line at the top: %s", reasons(v))
 	}
 	// A credit line after the last paragraph is no cut.
 	d = story(12, 80)

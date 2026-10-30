@@ -72,6 +72,10 @@ var shelfBars = map[string]int{
 // defaultBar is the bar of a shelf of the owner's own.
 const defaultBar = 300
 
+// informal shelves are written by anyone, as they like: their pieces may
+// stop without a full stop.
+var informal = map[string]bool{"textfiles": true, "smallweb": true, "underground": true}
+
 // ShelfBar is the fewest words a page of the shelf has.
 func ShelfBar(family string) int {
 	if b, ok := shelfBars[family]; ok {
@@ -94,16 +98,23 @@ var reNotWhole = regexp.MustCompile(`(?i)^(\d{1,3}|ten|five|seven|eight|nine|twe
 	`|^(book )?reviews?\b|\breview:|\bin review\b|\ba review of\b|\breviewed\b` +
 	`|\b(event|conference|symposium|seminar) report\b|\breport on the\b.*\b(event|conference|symposium|seminar|meeting)\b` +
 	`|^news\b|\bnews (roundup|digest|briefs?)\b|\b(roundup|round-up|this week in|week in review|what we're reading|newsletter)\b` +
-	`|\b(gallery|galleries|catalogue of|index of|table of contents|site ?map|bibliography)\b` +
-	`|^(encyclopedia|dictionary|glossary|index)\s+[a-z]$` +
+	`|\b(gallery|galleries|index of|table of contents|site ?map|bibliography)\b` +
+	`|^(encyclopedia|dictionary|glossary|index)\s+[a-z](-[a-z])?$` +
 	`|\b(texts?|digital|e-?texts?|virtual) library$|^contents$|^index$|^home$|^welcome\b`)
 
 var (
 	reBlankLine = regexp.MustCompile(`\n\s*\n`)
 	reTitleSep  = regexp.MustCompile(`\s+(?:[-|–—]|--)\s+`)
-	// reOpenMark: quotes, brackets and placeholders a paragraph opens with
-	// ("[image] Adam's Alchemy Weblog").
-	reOpenMark = regexp.MustCompile(`^(?:[\s"“‘'(*_—–]|\[[^\]]{0,20}\])+`)
+	reLetter    = regexp.MustCompile(`(?i)^[a-z](-[a-z])?$`)
+	// reOpenMark: quotes, brackets, placeholders and page or line numbers a
+	// paragraph opens with ("[image] Adam's Alchemy Weblog", a leaf's "723
+	// sections made with a sharp razor").
+	reOpenMark = regexp.MustCompile(`^(?:[\s"“‘'(*_—–]|\[[^\]]{0,20}\]|\d+\s)+`)
+	// reCredit: a line of who wrote, edited or translated it, or of what
+	// kind of tale follows, which a page opens with in small letters
+	// ("folktales of type 1176 translated and edited by", "by Elaine
+	// Pagels", "and other folktales of Aarne-Thompson-Uther type 1645").
+	reCredit = regexp.MustCompile(`(?i)\b(edited|translated|selected|compiled|abstracted|written|retold|adapted)\b.*\bby\b|^by\s|\b(aarne|thompson|uther|christiansen)\b`)
 )
 
 var errorWords = []string{"404", "not found", "access denied", "forbidden", "enable javascript", "just a moment", "page not found", "error"}
@@ -156,27 +167,52 @@ func Judge(d *doc.Document, family string) Verdict {
 		why(whyFragments)
 	}
 	// A title carries its site's name ("Kingdoms | Theoi Greek Mythology"):
-	// each part is read on its own.
-	for _, part := range reTitleSep.Split(title, -1) {
-		if reNotWhole.MatchString(part) {
-			why(whyTitle)
-			break
-		}
+	// each part is read on its own. A poem may be called anything.
+	if !v.Verse && notWholeTitle(title) {
+		why(whyTitle)
+	}
+	// Text files and the small web start and stop where their writers do,
+	// on a drawing or a line of code as often as on a sentence; they were
+	// never printed, so their words are not judged as print either.
+	if informal[family] {
+		return v
 	}
 	// Someone who writes all in small letters is not cut off.
 	smallHand := m.starts >= 3 && m.lowerStarts*2 > m.starts
 	if !v.Verse && !smallHand && m.first != "" && !opensWell(m.first, title) {
 		why(whyMidStart)
 	}
-	if !v.Verse && m.last != "" && cutOff(m.last) {
+	// A piece cut out of something is short; a long page that stops on no
+	// sentence stops on its footer.
+	if !v.Verse && v.Words < 3000 && m.last != "" && cutOff(m.last) {
 		why(whyMidEnd)
 	}
 	// Below half it is another language, not bad print; translations full
-	// of names and numbered lines (the Masnavi) score about 0.77.
-	if v.Clean >= 0.5 && v.Clean < 0.7 {
+	// of names and numbered lines (the Masnavi) score about 0.77, and a
+	// short poem full of another language's words is no bad print.
+	if v.Words >= 400 && v.Clean >= 0.5 && v.Clean < 0.7 {
 		why(whyGarbled)
 	}
 	return v
+}
+
+// notWholeTitle: a part of the title says the page is not a whole piece. A
+// lone letter is an encyclopedia's letter page ("C - Greek Gods, Spirits &
+// Monsters") only at the front, and not among initials ("P | A | Jaffray").
+func notWholeTitle(title string) bool {
+	parts := reTitleSep.Split(title, -1)
+	for i, part := range parts {
+		if reLetter.MatchString(part) {
+			if i == 0 && (len(parts) < 2 || !reLetter.MatchString(parts[1])) {
+				return true
+			}
+			continue
+		}
+		if reNotWhole.MatchString(part) {
+			return true
+		}
+	}
+	return false
 }
 
 // poemAddress: the poetry sites keep their poems under /poem(s)/.
@@ -339,7 +375,7 @@ func (m *measures) prosePara(t string, ending bool) {
 	m.paras = append(m.paras, w)
 	m.text.WriteString(t)
 	m.text.WriteString("\n")
-	if m.first == "" && w >= 8 {
+	if m.first == "" && w >= 8 && !(w < 30 && reCredit.MatchString(t)) {
 		m.first = t
 	}
 	if w >= longParaWords && ending {
