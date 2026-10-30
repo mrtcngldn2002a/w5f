@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
+
+	"w5f/internal/fetch"
 )
 
 func TestWPPickTakesTheNthPostOfTheRESTList(t *testing.T) {
@@ -185,5 +188,30 @@ func TestLiteratureFamily(t *testing.T) {
 	}
 	if len(old) != 5 {
 		t.Errorf("five sources chosen, %d listed", len(old))
+	}
+}
+
+func TestOncePerVisitStopsWhenTheMeterIsSet(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.SetCookie(w, &http.Cookie{Name: "bpwallcount", Value: "1", Path: "/"})
+		fmt.Fprint(w, "<p>The whole post.</p>")
+	}))
+	defer srv.Close()
+	draws := 0
+	pick := oncePerVisit(srv.URL+"/", "bpwallcount", func(context.Context, Env) (string, string, error) {
+		draws++
+		return srv.URL + "/post/", "A post", nil
+	})
+	env := Env{Fetcher: testFetcher()}
+	target, _, err := pick(context.Background(), env)
+	if err != nil || draws != 1 {
+		t.Fatalf("the first draw of a session: %q %v", target, err)
+	}
+	u, _ := url.Parse(target)
+	if _, err := env.Fetcher.Get(context.Background(), u, fetch.Options{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := pick(context.Background(), env); err == nil || draws != 1 {
+		t.Error("once the free post is read, the site is not drawn again")
 	}
 }

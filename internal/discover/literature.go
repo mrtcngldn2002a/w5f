@@ -35,7 +35,10 @@ type litSource struct {
 }
 
 var litSources = []litSource{
-	{"The Believer", 3, wpPick("https://www.thebeliever.net", "")},
+	// The Believer shows one whole post a visit and counts them in a cookie
+	// ("bpwallcount"; the next ones stop at 600–1,100 words): one draw a
+	// session (the owner, 2026-10-30).
+	{"The Believer", 3, oncePerVisit("https://www.thebeliever.net/", "bpwallcount", wpPick("https://www.thebeliever.net", ""))},
 	// Only its stories (Recommended Reading, category 63, 767 posts): the rest
 	// is reading lists, news, interviews and reviews (2026-10-30).
 	{"Electric Literature", 2, wpPick("https://electricliterature.com", "categories=63")},
@@ -157,6 +160,23 @@ func wpPick(base, filter string) func(context.Context, Env) (string, string, err
 			return "", "", errors.New("no post on that page")
 		}
 		return posts[0].Link, cleanTitle(posts[0].Title.Rendered), nil
+	}
+}
+
+// oncePerVisit draws from a site with a metered paywall only while its meter
+// is not set: once its cookie is in W5F's jar, the free post of this session
+// has been read and the shelf's other sources draw.
+func oncePerVisit(site, meter string, pick func(context.Context, Env) (string, string, error)) func(context.Context, Env) (string, string, error) {
+	u, _ := url.Parse(site)
+	return func(ctx context.Context, env Env) (string, string, error) {
+		if env.Fetcher != nil && env.Fetcher.Client.Jar != nil {
+			for _, c := range env.Fetcher.Client.Jar.Cookies(u) {
+				if c.Name == meter {
+					return "", "", errors.New("this session's free post is read")
+				}
+			}
+		}
+		return pick(ctx, env)
 	}
 }
 
