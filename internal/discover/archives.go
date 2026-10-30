@@ -235,11 +235,15 @@ func kagiDraw(ctx context.Context, f *fetch.Fetcher) (Draw, error) {
 	var draws []Draw
 	for _, it := range feed.Items {
 		t, err := url.Parse(strings.TrimSpace(it.Link))
-		if err != nil || (t.Scheme != "http" && t.Scheme != "https") {
+		title := strings.Join(strings.Fields(it.Title), " ")
+		// Tumblr turns W5F away (HTTP 403), some entries are the site's feed
+		// itself, and a "Quick Review" is not a whole piece.
+		if err != nil || (t.Scheme != "http" && t.Scheme != "https") || strings.HasSuffix(t.Host, "tumblr.com") ||
+			strings.HasSuffix(t.Path, ".xml") || notWholeTitle(title) {
 			continue
 		}
 		why := "smallweb/Kagi Small Web · " + t.Host
-		if title := strings.Join(strings.Fields(it.Title), " "); title != "" {
+		if title != "" {
 			why += " — " + title
 		}
 		draws = append(draws, Draw{Target: t.String(), Why: why})

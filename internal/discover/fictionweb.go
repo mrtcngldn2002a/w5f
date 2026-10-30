@@ -21,7 +21,7 @@ type fictionPlace struct {
 
 var fictionWeb = []fictionPlace{
 	{"Nature Futures", 2, natureFuturesPick},
-	{"Creepypasta.com", 2, wpPick("https://www.creepypasta.com")},
+	{"Creepypasta.com", 2, wpPick("https://www.creepypasta.com", "")},
 }
 
 var natureFuturesList = "https://www.nature.com/nature/articles?type=futures&page="

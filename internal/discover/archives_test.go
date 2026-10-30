@@ -94,6 +94,8 @@ func TestSmallWebDirectories(t *testing.T) {
 		case r.URL.Path == "/feed/":
 			w.Header().Set("Content-Type", "application/atom+xml")
 			fmt.Fprint(w, `<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom"><title>Kagi Small Web</title>
+<entry><title>Reblogged</title><link href="https://someone.tumblr.com/post/1"/><id>2</id><updated>2026-09-30T00:00:00Z</updated></entry>
+<entry><title>Quick Review: THE OPERATOR by Mike Lawson</title><link href="https://reviews.example/operator"/><id>3</id><updated>2026-09-30T00:00:00Z</updated></entry>
 <entry><title>On gardens</title><link href="https://person.example/gardens"/><id>1</id><updated>2026-09-30T00:00:00Z</updated></entry></feed>`)
 		case r.URL.Path == "/area51/":
 			fmt.Fprint(w, `<html><head><title>Index of /area51</title></head><body><h1>Index of /area51</h1><a href="?C=N;O=D">Name</a><a href="/">Parent Directory</a><a href="1013/">1013/</a><a href="zone.71e.delayed.tmp">tmp</a></body></html>`)
@@ -116,7 +118,12 @@ func TestSmallWebDirectories(t *testing.T) {
 	if err != nil || d.Target != "https://blog.example/2026/post.html" || d.Why != "smallweb/ooh.directory · Quiet Blog — Notes on old books." {
 		t.Errorf("ooh: %+v %v", d, err)
 	}
-	d, err = kagiDraw(context.Background(), f)
+	for range 6 { // never the Tumblr post (HTTP 403 to W5F) nor the review
+		d, err = kagiDraw(context.Background(), f)
+		if err != nil || d.Target != "https://person.example/gardens" {
+			t.Fatalf("kagi: %+v %v", d, err)
+		}
+	}
 	if err != nil || d.Target != "https://person.example/gardens" || !strings.Contains(d.Why, "person.example — On gardens") {
 		t.Errorf("kagi: %+v %v", d, err)
 	}
@@ -140,5 +147,38 @@ func TestSmallWebDirectories(t *testing.T) {
 	}
 	if _, err := Route(context.Background(), "w5f:discover/nothing", env); err == nil {
 		t.Error("an unknown directory is an error")
+	}
+}
+
+func TestFullerMovesToAPageWithText(t *testing.T) {
+	story := strings.Repeat("I built this page in 1998 to tell about my trip along the coast. ", 25)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/hood/1013/":
+			fmt.Fprint(w, `<html><head><title>Welcome</title></head><body><p>Welcome to my page!</p><a href="links.html">Links</a><a href="trip.html">My trip</a><a href="/other/">elsewhere</a><a href="me.jpg">me</a></body></html>`)
+		case "/hood/1013/trip.html":
+			fmt.Fprint(w, `<html><head><title>My Trip</title></head><body><p>`+story+`</p></body></html>`)
+		case "/hood/1013/links.html":
+			fmt.Fprint(w, `<html><body><a href="https://x.example/">A friend's page with a long name</a></body></html>`)
+		case "/hood/2000/":
+			fmt.Fprint(w, `<html><body><p>Under construction.</p><a href="links.html">Links</a></body></html>`)
+		case "/long/":
+			fmt.Fprint(w, `<html><body><p>`+story+`</p></body></html>`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	f := testFetcher()
+	ctx := context.Background()
+	d, err := fuller(ctx, f)(Draw{Target: srv.URL + "/hood/1013/", Why: "smallweb/Wiby · x"}, nil)
+	if err != nil || d.Target != srv.URL+"/hood/1013/trip.html" || d.Why != "smallweb/Wiby · x — My Trip" {
+		t.Errorf("the welcome page gives way to the trip: %+v %v", d, err)
+	}
+	if d, err := fuller(ctx, f)(Draw{Target: srv.URL + "/long/", Why: "smallweb/Wiby · x"}, nil); err != nil || d.Target != srv.URL+"/long/" {
+		t.Errorf("a page with text stays: %+v %v", d, err)
+	}
+	if _, err := fuller(ctx, f)(Draw{Target: srv.URL + "/hood/2000/", Why: "smallweb/Wiby · x"}, nil); err == nil {
+		t.Error("a site with nothing to read fails the draw")
 	}
 }

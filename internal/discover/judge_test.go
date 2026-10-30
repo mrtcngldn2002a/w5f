@@ -109,6 +109,7 @@ func TestJudgeTitles(t *testing.T) {
 	kept := []string{"The Library of Babel", "1984", "Twelve Angry Men", "Good News from Outer Space", "The Garden of Forking Paths", "A Report to an Academy",
 		"Popular Science Monthly/Volume 10/December 1876/The Laws of Health - Wikisource, the free online library",
 		"Kingdoms | Theoi Greek Mythology",
+		"HOMER, ILIAD BOOK 5 - Theoi Classical Texts Library",
 		"P | A | Jaffray: Introduction to the Kitab al-isfar | Muhyiddin Ibn Arabi Society"}
 	for _, title := range kept {
 		d := story(12, 80)
@@ -242,5 +243,13 @@ func TestSourceOf(t *testing.T) {
 		if got := SourceOf(Draw{Why: why}); got != want {
 			t.Errorf("SourceOf(%q) = %q, want %q", why, got, want)
 		}
+	}
+}
+
+func TestJudgeTitleDashLeaningOnAWord(t *testing.T) {
+	d := story(12, 80)
+	d.Title = "MEGARA & DEAD ADONIS- Theoi Classical Texts Library"
+	if v := Judge(d, "folklore"); slices.Contains(v.Reasons, whyTitle) {
+		t.Errorf("a book of the library turned away: %v", v.Reasons)
 	}
 }

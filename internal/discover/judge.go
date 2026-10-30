@@ -100,12 +100,20 @@ var reNotWhole = regexp.MustCompile(`(?i)^(\d{1,3}|ten|five|seven|eight|nine|twe
 	`|^news\b|\bnews (roundup|digest|briefs?)\b|\b(roundup|round-up|this week in|week in review|what we're reading|newsletter)\b` +
 	`|\b(gallery|galleries|index of|table of contents|site ?map|bibliography)\b` +
 	`|^(encyclopedia|dictionary|glossary|index)\s+[a-z](-[a-z])?$` +
-	`|\b(texts?|digital|e-?texts?|virtual) library$|^contents$|^index$|^home$|^welcome\b`)
+	`|^contents$|^index$|^home$|^welcome\b`)
+
+// reLibraryName: a library's own front page ("Theoi Classical Texts
+// Library"). Only the title's first part says so: after it comes the site's
+// name, and the books of a library carry it ("HOMER, ILIAD BOOK 5 - Theoi
+// Classical Texts Library").
+var reLibraryName = regexp.MustCompile(`(?i)\b(texts?|digital|e-?texts?|virtual) library$`)
 
 var (
 	reBlankLine = regexp.MustCompile(`\n\s*\n`)
-	reTitleSep  = regexp.MustCompile(`\s+(?:[-|–—]|--)\s+`)
-	reLetter    = regexp.MustCompile(`(?i)^[a-z](-[a-z])?$`)
+	// A dash may lean on the word before it ("MEGARA & DEAD ADONIS- Theoi
+	// Classical Texts Library").
+	reTitleSep = regexp.MustCompile(`\s*(?:[-|–—]|--)\s+`)
+	reLetter   = regexp.MustCompile(`(?i)^[a-z](-[a-z])?$`)
 	// reOpenMark: quotes, brackets, placeholders and page or line numbers a
 	// paragraph opens with ("[image] Adam's Alchemy Weblog", a leaf's "723
 	// sections made with a sharp razor").
@@ -208,7 +216,7 @@ func notWholeTitle(title string) bool {
 			}
 			continue
 		}
-		if reNotWhole.MatchString(part) {
+		if reNotWhole.MatchString(part) || i == 0 && reLibraryName.MatchString(part) {
 			return true
 		}
 	}

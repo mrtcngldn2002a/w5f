@@ -14,8 +14,8 @@ import (
 func TestWPPickTakesTheNthPostOfTheRESTList(t *testing.T) {
 	var pages []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !strings.HasPrefix(r.URL.Path, "/wp-json/wp/v2/posts") {
-			http.NotFound(w, r)
+		if !strings.HasPrefix(r.URL.Path, "/wp-json/wp/v2/posts") || r.URL.Query().Get("categories") != "63" {
+			http.NotFound(w, r) // the filter goes with every request
 			return
 		}
 		w.Header().Set("X-WP-Total", "3191")
@@ -28,7 +28,7 @@ func TestWPPickTakesTheNthPostOfTheRESTList(t *testing.T) {
 		fmt.Fprintf(w, `[{"link":"%s/post-%s/","title":{"rendered":"An Interview with Daniel Dennett &#8211; Part <em>%s</em>"}}]`, "http://example.org", page, page)
 	}))
 	defer srv.Close()
-	pick := wpPick(srv.URL)
+	pick := wpPick(srv.URL, "categories=63")
 	env := Env{Fetcher: testFetcher()}
 	for range 10 {
 		target, title, err := pick(context.Background(), env)
@@ -41,7 +41,7 @@ func TestWPPickTakesTheNthPostOfTheRESTList(t *testing.T) {
 			t.Errorf("page %s is outside 1..3191", p)
 		}
 	}
-	if wpTotals[srv.URL] != 3191 {
+	if wpTotals[srv.URL+"/wp-json/wp/v2/posts?per_page=1&categories=63"] != 3191 {
 		t.Error("the total is kept")
 	}
 }
@@ -49,7 +49,7 @@ func TestWPPickTakesTheNthPostOfTheRESTList(t *testing.T) {
 func TestWPPickWithoutATotal(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, `[{"id":1}]`) }))
 	defer srv.Close()
-	if _, _, err := wpPick(srv.URL)(context.Background(), Env{Fetcher: testFetcher()}); err == nil {
+	if _, _, err := wpPick(srv.URL, "")(context.Background(), Env{Fetcher: testFetcher()}); err == nil {
 		t.Error("a REST API that does not say how many posts has no random post")
 	}
 }
