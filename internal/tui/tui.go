@@ -45,12 +45,13 @@ const (
 	modeTOC
 	modeHelp
 	modeGoto
-	modeSecret // hidden input for the Reddit session cookie
-	modeDict   // pop-up dictionary over the page
-	modeFind   // "/" search prompt
-	modeNote   // pop-up note box
-	modeClip   // paragraph selection for a clipping
-	modeQuit   // "Quit W5F?" after esc with nothing left to close
+	modeSecret  // hidden input for the Reddit session cookie
+	modeDict    // pop-up dictionary over the page
+	modeFind    // "/" search prompt
+	modeNote    // pop-up note box
+	modeClip    // paragraph selection for a clipping
+	modeQuit    // "Quit W5F?" after esc with nothing left to close
+	modePicture // z: a picture of the page, large
 )
 
 // Session storage hooks (replaced in tests so they never touch real config).
@@ -69,6 +70,8 @@ type page struct {
 	layout *render.Layout
 	offset int
 	focus  int // 1-based index into layout.Focus, 0 = none
+	// picLines are the pictures drawn in the page, by layout line.
+	picLines map[int]string
 }
 
 // Model is the root Bubble Tea model.
@@ -99,11 +102,16 @@ type Model struct {
 	loading string
 	status  string
 	sideOff bool // the side menu hidden (\)
+
+	pics     *picStore
+	gfx      gfx
+	picView  int // the picture shown large (modePicture), in the layout's pictures
+	sixelGen int // the sixel drawing asked for last
 }
 
 // New creates the model; target may be empty for the welcome page.
 func New(target, version string) Model {
-	m := Model{version: version, theme: theme.Default, width: 80, height: 24}
+	m := Model{version: version, theme: theme.Default, width: 80, height: 24, pics: newPicStore()}
 	m.loadPrefs()
 	if target == "" {
 		m.cur = newPage("w5f:welcome", welcomeDoc(version))
@@ -193,10 +201,11 @@ func catalogLoading(href string) string {
 
 // Init implements tea.Model.
 func (m Model) Init() tea.Cmd {
+	// What the terminal draws (sixel?) is asked once, at the start.
 	if m.loading != "" {
-		return load(m.loading, false)
+		return tea.Batch(tea.Raw(gfxQuery), load(m.loading, false))
 	}
-	return nil
+	return tea.Raw(gfxQuery)
 }
 
 func (m *Model) textWidth() int {
@@ -227,7 +236,9 @@ func (m *Model) relayout() {
 	if p == nil {
 		return
 	}
-	p.layout = render.Render(p.doc, render.Options{Width: m.textWidth(), Open: p.open, Book: catalog.Prose(p.target, p.doc)})
+	p.layout = render.Render(p.doc, render.Options{Width: m.textWidth(), Open: p.open, Book: catalog.Prose(p.target, p.doc),
+		Picture: m.pictureSize(p)})
+	m.drawPictures(p)
 	if p.focus > len(p.layout.Focus) {
 		p.focus = 0
 	}
@@ -249,8 +260,33 @@ func (m *Model) clamp() {
 }
 
 // Update implements tea.Model.
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Model) Update(msg tea.Msg) (_ tea.Model, cmd tea.Cmd) {
+	// Pictures a layout asked for are fetched, whatever laid it out.
+	defer func() {
+		if f := m.pics.fetches(); f != nil {
+			cmd = tea.Batch(cmd, f)
+		}
+	}()
+	if m.gfxEvent(msg) {
+		return m, nil
+	}
 	switch msg := msg.(type) {
+	case pictureLoaded:
+		return m.pictureArrived(msg)
+	case sixelMsg:
+		if m.mode == modePicture && msg.gen == m.sixelGen {
+			if s := m.sixel(); s != "" {
+				return m, tea.Raw(s)
+			}
+		}
+		return m, nil
+	case viewPicture:
+		return m.runViewer(msg)
+	case ownColoursDone:
+		if msg.err != nil {
+			m.status = "the viewer: " + msg.err.Error()
+		}
+		return m, tea.Batch(tea.ClearScreen, m.sixelLater())
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		m.relayout()
@@ -388,6 +424,8 @@ func (m Model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.noteKey(k)
 	case modeClip:
 		return m.clipKey(k)
+	case modePicture:
+		return m.pictureKey(s)
 	}
 	m.status = ""
 	p := m.cur
@@ -511,6 +549,8 @@ func (m Model) key(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.openRoom(s)
 	case `\`:
 		return m.toggleSide()
+	case "z":
+		return m.openPicture()
 	case "c", "i":
 		// A tarot card, or an I Ching hexagram, drawn now.
 		target := "w5f:discover/tarot"
@@ -1248,7 +1288,7 @@ func (m Model) View() tea.View {
 	b.WriteByte('\n')
 	body := m.bodyLines()
 	var side []string
-	if m.sideShown() {
+	if m.sideShown() && m.mode != modePicture { // the picture has the screen
 		side = m.sideLines(m.bodyHeight())
 	}
 	for i := 0; i < m.bodyHeight(); i++ {
@@ -1300,6 +1340,8 @@ func (m Model) bodyLines() []string {
 		return lines[min(m.helpTop, len(lines)):]
 	case modeSecret:
 		return m.secretLines()
+	case modePicture:
+		return m.pictureLines()
 	case modeDict:
 		read := m
 		read.mode = modeRead
@@ -1327,6 +1369,10 @@ func (m Model) bodyLines() []string {
 		selLo, selHi = p.layout.Paras[lo].Start, p.layout.Paras[hi].End-1
 	}
 	for li, ln := range p.layout.Lines[p.offset:end] {
+		if row, ok := p.picLines[p.offset+li]; ok {
+			out = append(out, margin+row)
+			continue
+		}
 		var sb strings.Builder
 		lead := margin
 		for _, sg := range ln.Segs {
@@ -1426,6 +1472,7 @@ func (m Model) helpLines() []string {
 		{"enter / g → ? text", "answer a page that asks for input (g → smallweb, g → worlds)"},
 		{"+ / -", "expand / fold all sections"}, {"o", "show link address"}, {"ctrl+r", "reload"},
 		{"v", "view this page in the browser (a link: open it with enter, then v; in rooms: the selected link) · g → browser <address>"},
+		{"z", "the picture on screen, large (← → the others · o in its own colours, full screen)"},
 		{"c · i", "draw a tarot card · cast an I Ching hexagram (kept: the texts come once from sacred-texts)"},
 		{"1 … 9, 0", "the rooms of the library: 1 Reading Room (home) · 2 Periodical Gallery (periodicals) · 3 The Stacks (books) · 4 The Serial Hall (internet fiction) · 5 The Picture Vault (comics) · 6 The Gaming Table (solo RPG) · 7 The Newsroom (Usenet) · 8 Curiosity Cabinet (discovery) · 9 The Lectern (queue) · 0 The Scriptorium (notes)"},
 		{"h · l · w", "The Register (your history) · Ultan's Ledger (your reading, counted) · The Weeding Room (what is kept, and what can go)"},

@@ -415,6 +415,11 @@ var shelves = map[string][]string{
 		"From the serial hall. The authors are still writing; mind you do not wake them.",
 		"From the hall of stories in parts. Each chapter is a promise of the next.",
 	},
+	"plates": {
+		"From the print room, where the plates are kept flat and the light is kept low. Press z to see it whole.",
+		"From the print room. Look first; the label will wait. Press z to see it whole.",
+		"From the drawers of plates and photographs, each one a window someone took the trouble to frame. Press z to see it whole.",
+	},
 	"yours": {
 		"From your own shelf. You chose these; I only dust them.",
 		"From your own shelf, where every book is one you asked for.",

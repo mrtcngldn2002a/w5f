@@ -297,6 +297,8 @@ func Route(ctx context.Context, target string, env Env) (*doc.Document, error) {
 		return bhlRoute(ctx, env, target)
 	case strings.HasPrefix(target, "w5f:discover/gutenberg?"):
 		return gutenbergRoute(ctx, env, target)
+	case strings.HasPrefix(target, "w5f:discover/plate?"):
+		return plateRoute(ctx, env, target)
 	case strings.HasPrefix(target, "w5f:discover/futures?"):
 		return futuresRoute(ctx, env, target)
 	case target == "w5f:discover/random":

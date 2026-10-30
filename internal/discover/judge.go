@@ -129,6 +129,9 @@ var errorWords = []string{"404", "not found", "access denied", "forbidden", "ena
 
 // Judge weighs a page drawn from the shelf family.
 func Judge(d *doc.Document, family string) Verdict {
+	if family == "plates" {
+		return judgePlate(d)
+	}
 	m := measure(d.Blocks)
 	v := Verdict{Words: m.prose + m.listWords, Bar: ShelfBar(family), Paras: len(m.paras), First: m.first}
 	all := m.prose + m.listWords + m.headWords + m.linkWords
@@ -200,6 +203,35 @@ func Judge(d *doc.Document, family string) Verdict {
 	// short poem full of another language's words is no bad print.
 	if v.Words >= 400 && v.Clean >= 0.5 && v.Clean < 0.7 {
 		why(whyGarbled)
+	}
+	return v
+}
+
+// whyNoPicture: a plate page whose picture is missing.
+const whyNoPicture = "no picture"
+
+// plateWords is the least a plate is labelled with: its title, caption and
+// text together (a title alone, "Untitled", is not a label).
+const plateWords = 4
+
+// judgePlate: a plate is its picture and its label; there is no bar of
+// prose.
+func judgePlate(d *doc.Document) Verdict {
+	m := measure(d.Blocks)
+	v := Verdict{Words: m.prose + m.listWords, Bar: plateWords, Paras: len(m.paras), First: m.first}
+	label := len(strings.Fields(d.Title))
+	pictures := 0
+	for _, b := range d.Blocks {
+		if im, ok := b.(doc.Image); ok && im.Src != "" {
+			pictures++
+			label += len(strings.Fields(im.Caption))
+		}
+	}
+	if pictures == 0 {
+		v.Reasons = append(v.Reasons, whyNoPicture)
+	}
+	if label+v.Words < plateWords {
+		v.Reasons = append(v.Reasons, whyShort)
 	}
 	return v
 }

@@ -253,3 +253,19 @@ func TestJudgeTitleDashLeaningOnAWord(t *testing.T) {
 		t.Errorf("a book of the library turned away: %v", v.Reasons)
 	}
 }
+
+// A plate is its picture and a label: no bar of prose, but no picture or
+// no label is turned away.
+func TestJudgePlate(t *testing.T) {
+	pic := doc.Image{Src: "https://example.org/a.jpg"}
+	ok := &doc.Document{Title: "Two Monks practising alchemy", Blocks: []doc.Block{pic}}
+	if v := Judge(ok, "plates"); !v.OK() {
+		t.Fatalf("plate turned away: %v", v.Reasons)
+	}
+	if v := Judge(&doc.Document{Title: "Untitled", Blocks: []doc.Block{pic}}, "plates"); v.OK() {
+		t.Fatal("a picture without a label passed")
+	}
+	if v := Judge(&doc.Document{Title: "A long and well labelled page", Blocks: []doc.Block{doc.Paragraph{Text: doc.Inline{{Text: "words only"}}}}}, "plates"); v.OK() {
+		t.Fatal("a plate without a picture passed")
+	}
+}

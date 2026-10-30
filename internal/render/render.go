@@ -95,6 +95,18 @@ type Layout struct {
 	Focus    []Focusable
 	Headings []HeadingRef
 	Paras    []Para
+	// Pictures are the page's pictures in order: where each is drawn, or
+	// (Rows 0) the line that names it.
+	Pictures []Picture
+}
+
+// Picture is a picture's place: lines [Line, Line+Rows) hold it, Cols
+// cells wide from Indent (the TUI draws it there); with Rows 0, Line is the
+// line that names it.
+type Picture struct {
+	Src                      string
+	Caption                  string
+	Line, Rows, Cols, Indent int
 }
 
 // Options control layout.
@@ -104,6 +116,9 @@ type Options struct {
 	// Book sets running prose as a printed book does: a paragraph that
 	// follows another starts with an indent instead of a blank line.
 	Book bool
+	// Picture is the size a picture is drawn at within width cells; 0
+	// rows: not drawn (not wanted, or not here yet), named in a line.
+	Picture func(src string, width int) (cols, rows int)
 }
 
 type renderer struct {
@@ -296,6 +311,24 @@ func (r *renderer) block(b doc.Block, c ctx) {
 		} else if b.Alt != "" {
 			label = b.Alt
 		}
+		pic := Picture{Src: b.Src, Caption: label, Line: len(r.out.Lines)}
+		if r.o.Picture != nil && b.Src != "" {
+			avail := c.width - segsWidth(c.rest)
+			if cols, rows := r.o.Picture(b.Src, avail); rows > 0 {
+				cols = min(cols, avail)
+				pic.Rows, pic.Cols, pic.Indent = rows, cols, segsWidth(c.rest)+(avail-cols)/2
+				blank := append(append([]Seg{}, c.rest...), Seg{Text: strings.Repeat(" ", avail), Role: ImageRole})
+				for range rows {
+					r.emit(blank)
+				}
+				r.out.Pictures = append(r.out.Pictures, pic)
+				if b.Caption != "" {
+					r.wrap(doc.Inline{{Text: b.Caption}}, c.nest(Seg{}, Seg{}), ImageRole)
+				}
+				break
+			}
+		}
+		r.out.Pictures = append(r.out.Pictures, pic)
 		r.wrapPrefixed(doc.Inline{{Text: label}}, c, ImageRole, Seg{Text: "▒▒ ", Role: ImageRole})
 	case doc.Columns:
 		r.columns(b, c)
