@@ -2,14 +2,17 @@ package source
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
-	"unicode"
 
 	"w5f/internal/discover"
 	"w5f/internal/doc"
@@ -17,11 +20,26 @@ import (
 	"w5f/internal/store"
 )
 
+// auditDraw is one draw of the source audit, as draws.jsonl keeps it.
+type auditDraw struct {
+	Family  string            `json:"family"`
+	Source  string            `json:"source"`
+	Why     string            `json:"why"`
+	Target  string            `json:"target"`
+	Title   string            `json:"title,omitempty"`
+	Seconds float64           `json:"seconds"`
+	Error   string            `json:"error,omitempty"` // nothing opened
+	Verdict *discover.Verdict `json:"verdict,omitempty"`
+}
+
 // TestSourceAuditLive draws from every Deep random shelf against the real
-// sites and opens each page the way the reader does, then says what is wrong
-// with it: nothing opens, too little text, a text that starts in the middle
-// of a sentence, an error page. It needs the network, so it runs only with
-// W5F_AUDIT=1 (W5F_AUDIT_N=<draws per shelf>, W5F_AUDIT_ONLY=<shelf,…>).
+// sites, opens each page the way the reader does and hands it to the
+// reading-matter judge (discover.Judge): is it a whole piece to read, by its
+// shelf's bar? It ends with the source report: for each source, how many
+// draws opened, how many the judge took and why it turned the others away.
+// It needs the network, so it runs only with W5F_AUDIT=1 (W5F_AUDIT_N=<draws
+// per shelf>, W5F_AUDIT_ONLY=<shelf,…>, W5F_AUDIT_OUT=<folder> for
+// draws.jsonl and report.md). The shelves are drawn side by side.
 func TestSourceAuditLive(t *testing.T) {
 	if os.Getenv("W5F_AUDIT") == "" {
 		t.Skip("set W5F_AUDIT=1 to audit the real sources")
@@ -52,117 +70,164 @@ func TestSourceAuditLive(t *testing.T) {
 			only[s] = true
 		}
 	}
-	bad, passed := 0, 0
+	var (
+		mu    sync.Mutex
+		draws []auditDraw
+		wg    sync.WaitGroup
+	)
 	for _, name := range discover.FamilyNames() {
 		if len(only) > 0 && !only[name] {
 			continue
 		}
 		fam := discover.FamilyByName(name)
-		for range n {
-			ctx, cancel := context.WithTimeout(context.Background(), 150*time.Second)
-			start := time.Now()
-			d, err := fam.Draw(ctx, env)
-			var page *doc.Document
-			if err == nil {
-				page, err = Load(ctx, d.Target, Options{})
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for range n {
+				a := auditOne(env, name, fam)
+				mu.Lock()
+				draws = append(draws, a)
+				mu.Unlock()
+				t.Log(a.line())
 			}
-			cancel()
-			took := time.Since(start).Round(time.Second)
-			if err != nil {
-				bad++
-				t.Logf("✗ %-12s %-5s %s\n      %v", name, took, d.Why, err)
-				continue
-			}
-			words, first := auditText(page)
-			if words < 80 { // Deep random and the Daily Packet pass such a page over (thin)
-				passed++
-				t.Logf("↷ %-12s %-5s %5dw %s (passed over)\n      %s", name, took, words, d.Why, d.Target)
-				continue
-			}
-			var faults []string
-			if words < 150 {
-				faults = append(faults, fmt.Sprintf("only %d words", words))
-			}
-			if midSentence(first) {
-				faults = append(faults, "starts mid-sentence")
-			}
-			if strings.TrimSpace(page.Title) == "" {
-				faults = append(faults, "no title")
-			}
-			if words < 300 && looksLikeError(page, first) {
-				faults = append(faults, "error page")
-			}
-			mark := "✓"
-			if len(faults) > 0 {
-				mark = "!"
-				bad++
-			}
-			t.Logf("%s %-12s %-5s %5dw %s\n      %s\n      %s\n      %q %s", mark, name, took, words, d.Why, d.Target, page.Byline, clip(first, 90), strings.Join(faults, "; "))
+		}()
+	}
+	wg.Wait()
+	sort.SliceStable(draws, func(i, j int) bool { return draws[i].Family < draws[j].Family })
+	report := auditReport(draws, n)
+	t.Log("\n" + report)
+	if out := os.Getenv("W5F_AUDIT_OUT"); out != "" {
+		if err := os.MkdirAll(out, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		var b strings.Builder
+		for _, a := range draws {
+			j, _ := json.Marshal(a)
+			b.Write(j)
+			b.WriteByte('\n')
+		}
+		if err := os.WriteFile(filepath.Join(out, "draws.jsonl"), []byte(b.String()), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(out, "report.md"), []byte(report), 0o644); err != nil {
+			t.Fatal(err)
 		}
 	}
-	t.Logf("%d draws with something wrong, %d thin pages passed over", bad, passed)
 }
 
-// auditText counts a page's words of prose and gives its first real paragraph
-// (past the notices and headings a page opens with).
-func auditText(d *doc.Document) (int, string) {
-	words, first := 0, ""
-	var walk func([]doc.Block)
-	walk = func(bs []doc.Block) {
-		for _, b := range bs {
-			switch b := b.(type) {
-			case doc.Paragraph:
-				var s strings.Builder
-				for _, sp := range b.Text {
-					if sp.Link == 0 {
-						s.WriteString(sp.Text)
-					}
-				}
-				w := len(strings.Fields(s.String()))
-				words += w
-				if first == "" && w >= 8 {
-					first = strings.TrimSpace(s.String())
-				}
-			case doc.Pre:
-				words += len(strings.Fields(b.Text))
-				if first == "" && len(strings.Fields(b.Text)) >= 8 {
-					first = strings.Join(strings.Fields(b.Text), " ")
-				}
-			case doc.Quote:
-				walk(b.Blocks)
-			case doc.Columns:
-				for _, c := range b.Cols {
-					walk(c)
-				}
-			case doc.Collapsible:
-				walk(b.Blocks)
+func auditOne(env discover.Env, name string, fam discover.Family) auditDraw {
+	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Second)
+	defer cancel()
+	start := time.Now()
+	d, err := fam.Draw(ctx, env)
+	a := auditDraw{Family: name, Source: discover.SourceOf(d), Why: d.Why, Target: d.Target}
+	if a.Source == "" {
+		a.Source = name
+	}
+	var page *doc.Document
+	if err == nil {
+		page, err = Load(ctx, d.Target, Options{})
+	}
+	a.Seconds = time.Since(start).Round(100 * time.Millisecond).Seconds()
+	if err != nil {
+		a.Error = err.Error()
+		return a
+	}
+	a.Title = page.Title
+	v := discover.Judge(page, name)
+	a.Verdict = &v
+	return a
+}
+
+func (a auditDraw) line() string {
+	if a.Error != "" {
+		return fmt.Sprintf("✗ %-12s %4.0fs %s\n      %s", a.Family, a.Seconds, a.Why, a.Error)
+	}
+	v := a.Verdict
+	mark, why := "✓", ""
+	if !v.OK() {
+		mark, why = "↷", " — "+strings.Join(v.Reasons, ", ")
+	}
+	verse := ""
+	if v.Verse {
+		verse = " verse"
+	}
+	return fmt.Sprintf("%s %-12s %4.0fs %5dw/%d links %.2f lists %.2f long %.2f clean %.2f%s%s\n      %s\n      %s\n      %q",
+		mark, a.Family, a.Seconds, v.Words, v.Bar, v.LinkShare, v.ListShare, v.LongShare, v.Clean, verse, why, a.Why, a.Target, clip(v.First, 90))
+}
+
+// auditReport is the source report: for each source its draws, how many
+// opened, how many the judge took, its reasons for the rest and the median
+// words of what it took.
+func auditReport(draws []auditDraw, n int) string {
+	type tally struct {
+		family            string
+		draws, failed, ok int
+		reasons           map[string]int
+		words, secs       []float64
+	}
+	bySource := map[string]*tally{}
+	var order []string
+	for _, a := range draws {
+		s := bySource[a.Source]
+		if s == nil {
+			s = &tally{family: a.Family, reasons: map[string]int{}}
+			bySource[a.Source] = s
+			order = append(order, a.Source)
+		}
+		s.draws++
+		s.secs = append(s.secs, a.Seconds)
+		switch {
+		case a.Error != "":
+			s.failed++
+		case a.Verdict.OK():
+			s.ok++
+			s.words = append(s.words, float64(a.Verdict.Words))
+		default:
+			for _, r := range a.Verdict.Reasons {
+				s.reasons[r]++
 			}
 		}
 	}
-	walk(d.Blocks)
-	return words, first
+	sort.SliceStable(order, func(i, j int) bool {
+		a, b := bySource[order[i]], bySource[order[j]]
+		if a.family != b.family {
+			return a.family < b.family
+		}
+		return order[i] < order[j]
+	})
+	var b strings.Builder
+	total, failed, ok := 0, 0, 0
+	for _, s := range bySource {
+		total += s.draws
+		failed += s.failed
+		ok += s.ok
+	}
+	fmt.Fprintf(&b, "# Deep random source report (%s)\n\n", time.Now().Format("2006-01-02 15:04"))
+	fmt.Fprintf(&b, "%d draws per shelf, %d in all: %d did not open, %d whole pieces (%.0f%% of all), %d turned away.\n\n",
+		n, total, failed, ok, 100*float64(ok)/float64(max(total, 1)), total-failed-ok)
+	b.WriteString("| Source | Draws | Not opened | Taken | Turned away | Why | Median words taken | Median seconds |\n")
+	b.WriteString("|---|---:|---:|---:|---:|---|---:|---:|\n")
+	for _, src := range order {
+		s := bySource[src]
+		var rs []string
+		for r, c := range s.reasons {
+			rs = append(rs, fmt.Sprintf("%s %d", r, c))
+		}
+		slices.Sort(rs)
+		fmt.Fprintf(&b, "| %s | %d | %d | %d | %d | %s | %.0f | %.1f |\n",
+			src, s.draws, s.failed, s.ok, s.draws-s.failed-s.ok, strings.Join(rs, ", "), median(s.words), median(s.secs))
+	}
+	return b.String()
 }
 
-// midSentence: a text that opens on a small letter or on punctuation was cut
-// out of the middle of something.
-func midSentence(s string) bool {
-	for _, r := range s {
-		if unicode.IsSpace(r) || r == '"' || r == '“' || r == '\'' || r == '‘' || r == '(' || r == '[' || r == '*' || r == '_' {
-			continue
-		}
-		return unicode.IsLower(r) || r == ',' || r == ';' || r == '.' || r == ')' || r == '-'
+func median(xs []float64) float64 {
+	if len(xs) == 0 {
+		return 0
 	}
-	return false
-}
-
-func looksLikeError(d *doc.Document, first string) bool {
-	low := strings.ToLower(d.Title + " " + first)
-	for _, w := range []string{"404", "not found", "access denied", "forbidden", "enable javascript", "just a moment", "page not found", "error"} {
-		if strings.Contains(low, w) {
-			return true
-		}
-	}
-	return false
+	s := slices.Clone(xs)
+	slices.Sort(s)
+	return s[len(s)/2]
 }
 
 func clip(s string, n int) string {
