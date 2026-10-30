@@ -12,6 +12,7 @@ import (
 	"math/rand/v2"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"w5f/internal/doc"
@@ -51,6 +52,9 @@ type Env struct {
 	Shelves map[string]string
 	// SitesPath is the owner's sites file (random.toml); "": none.
 	SitesPath string
+	// Ahead keeps pages drawn behind the one being read; nil: each page is
+	// drawn when it is asked for.
+	Ahead *Ahead
 }
 
 // families are the Deep Random sources; each family file adds its own.
@@ -58,12 +62,19 @@ var families []Family
 
 const bagKey, lastKey = "discover:bag", "discover:last"
 
+// bagMu keeps the bag and the pages shown whole while pages are drawn
+// ahead, behind the one being read.
+var bagMu sync.Mutex
+
 // nextFamily takes the next family from the shuffle bag: every family once
-// per bag, never the same one twice in a row.
-func nextFamily(db *store.DB, families []Family) (Family, error) {
+// per bag, never the same one twice in a row (last is the family of the page
+// before: shown, or waiting to be).
+func nextFamily(db *store.DB, families []Family, last string) (Family, error) {
 	if len(families) == 0 {
 		return nil, errors.New("no discovery sources")
 	}
+	bagMu.Lock()
+	defer bagMu.Unlock()
 	byName := map[string]Family{}
 	for _, f := range families {
 		byName[f.Name()] = f
@@ -97,9 +108,8 @@ func nextFamily(db *store.DB, families []Family) (Family, error) {
 	if len(bag) == 0 {
 		bag = fresh()
 	}
-	// The family of the last page shown never comes right again (even when
-	// the one in between failed), even when only its own places are left.
-	last := db.Get(lastKey)
+	// The family of the page before never comes right again (even when the
+	// one in between failed), even when only its own places are left.
 	if bag[0] == last && !slices.ContainsFunc(bag, func(n string) bool { return n != last }) {
 		bag = append(bag, fresh()...)
 	}
@@ -110,51 +120,90 @@ func nextFamily(db *store.DB, families []Family) (Family, error) {
 	return f, nil
 }
 
-// Next draws a page: up to three families are tried, a failing one is
-// skipped. The page opens with its "why you are here" line.
+// Next shows a page: one drawn ahead when there is one (env.Ahead), else one
+// drawn now, up to four families tried, a failing one or one whose page the
+// reading-matter judge turns away skipped. Either way the next pages are
+// then drawn behind the one shown. The page opens with its "why you are
+// here" line.
 func Next(ctx context.Context, env Env) (Draw, *doc.Document, error) {
+	defer env.Ahead.fill(env)
+	if d, page, ok := env.Ahead.take(env.DB, lastShown(env.DB)); ok {
+		return show(env, d, page)
+	}
 	// One bot-check helper request per draw (up to a minute); the other
 	// shelves are tried without it.
-	ctx = fetch.SolverOnce(ctx)
+	d, page, err := pickReading(fetch.SolverOnce(ctx), env, lastShown(env.DB), drawTries)
+	if err != nil {
+		return Draw{}, nil, err
+	}
+	return show(env, d, page)
+}
+
+// drawTries are the families Next tries while the reader waits.
+const drawTries = 4
+
+// pickReading draws a page that is reading matter, trying up to tries
+// families, the first not the family last; the draw carries its family.
+func pickReading(ctx context.Context, env Env, last string, tries int) (Draw, *doc.Document, error) {
 	fams := allFamilies(env)
 	var errs []string
-	for try := 0; try < 3; try++ {
-		f, err := nextFamily(env.DB, fams)
+	for range tries {
+		f, err := nextFamily(env.DB, fams, last)
 		if err != nil {
 			return Draw{}, nil, err
 		}
 		d, err := drawUnseen(ctx, env, f)
 		if err == nil {
 			var page *doc.Document
-			if page, err = env.Load(ctx, d.Target); err == nil && thin(page) {
-				err = errThin
+			if page, err = env.Load(ctx, d.Target); err == nil {
+				if v := Judge(page, f.Name()); !v.OK() {
+					err = fmt.Errorf("not reading matter (%s)", strings.Join(v.Reasons, ", "))
+				}
 			}
 			if err == nil {
 				d.Family = f.Name()
-				_ = env.DB.Set(lastKey, d.Family)
-				markSeen(env.DB, d.Target)
-				head := []doc.Block{doc.Notice{Kind: "info", Text: "Deep random · " + d.Why + " · press x for another"}}
-				// Ultan's note on the shelf it came from, and on a page
-				// read before that it is kin to.
-				note := ultan.Shelf(env.DB, d.Family, time.Now())
-				if k, ok := ultan.Echo(env.DB, d.Target, page, time.Now()); ok {
-					note = note.And(k)
-				}
-				head = append(head, note.Blocks(func(href, text string) int {
-					page.Links = append(page.Links, doc.Link{Href: href, Text: text})
-					return len(page.Links)
-				})...)
-				page.Blocks = append(head, page.Blocks...)
 				return d, page, nil
 			}
 		}
 		errs = append(errs, fmt.Sprintf("%s: %v", f.Name(), err))
+		if ctx.Err() != nil {
+			break
+		}
 	}
 	return Draw{}, nil, errors.New("Deep random found nothing this time (" + strings.Join(errs, "; ") + ")")
 }
 
-// thinWords is the least prose a drawn page shows: less is a page of
-// pictures, a site's front door or a page that did not really open.
+// show remembers a drawn page as shown and heads it with its why line and
+// Ultan's note on the shelf it came from (and on a page read before that it
+// is kin to).
+func show(env Env, d Draw, page *doc.Document) (Draw, *doc.Document, error) {
+	bagMu.Lock()
+	_ = env.DB.Set(lastKey, d.Family)
+	markSeen(env.DB, d.Target)
+	bagMu.Unlock()
+	head := []doc.Block{doc.Notice{Kind: "info", Text: "Deep random · " + d.Why + " · press x for another"}}
+	note := ultan.Shelf(env.DB, d.Family, time.Now())
+	if k, ok := ultan.Echo(env.DB, d.Target, page, time.Now()); ok {
+		note = note.And(k)
+	}
+	head = append(head, note.Blocks(func(href, text string) int {
+		page.Links = append(page.Links, doc.Link{Href: href, Text: text})
+		return len(page.Links)
+	})...)
+	page.Blocks = append(head, page.Blocks...)
+	return d, page, nil
+}
+
+// lastShown is the family of the page shown last.
+func lastShown(db *store.DB) string {
+	bagMu.Lock()
+	defer bagMu.Unlock()
+	return db.Get(lastKey)
+}
+
+// thinWords is the least prose a Daily Packet page shows: less is a page of
+// pictures, a site's front door or a page that did not really open (Deep
+// random's pages go before the reading-matter judge instead).
 const thinWords = 80
 
 var errThin = errors.New("the page has hardly any text")
@@ -208,12 +257,13 @@ func proseWords(bs []doc.Block, enough int) int {
 }
 
 // drawUnseen draws from a family, drawing again (twice at most) when the page
-// was shown lately; a shelf too small to offer anything new repeats itself.
+// was shown lately or waits to be; a shelf too small to offer anything new
+// repeats itself.
 func drawUnseen(ctx context.Context, env Env, f Family) (Draw, error) {
 	var d Draw
 	var err error
 	for range 3 {
-		if d, err = f.Draw(ctx, env); err != nil || ctx.Err() != nil || !wasSeen(env.DB, d.Target) {
+		if d, err = f.Draw(ctx, env); err != nil || ctx.Err() != nil || !wasSeen(env.DB, d.Target) && !env.Ahead.holds(d.Target) {
 			return d, err
 		}
 	}

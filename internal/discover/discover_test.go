@@ -82,5 +82,6 @@ func TestAllFamiliesFailing(t *testing.T) {
 	}
 }
 
-// fakeBody is a page's text long enough to be shown (see thin).
-var fakeBody = strings.Repeat("The quick brown fox jumps over the lazy dog. ", 12)
+// fakeBody is a page's text long enough to be shown (see Judge: the
+// fiction shelf asks for 600 words).
+var fakeBody = strings.Repeat("The quick brown fox jumps over the lazy dog. ", 80)

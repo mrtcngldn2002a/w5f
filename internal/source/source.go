@@ -589,13 +589,16 @@ func SmallwebEnv() smallweb.Env {
 	return smallweb.Env{DataDir: store.DataDir(), CacheDir: Fetcher.CacheDir, Offline: Fetcher.Offline}
 }
 
+// discoverAhead keeps the next two Deep random pages ready while one is read.
+var discoverAhead = discover.NewAhead(2)
+
 // DiscoverEnv is what Deep Random and the Daily Packet need.
 func DiscoverEnv() (discover.Env, error) {
 	db, err := store.Default()
 	if err != nil {
 		return discover.Env{}, fmt.Errorf("opening the local database: %w", err)
 	}
-	env := discover.Env{Fetcher: Fetcher, DB: db,
+	env := discover.Env{Fetcher: Fetcher, DB: db, Ahead: discoverAhead,
 		Load: func(ctx context.Context, target string) (*doc.Document, error) { return Load(ctx, target, Options{}) },
 		Crom: func(ctx context.Context, preset string) (string, error) {
 			p, ok := crom.Presets[preset]
