@@ -231,9 +231,80 @@ func TestPSMPicksAnArticle(t *testing.T) {
 	}
 }
 
+// testArticles puts an article of the mock book (bhlServer: item 123, leaf n
+// is page 5000+n) in the place of the embedded list.
+func testArticles(t *testing.T) {
+	bhlPartsOnce.Do(loadBHLParts)
+	swap(t, &bhlParts, []bhlArticle{{part: 9, item: 123, year: 1890, first: 5013, pages: 4,
+		title: "The Old Naturalist", container: "The Auk : a quarterly journal of ornithology"}})
+}
+
+func TestEmbeddedBHLArticles(t *testing.T) {
+	bhlPartsOnce.Do(loadBHLParts)
+	if len(bhlParts) < 30000 {
+		t.Fatalf("%d articles", len(bhlParts))
+	}
+	for _, a := range bhlParts {
+		if a.part <= 0 || a.item <= 0 || a.first <= 0 || a.pages < 3 || a.pages > 25 || a.title == "" {
+			t.Fatalf("bad article %+v", a)
+		}
+	}
+	if a, ok := bhlArticleByID(74130); !ok || a.title != "On a Living Octopus" || a.first != 32272079 {
+		t.Errorf("On a Living Octopus: %+v %v", a, ok)
+	}
+}
+
+// An article is its pages from the first to the last, whole: a draw is a
+// part address, and the page opens on the article's own title and journal.
+func TestBHLArticleIsWhole(t *testing.T) {
+	srv := bhlServer(t)
+	swap(t, &bhlBucket, srv.URL)
+	testArticles(t)
+	env := Env{Fetcher: testFetcher()}
+	target, title, err := bhlArticlePick(context.Background(), env)
+	if err != nil || target != "w5f:discover/bhl?part=9" || title != "The Old Naturalist (The Auk, 1890)" {
+		t.Fatalf("pick: %q %q %v", target, title, err)
+	}
+	d, err := Route(context.Background(), target, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Title != "The Old Naturalist" || d.Byline != "The Auk · 1890 · Biodiversity Heritage Library" || !strings.HasSuffix(d.Links[0].Href, "/part/9") {
+		t.Fatalf("document: %q %q %+v", d.Title, d.Byline, d.Links)
+	}
+	var text []string
+	for _, b := range d.Blocks[:len(d.Blocks)-1] {
+		text = append(text, b.(doc.Paragraph).Text[0].Text)
+	}
+	all := strings.Join(text, " ")
+	// Four leaves of 2,200 characters (with the spaces where lines were
+	// joined), less the fragments cut at both ends; a fifth would be 11,000.
+	if len(all) < 7000 || len(all) > 10000 {
+		t.Errorf("%d characters for four leaves", len(all))
+	}
+	if r := all[0]; r < 'A' || r > 'Z' || !strings.HasSuffix(all, ".") || strings.Contains(all, "THE NATURALIST") {
+		t.Errorf("not whole sentences, or a running head kept: %.60q … %q", all, all[len(all)-40:])
+	}
+	if _, err := Route(context.Background(), "w5f:discover/bhl?part=8", env); err == nil {
+		t.Error("an article not on the list opened")
+	}
+}
+
+func TestFromTitleDropsWhatComesBefore(t *testing.T) {
+	page := "533\n\nhe saw them again in the spring. The end of the last paper.\n\n9. On a Livine Octopus. By J. P. G. Smiru, Esa..\nIn a Letrer To Dr. Gray, F.RB.S.\n\n\"We found a Sea-spider at Goldthorpe Roads\n"
+	got := fromTitle(page, "On a Living Octopus")
+	if strings.Contains(got, "last paper") || strings.Contains(got, "Livine") || !strings.Contains(got, "Letrer To Dr. Gray") {
+		t.Errorf("got %q", got)
+	}
+	if fromTitle("Nothing of the title here.\nNor here.", "On a Living Octopus") != "Nothing of the title here.\nNor here." {
+		t.Error("a page without the title is kept whole")
+	}
+}
+
 func TestNatureFamily(t *testing.T) {
 	srv := bhlServer(t)
 	swap(t, &bhlBucket, srv.URL)
+	testArticles(t)
 	old := natureSources
 	t.Cleanup(func() { natureSources = old })
 	natureSources = natureSources[:1] // BHL alone: the Wikisource side needs the network

@@ -34,7 +34,8 @@ var (
 var (
 	// An id of the journal's own numbering: volume (3 digits), page, "a".
 	reFuturesLegacy = regexp.MustCompile(`^(\d{3})\d+a$`)
-	reFuturesID     = regexp.MustCompile(`^\d[0-9a-z]{3,12}$`)
+	// Old ids ("516444a", "35012720") and those since 2018 ("d41586-022-01844-3").
+	reFuturesID = regexp.MustCompile(`^(\d[0-9a-z]{3,12}|d41586-\d{3}-\d{5}-\d)$`)
 )
 
 const (

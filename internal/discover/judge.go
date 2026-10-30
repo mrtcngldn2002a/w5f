@@ -350,7 +350,9 @@ func (m *measures) paragraph(in doc.Inline) {
 		s.WriteString(sp.Text)
 	}
 	lines = append(lines, cur)
-	if len(lines) >= 3 { // set in lines: verse, or an address block
+	// Set in lines: verse, or an address block; not pictures with their
+	// captions under them (the Alchemy Web Site's art pages).
+	if len(lines) >= 3 && !strings.Contains(s.String(), "[image]") {
 		for _, l := range lines {
 			if l > 0 {
 				m.lines++

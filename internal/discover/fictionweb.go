@@ -27,29 +27,34 @@ var fictionWeb = []fictionPlace{
 var natureFuturesList = "https://www.nature.com/nature/articles?type=futures&page="
 
 // Nature Futures keeps some 1,240 stories on 62 pages of its list (twenty to a
-// page, the newest first). Those since 2018 ("d41586-...", the first
-// twenty-odd pages) are open. The older ones (ids like "516444a" or
-// "35012720") are behind the journal's paywall, which shows a preview and
-// "Buy this article"; they are read from the Internet Archive's copies
-// (futures.go), and while the Archive is down only the open ones are drawn.
+// page, the newest first). All of them are behind the journal's paywall now,
+// which shows the first paragraph and "Rent or buy this article" (those since
+// 2018, "d41586-...", were open until about 2025; the source audit found
+// 0 of 9 whole on 2026-10-30). They are read from the Internet Archive's
+// copies of the years they were free (futures.go); while the Archive is down
+// the shelf draws nothing.
 const (
-	natureFuturesPages     = 62
-	natureFuturesOpenPages = 24
-	natureFuturesOpen      = "d41586-"
-	natureFuturesTries     = 3 // old stories tried in one draw
+	natureFuturesPages       = 62
+	natureFuturesRecentPages = 24 // the list pages of the stories since 2018
+	natureFuturesRecent      = "d41586-"
+	natureFuturesTries       = 3 // stories tried in one draw
 )
 
 // natureFuturesPick takes one of the short science fiction stories Nature
-// prints on its last page: an open one, or an old one the Archive holds whole.
+// prints on its last page, one the Archive holds whole.
 func natureFuturesPick(ctx context.Context, env Env) (string, string, error) {
 	var errs []string
-	archiveDown := false
+	oldSlow := false
 	for range 3 {
-		pages := natureFuturesPages
-		if archiveDown {
-			pages = natureFuturesOpenPages
+		// Most draws are of the stories since 2018: the Archive finds their
+		// captures by their address. The old ones need a search over the
+		// journal's folders, which the Archive often does not finish in
+		// time; after one such failure a draw stays with the new ones.
+		page := 1 + rand.IntN(natureFuturesRecentPages)
+		if !oldSlow && rand.IntN(4) == 0 {
+			page = natureFuturesRecentPages + 1 + rand.IntN(natureFuturesPages-natureFuturesRecentPages)
 		}
-		gq, base, err := get(ctx, env.Fetcher, fmt.Sprintf("%s%d", natureFuturesList, 1+rand.IntN(pages)))
+		gq, base, err := get(ctx, env.Fetcher, fmt.Sprintf("%s%d", natureFuturesList, page))
 		if err != nil {
 			errs = append(errs, err.Error())
 			continue
@@ -76,18 +81,22 @@ func natureFuturesPick(ctx context.Context, env Env) (string, string, error) {
 		tried := 0
 		for _, i := range rand.Perm(len(stories)) {
 			s := stories[i]
-			if strings.HasPrefix(s.id, natureFuturesOpen) {
-				return s.href, s.title, nil
-			}
-			if archiveDown || tried == natureFuturesTries {
-				continue
+			if tried == natureFuturesTries {
+				break
 			}
 			tried++
 			if _, err := futuresStoryFor(ctx, env.Fetcher, s.id); err != nil {
 				if ctx.Err() != nil {
 					return "", "", ctx.Err()
 				}
-				archiveDown = errors.Is(err, errArchiveDown)
+				if errors.Is(err, errArchiveDown) {
+					if strings.HasPrefix(s.id, natureFuturesRecent) {
+						return "", "", err
+					}
+					oldSlow = true
+					errs = append(errs, s.id+": "+err.Error())
+					break
+				}
 				errs = append(errs, s.id+": "+err.Error())
 				continue
 			}

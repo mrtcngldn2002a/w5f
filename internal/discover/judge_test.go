@@ -186,6 +186,30 @@ func TestJudgePoem(t *testing.T) {
 	}
 }
 
+// The Alchemy Web Site's art pages set pictures and short captions in
+// lines: no poem.
+func TestJudgeCaptionsAreNoVerse(t *testing.T) {
+	var in doc.Inline
+	for i := range 12 {
+		if i > 0 {
+			in = append(in, doc.Span{Break: true})
+		}
+		in = append(in, doc.Span{Text: "[image]"}, doc.Span{Break: true}, doc.Span{Text: "Facsimile oil painting by McLean"})
+	}
+	d := &doc.Document{Title: "Splendor Solis Art Project", Blocks: []doc.Block{doc.Paragraph{Text: in}}}
+	if v := Judge(d, "esoteric"); v.Verse || v.OK() {
+		t.Errorf("a gallery of captions passed as a poem: %+v", v)
+	}
+}
+
+// A whole book on one page stays (the owner, 2026-10-30): there is no
+// upper bar.
+func TestJudgeWholeBookStays(t *testing.T) {
+	if v := Judge(story(2500, 80), "esoteric"); !v.OK() {
+		t.Errorf("200,000 words on one page was turned away: %s", reasons(v))
+	}
+}
+
 func TestJudgeTextFile(t *testing.T) {
 	text := strings.Repeat(sentences(60)+"\n\n", 5)
 	d := &doc.Document{Title: "phreak.txt", Blocks: []doc.Block{doc.Pre{Text: text}}}
