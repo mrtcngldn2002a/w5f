@@ -14,8 +14,8 @@ import (
 func init() { families = append(families, nature{}) }
 
 // nature: old natural history on the curious side (chosen with the owner,
-// 2026-10-12): a page of a Biodiversity Heritage Library book, or an article
-// of the Popular Science Monthly (1872-1915).
+// 2026-10-12): a whole article of a Biodiversity Heritage Library journal, or
+// an article of the Popular Science Monthly (1872-1915).
 type nature struct{}
 
 type natureSource struct {
@@ -25,7 +25,7 @@ type natureSource struct {
 }
 
 var natureSources = []natureSource{
-	{"Biodiversity Heritage Library", 3, bhlPage},
+	{"Biodiversity Heritage Library", 3, bhlArticlePick},
 	{"Popular Science Monthly", 2, psmPick},
 }
 

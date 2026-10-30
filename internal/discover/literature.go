@@ -35,8 +35,13 @@ type litSource struct {
 }
 
 var litSources = []litSource{
-	{"The Believer", 3, wpPick("https://www.thebeliever.net")},
-	{"Electric Literature", 2, wpPick("https://electricliterature.com")},
+	// The Believer shows one whole post a visit and counts them in a cookie
+	// ("bpwallcount"; the next ones stop at 600–1,100 words): one draw a
+	// session (the owner, 2026-10-30).
+	{"The Believer", 3, oncePerVisit("https://www.thebeliever.net/", "bpwallcount", wpPick("https://www.thebeliever.net", ""))},
+	// Only its stories (Recommended Reading, category 63, 767 posts): the rest
+	// is reading lists, news, interviews and reviews (2026-10-30).
+	{"Electric Literature", 2, wpPick("https://electricliterature.com", "categories=63")},
 	{"Words Without Borders", 2, sitemapPick("https://wordswithoutborders.org/sitemap_index.xml",
 		`/post-sitemap\d*\.xml$`, `/read/article/`, `week-in-translation|translator-relay|book-club|translation-roundup`)},
 	{"Poets.org", 2, sitemapPick("https://poets.org/sitemap.xml", `sitemap\.xml\?page=\d+$`, `/poem/`, ``)},
@@ -117,14 +122,19 @@ var (
 )
 
 // wpPick takes a random post of a WordPress site (the REST API's posts, one
-// per page: page N is the N-th post).
-func wpPick(base string) func(context.Context, Env) (string, string, error) {
+// per page: page N is the N-th post), of those the filter keeps
+// ("categories=63"; "" keeps all).
+func wpPick(base, filter string) func(context.Context, Env) (string, string, error) {
+	list := base + "/wp-json/wp/v2/posts?per_page=1"
+	if filter != "" {
+		list += "&" + filter
+	}
 	return func(ctx context.Context, env Env) (string, string, error) {
 		wpTotalsMu.Lock()
-		total := wpTotals[base]
+		total := wpTotals[list]
 		wpTotalsMu.Unlock()
 		if total == 0 {
-			_, h, err := rawDo(ctx, env.Fetcher, "GET", base+"/wp-json/wp/v2/posts?per_page=1&_fields=id", nil, nil)
+			_, h, err := rawDo(ctx, env.Fetcher, "GET", list+"&_fields=id", nil, nil)
 			if err != nil {
 				return "", "", err
 			}
@@ -133,11 +143,10 @@ func wpPick(base string) func(context.Context, Env) (string, string, error) {
 				return "", "", errors.New("the REST API does not say how many posts")
 			}
 			wpTotalsMu.Lock()
-			wpTotals[base] = total
+			wpTotals[list] = total
 			wpTotalsMu.Unlock()
 		}
-		b, _, err := rawDo(ctx, env.Fetcher, "GET",
-			fmt.Sprintf("%s/wp-json/wp/v2/posts?per_page=1&page=%d&_fields=link,title", base, 1+rand.IntN(total)), nil, nil)
+		b, _, err := rawDo(ctx, env.Fetcher, "GET", fmt.Sprintf("%s&page=%d&_fields=link,title", list, 1+rand.IntN(total)), nil, nil)
 		if err != nil {
 			return "", "", err
 		}
@@ -151,6 +160,23 @@ func wpPick(base string) func(context.Context, Env) (string, string, error) {
 			return "", "", errors.New("no post on that page")
 		}
 		return posts[0].Link, cleanTitle(posts[0].Title.Rendered), nil
+	}
+}
+
+// oncePerVisit draws from a site with a metered paywall only while its meter
+// is not set: once its cookie is in W5F's jar, the free post of this session
+// has been read and the shelf's other sources draw.
+func oncePerVisit(site, meter string, pick func(context.Context, Env) (string, string, error)) func(context.Context, Env) (string, string, error) {
+	u, _ := url.Parse(site)
+	return func(ctx context.Context, env Env) (string, string, error) {
+		if env.Fetcher != nil && env.Fetcher.Client.Jar != nil {
+			for _, c := range env.Fetcher.Client.Jar.Cookies(u) {
+				if c.Name == meter {
+					return "", "", errors.New("this session's free post is read")
+				}
+			}
+		}
+		return pick(ctx, env)
 	}
 }
 

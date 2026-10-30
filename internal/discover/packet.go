@@ -432,7 +432,8 @@ func packetRoute(ctx context.Context, target string, env Env) (*doc.Document, er
 
 // publicDomainDraws are the public-domain sources, tried in random order: a
 // recent Public Domain Review article, a random Project Gutenberg book, or
-// an old curious natural history book of the Biodiversity Heritage Library.
+// a whole article of a Biodiversity Heritage Library journal (from its open
+// data, as the nature shelf reads it: the owner, 2026-10-30).
 var publicDomainDraws = []func(context.Context, Env) (Draw, error){
 	func(ctx context.Context, env Env) (Draw, error) {
 		link, title, err := rssPick(ctx, env.Fetcher, "https://publicdomainreview.org/rss.xml")
@@ -442,7 +443,13 @@ var publicDomainDraws = []func(context.Context, Env) (Draw, error){
 		return Draw{Target: link, Why: "public domain/Public Domain Review · " + title}, nil
 	},
 	gutenbergDraw,
-	bhlPick,
+	func(ctx context.Context, env Env) (Draw, error) {
+		target, title, err := bhlArticlePick(ctx, env)
+		if err != nil {
+			return Draw{}, errors.New("BHL: " + err.Error())
+		}
+		return Draw{Target: target, Why: "public domain/Biodiversity Heritage Library · " + title}, nil
+	},
 }
 
 func publicDomainDraw(ctx context.Context, env Env) (Draw, error) {

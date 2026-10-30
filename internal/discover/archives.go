@@ -3,13 +3,11 @@ package discover
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand/v2"
 	"net/url"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -19,9 +17,9 @@ import (
 )
 
 // Sources added in M9 (chosen with the owner, 2026-09-30): the Internet
-// Encyclopedia of Philosophy, the Perseus Digital Library, the Biodiversity
-// Heritage Library (through its Internet Archive copy: its own site asks
-// every visitor for a browser check) and small web directories.
+// Encyclopedia of Philosophy, the Perseus Digital Library and small web
+// directories. The Biodiversity Heritage Library they began with, through
+// its Internet Archive copy, is read from its own open data now (nature.go).
 
 // --- Internet Encyclopedia of Philosophy: an article from a random letter.
 
@@ -102,76 +100,6 @@ func perseusPick(ctx context.Context, env Env) (string, string, error) {
 	return w.href, w.title, nil
 }
 
-// --- Biodiversity Heritage Library, through the Internet Archive's copy of
-// it (collection "biodiversity"): old natural history on the curious side.
-// The draw opens the book's full text.
-
-var (
-	archiveAPI = "https://archive.org"
-	bhlQuery   = `collection:biodiversity AND mediatype:texts AND (subject:(bestiaries OR monsters OR dragons OR "sea serpents" OR folklore OR superstition OR mythology OR legends OR magic OR alchemy OR witchcraft OR herbals OR "pre-linnean" OR "early works to 1800" OR curiosities) OR title:(bestiary OR monsters OR wonders OR curiosities OR "natural magic" OR superstitions OR folk-lore OR herbal))`
-)
-
-type archiveDoc struct {
-	Identifier string          `json:"identifier"`
-	Title      string          `json:"title"`
-	Year       json.RawMessage `json:"year"`
-}
-
-func archiveSearch(ctx context.Context, f *fetch.Fetcher, q string, rows, page int) (int, []archiveDoc, error) {
-	v := url.Values{"q": {q}, "fl[]": {"identifier", "title", "year"}, "rows": {strconv.Itoa(rows)},
-		"page": {strconv.Itoa(page)}, "output": {"json"}}
-	u, _ := url.Parse(archiveAPI + "/advancedsearch.php?" + v.Encode())
-	// Not cached: the search answers a failing backend with a 200 and an
-	// error in the body, which must not be kept as an answer.
-	resp, err := f.Get(ctx, u, fetch.Options{NoStore: true})
-	if err != nil {
-		return 0, nil, err
-	}
-	var r struct {
-		Error    string `json:"error"`
-		Response struct {
-			NumFound int          `json:"numFound"`
-			Docs     []archiveDoc `json:"docs"`
-		} `json:"response"`
-	}
-	if err := json.Unmarshal(resp.Body, &r); err != nil {
-		return 0, nil, errors.New("unexpected answer from the Internet Archive")
-	}
-	if r.Error != "" {
-		return 0, nil, errors.New("the Internet Archive's search is failing: " + r.Error)
-	}
-	return r.Response.NumFound, r.Response.Docs, nil
-}
-
-func bhlPick(ctx context.Context, env Env) (Draw, error) {
-	d, err := archivePick(ctx, env.Fetcher, bhlQuery)
-	if err != nil {
-		return Draw{}, errors.New("BHL: " + err.Error())
-	}
-	id := url.PathEscape(d.Identifier)
-	return Draw{Target: archiveAPI + "/stream/" + id + "/" + id + "_djvu.txt",
-		Why: "public domain/Biodiversity Heritage Library · " + d.label()}, nil
-}
-
-// label is the item's title, shortened, with its year.
-func (d archiveDoc) label() string {
-	title := strings.Join(strings.Fields(d.Title), " ")
-	if len([]rune(title)) > 110 {
-		title = string([]rune(title)[:110]) + "…"
-	}
-	var year string
-	if json.Unmarshal(d.Year, &year) != nil {
-		var y int
-		if json.Unmarshal(d.Year, &y) == nil && y > 0 {
-			year = strconv.Itoa(y)
-		}
-	}
-	if year != "" {
-		title += " (" + year + ")"
-	}
-	return title
-}
-
 // --- Small web directories.
 
 var (
@@ -235,11 +163,15 @@ func kagiDraw(ctx context.Context, f *fetch.Fetcher) (Draw, error) {
 	var draws []Draw
 	for _, it := range feed.Items {
 		t, err := url.Parse(strings.TrimSpace(it.Link))
-		if err != nil || (t.Scheme != "http" && t.Scheme != "https") {
+		title := strings.Join(strings.Fields(it.Title), " ")
+		// Tumblr turns W5F away (HTTP 403), some entries are the site's feed
+		// itself, and a "Quick Review" is not a whole piece.
+		if err != nil || (t.Scheme != "http" && t.Scheme != "https") || strings.HasSuffix(t.Host, "tumblr.com") ||
+			strings.HasSuffix(t.Path, ".xml") || notWholeTitle(title) {
 			continue
 		}
 		why := "smallweb/Kagi Small Web · " + t.Host
-		if title := strings.Join(strings.Fields(it.Title), " "); title != "" {
+		if title != "" {
 			why += " — " + title
 		}
 		draws = append(draws, Draw{Target: t.String(), Why: why})

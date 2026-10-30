@@ -163,9 +163,12 @@ func drawFromSites(ctx context.Context, env Env, family string, sites []site) (D
 		s := sites[i]
 		var target, title string
 		var err error
-		if s.name == "Sacred Texts" {
+		switch s.name {
+		case "Sacred Texts":
 			target, title, err = sacredTextsPick(ctx, env.Fetcher, s.start)
-		} else {
+		case "Theoi":
+			target, title, err = theoiPick(ctx, env.Fetcher, s.start)
+		default:
 			target, title, err = descend(ctx, env.Fetcher, s.start, 4)
 		}
 		if err != nil {

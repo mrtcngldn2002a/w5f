@@ -60,7 +60,7 @@ func TestBritannicaAIFilterScope(t *testing.T) {
 		t.Run(host, func(t *testing.T) {
 			u, _ := url.Parse("https://" + host + "/topic/example")
 			body := []byte("<html><body>" + britannicaAIModule + "<p>Editorial text.</p></body></html>")
-			got := string(stripBritannicaAI(body, u))
+			got := string(stripSiteChrome(body, u))
 			if host == "britannica.com" || host == "WWW.BRITANNICA.COM" {
 				if strings.Contains(got, "Generated answer") || !strings.Contains(got, "Editorial text.") {
 					t.Fatal("expected only AI module to be removed")
@@ -72,7 +72,28 @@ func TestBritannicaAIFilterScope(t *testing.T) {
 	}
 	u, _ := url.Parse("https://www.britannica.com/topic/example")
 	plain := []byte("<p>Ordinary editorial page without AI.</p>")
-	if string(stripBritannicaAI(plain, u)) != string(plain) {
+	if string(stripSiteChrome(plain, u)) != string(plain) {
 		t.Fatal("page without AI was modified")
+	}
+}
+
+func TestGnosisLosesItsBannerAndLinkBars(t *testing.T) {
+	body := []byte(`<html><head><title>The Didache</title></head><body>
+<center><p><img src="/images/GnosticSocietyLibrary.gif" alt="The Gnostic Society Library"></p></center>
+<h2>Christian Apocrypha and Early Christian Literature</h2>
+<h6><a href="../welcome.html">Gnosis Archive</a> | <a href="../library.html">Library</a> | <a href="../bookstore1.htm">Bookstore</a></h6>
+<h2>The Didache</h2><p>` + strings.Repeat("Chapter 1. The Two Ways and the First Commandment. There are two ways, one of life and one of death. ", 20) + `</p>
+<h5>| <a href="../welcome.html">GNOSIS ARCHIVE</a> | <a href="../library.html">GNOSTIC SOCIETY LIBARY</a> |</h5>
+</body></html>`)
+	d, err := Article(body, "http://gnosis.org/library/didache.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := allText(d.Blocks)
+	if strings.Contains(text, "Bookstore") || strings.Contains(text, "GNOSIS ARCHIVE") || strings.Contains(text, "Gnostic Society Library") {
+		t.Errorf("the chrome stayed: %q", text)
+	}
+	if !strings.Contains(text, "The Two Ways") || !strings.Contains(text, "Christian Apocrypha") {
+		t.Errorf("the text went with it: %q", text)
 	}
 }

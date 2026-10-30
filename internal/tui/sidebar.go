@@ -353,6 +353,11 @@ func (m Model) hintBar() string {
 		tail = []hint{{"?", "help"}, {"esc", "quit"}} // q closes pages, not rooms
 	}
 	hs := append(m.roomHints(), tail...)
+	if m.pictureOnScreen() >= 0 {
+		// A page with pictures says how to see one large (found in the
+		// laptop's session, 2026-10-30: a plate page had no word of z).
+		hs = append([]hint{{"z", "picture"}}, hs...)
+	}
 	plain := func(hs []hint) int {
 		w := 1
 		for i, h := range hs {

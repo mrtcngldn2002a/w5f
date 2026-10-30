@@ -108,7 +108,9 @@ func bhlPassage(ctx context.Context, f *fetch.Fetcher, leaves []bhlLeaf, i int) 
 }
 
 // bhlPage picks a passage of a random book that reads: English prose, not an
-// index, a table, a list of names or a plate.
+// index, a table, a list of names or a plate. Deep random draws whole
+// articles instead (bhlparts.go); the Daily Packet's BHL section is to move
+// here from the Archive's search (the owner, 2026-10-30).
 func bhlPage(ctx context.Context, env Env) (string, string, error) {
 	var errs []string
 	for range 5 {
@@ -153,11 +155,19 @@ func leafRange(used []bhlLeaf) string {
 	return fmt.Sprintf("leaves %d–%d", used[0].seq, used[len(used)-1].seq)
 }
 
-// bhlRoute builds the passage a draw promised (the same one every time).
+// bhlRoute builds the article or the passage a draw promised (the same one
+// every time). Passages are no longer drawn; their addresses still open.
 func bhlRoute(ctx context.Context, env Env, target string) (*doc.Document, error) {
 	q, err := url.ParseQuery(strings.TrimPrefix(target, "w5f:discover/bhl?"))
 	if err != nil {
 		return nil, err
+	}
+	if p := q.Get("part"); p != "" {
+		part, err := strconv.Atoi(p)
+		if err != nil || part <= 0 {
+			return nil, errors.New("bhl: bad address")
+		}
+		return bhlArticleDoc(ctx, env, target, part)
 	}
 	item, err1 := strconv.Atoi(q.Get("item"))
 	seq, err2 := strconv.Atoi(q.Get("seq"))

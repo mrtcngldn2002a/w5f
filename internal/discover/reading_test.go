@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"strings"
 	"testing"
-	"time"
 
 	"w5f/internal/doc"
 )
@@ -32,80 +31,6 @@ func TestOpeningTellsAStoryStart(t *testing.T) {
 	} {
 		if opening(p) {
 			t.Errorf("not an opening: %q", p)
-		}
-	}
-}
-
-// storyText is a magazine's text: scenes of plain paragraphs, each begun the
-// way a magazine sets a story or a chapter going.
-func storyText(scenes, each int) string {
-	var b strings.Builder
-	for s := 0; s < scenes; s++ {
-		for i := 0; i < each; i++ {
-			if i == 0 {
-				fmt.Fprintf(&b, "THE old naturalist of scene %d walked down to the shore every morning and wrote what he saw in a small book, for he held that nothing seen once is ever seen twice.\n\n", s)
-				continue
-			}
-			fmt.Fprintf(&b, "%s Scene %d, entry %d records the tide, the weather and the birds that came with them.\n\n", goodText, s, i)
-		}
-	}
-	return b.String()
-}
-
-func TestWindowStartsAtAnOpeningAndReadsToTheNext(t *testing.T) {
-	paras := paragraphs(storyText(12, 30))
-	for seed := int64(1); seed < 20; seed++ {
-		win, from := pickWindow(paras, seed)
-		if len(win) == 0 {
-			t.Fatal("no window")
-		}
-		if !opening(win[0]) {
-			t.Fatalf("seed %d: the window starts mid-scene: %.60q", seed, win[0])
-		}
-		end := from + len(win)
-		if end < len(paras) && !opening(paras[end]) {
-			t.Errorf("seed %d: the window stops mid-scene, before %.60q", seed, paras[end])
-		}
-		for _, p := range win[1:] {
-			if opening(p) {
-				t.Errorf("seed %d: the window runs into the next scene", seed)
-			}
-		}
-	}
-}
-
-func TestWindowReadsOn(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, storyText(12, 30))
-	}))
-	defer srv.Close()
-	env := Env{Fetcher: testFetcher()}
-	var d *doc.Document
-	for range 20 { // the seed picks a scene: the last has nothing after it
-		var err error
-		if d, err = Route(context.Background(), windowTarget(srv.URL+"/x/x_djvu.txt", "Weird Tales"), env); err != nil {
-			t.Fatal(err)
-		}
-		if d.Next != "" {
-			break
-		}
-	}
-	if !strings.HasPrefix(d.Byline, "from the start of a story or chapter") || d.Next == "" {
-		t.Fatalf("byline %q, next %q", d.Byline, d.Next)
-	}
-	last := d.Blocks[len(d.Blocks)-2].(doc.Paragraph).Text[0].Text
-	next, err := Route(context.Background(), d.Next, env)
-	if err != nil {
-		t.Fatal(err)
-	}
-	first := next.Blocks[0].(doc.Paragraph).Text[0].Text
-	if !strings.HasPrefix(next.Byline, "read on") || !opening(first) || first == last {
-		t.Errorf("read on: %q, starts %.60q after %.60q", next.Byline, first, last)
-	}
-	for _, page := range []*doc.Document{d, next} {
-		foot := page.Blocks[len(page.Blocks)-1].(doc.Paragraph).Text
-		if foot[0].Text != "The whole text" || (page.Next != "") != (foot[len(foot)-1].Text == "Read on ›") {
-			t.Errorf("foot %+v, next %q", foot, page.Next)
 		}
 	}
 }
@@ -221,75 +146,5 @@ func TestBylineMarksAStoryStart(t *testing.T) {
 	}
 	if shown(paras[0]) != goodText+" "+goodText {
 		t.Errorf("the mark is not shown: %q", shown(paras[0]))
-	}
-}
-
-// logXML is the DjVu XML of a log of numbered entries, one column a page,
-// every entry of eleven words: a page ends in the middle of one.
-func logXML(pages int) (string, []string) {
-	names := strings.Fields("tide bird boat stone wind rain shell fish cloud sand reed crab gull wave moon star")
-	var entries, words []string
-	for i := 0; len(words) < pages*320; i++ {
-		e := fmt.Sprintf("The log of the %s and the %s tells the weather.", names[i%16], names[i/16%16])
-		entries = append(entries, e)
-		words = append(words, strings.Fields(e)...)
-	}
-	var xml strings.Builder
-	xml.WriteString("<?xml version=\"1.0\"?>\n<DjVuXML><BODY>\n")
-	for p := 0; p < pages; p++ {
-		var page []lword
-		for i := 0; i < 40; i++ {
-			page = append(page, columnLine(100, 200+i*48, words[p*320+i*8:p*320+i*8+8])...)
-		}
-		xml.WriteString(xmlPage(page))
-	}
-	xml.WriteString("</BODY></DjVuXML>\n")
-	return xml.String(), entries
-}
-
-func TestReadOnAcrossPagesLosesNoSentence(t *testing.T) {
-	body, entries := logXML(12)
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.ServeContent(w, r, "x_djvu.xml", time.Time{}, strings.NewReader(body))
-	}))
-	defer srv.Close()
-	env := Env{Fetcher: testFetcher()}
-	target := windowPagesTarget(srv.URL+"/download/x/x_djvu.xml", "The log", 0, len(body)/4, len(body))
-	var read strings.Builder
-	ranges := map[string]bool{}
-	for hop := 0; hop < 30 && target != "" && len(ranges) < 3; hop++ {
-		d, err := Route(context.Background(), target, env)
-		if err != nil {
-			t.Fatalf("hop %d: %v", hop, err)
-		}
-		q, _ := url.ParseQuery(strings.TrimPrefix(target, "w5f:discover/window?"))
-		ranges[q.Get("r")] = true
-		for _, b := range d.Blocks[:len(d.Blocks)-1] {
-			read.WriteString(b.(doc.Paragraph).Text[0].Text + " ")
-		}
-		target = d.Next
-	}
-	if len(ranges) < 3 {
-		t.Fatalf("read on into the pages after: %v", ranges)
-	}
-	text := read.String()
-	first := -1
-	for i, e := range entries {
-		if strings.Contains(text, e) {
-			first = i
-			break
-		}
-	}
-	last, at := first, 0
-	for i := first; i < len(entries); i++ {
-		j := strings.Index(text[at:], entries[i])
-		if j < 0 {
-			break
-		}
-		at += j + len(entries[i])
-		last = i
-	}
-	if rest := strings.TrimSpace(text[at:]); first < 0 || rest != "" {
-		t.Errorf("entries %d to %d read in order, then %.120q", first, last, rest)
 	}
 }

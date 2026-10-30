@@ -14,9 +14,10 @@ type weighted interface{ weight() int }
 func (textfiles) weight() int      { return 2 }
 func (knowledge) weight() int      { return 2 }
 func (smallwebFamily) weight() int { return 2 }
-func (fiction) weight() int        { return 2 }
+func (fiction) weight() int        { return 3 } // three magazines more (2026-10-30)
 func (printFamily) weight() int    { return 2 }
 func (literature) weight() int     { return 1 }
+func (plates) weight() int         { return 2 } // eleven sources, but pictures (2026-10-30)
 
 // weightOf is how many places a family takes in the bag (at least one).
 func weightOf(f Family) int {

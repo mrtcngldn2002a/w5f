@@ -33,6 +33,9 @@ type Document struct {
 	Origin       string // "live", "cache", "file", "archive"
 	// Searches are the page's own search boxes, the likeliest first.
 	Searches []Search
+	// Pictures: the reader draws the page's pictures in it (a plate);
+	// elsewhere each is a line, shown large with z.
+	Pictures bool
 }
 
 // Search is a site's search box (a GET form): the reader asks for the words

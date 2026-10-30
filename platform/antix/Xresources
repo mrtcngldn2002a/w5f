@@ -8,6 +8,9 @@ XTerm*scrollBar: false
 XTerm*saveLines: 0
 XTerm*metaSendsEscape: true
 XTerm*allowWindowOps: false
+! Sixel pictures (z in the reader) without changing what the terminal says it
+! is: decTerminalID stays VT420 (measured on the laptop, 2026-10-30).
+XTerm*decGraphicsID: vt340
 ! Amber P3, from internal/theme (a Go test keeps these lines in step).
 XTerm*foreground: #ffb000
 XTerm*background: #120c02

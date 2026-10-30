@@ -23,7 +23,7 @@ const minArticleText = 200
 // the generic converter.
 func Article(body []byte, pageURL string) (*doc.Document, error) {
 	u, _ := url.Parse(pageURL)
-	body = stripBritannicaAI(body, u)
+	body = stripSiteChrome(body, u)
 	body = reCSSInClass.ReplaceAll(body, []byte("$1"))
 	art, err := readability.FromReader(bytes.NewReader(body), u)
 	if err != nil || art.Node == nil {

@@ -133,10 +133,15 @@ func masnaviPick(ctx context.Context, env Env) (string, string, error) {
 // its Journal.
 var miasArticles = "https://ibnarabisociety.org/articles/"
 
+// reMiasNotPaper: the list also links the society's news, its courses'
+// pages, event reports and the Journal's own index (a short course's own text stays:
+// "ibn-arabi-short-course-on-love-james-morris").
+var reMiasNotPaper = regexp.MustCompile(`(?i)news|programme|education-|overview|events?/|report|symposium|^/journal/$`)
+
 func miasPick(ctx context.Context, env Env) (string, string, error) {
 	return listPick(ctx, env.Fetcher, miasArticles, ".entry-content a[href]", func(u *url.URL) bool {
 		return strings.Count(strings.Trim(u.Path, "/"), "/") == 0 && u.Path != "/" &&
-			!skipExt[strings.ToLower(path.Ext(u.Path))] && !reNotContent.MatchString(u.Path)
+			!skipExt[strings.ToLower(path.Ext(u.Path))] && !reNotContent.MatchString(u.Path) && !reMiasNotPaper.MatchString(u.Path)
 	})
 }
 

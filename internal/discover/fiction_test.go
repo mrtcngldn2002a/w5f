@@ -39,21 +39,39 @@ func futuresListServer(t *testing.T, ids ...string) (*httptest.Server, *[]string
 	return srv, &asked
 }
 
-// While the Archive is down, only the open stories are drawn.
-func TestNatureFuturesPicksAnOpenStoryWhileTheArchiveIsDown(t *testing.T) {
+// Every story is paywalled now (2026-10-30): while the Archive is down the
+// shelf draws nothing, and never the journal's own preview.
+func TestNatureFuturesDrawsNothingWhileTheArchiveIsDown(t *testing.T) {
 	(&wayback{down: true}).serve(t)
-	srv, asked := futuresListServer(t, "516444a", "35012720", "d41586-025-03600-9")
+	_, asked := futuresListServer(t, "516444a", "35012720", "d41586-025-03600-9")
 	for range 8 {
-		target, title, err := natureFuturesPick(context.Background(), Env{Fetcher: testFetcher()})
-		if err != nil || target != srv.URL+"/articles/d41586-025-03600-9" || title != "Story d41586-025-03600-9" {
-			t.Fatalf("pick: %q %q %v", target, title, err)
+		if target, _, err := natureFuturesPick(context.Background(), Env{Fetcher: testFetcher()}); err == nil {
+			t.Fatalf("drew %q with the Archive down", target)
 		}
 	}
+	recent := 0
 	for _, q := range *asked {
 		var page int
 		if _, err := fmt.Sscanf(q, "type=futures&page=%d", &page); err != nil || page < 1 || page > natureFuturesPages {
 			t.Errorf("page %q is outside the list", q)
 		}
+		if page <= natureFuturesRecentPages {
+			recent++
+		}
+	}
+	if recent*2 < len(*asked) {
+		t.Errorf("%d of %d list pages were of the stories since 2018", recent, len(*asked))
+	}
+}
+
+// A story since 2018 is read from the Archive too, as a page of its own.
+func TestNatureFuturesPicksANewStoryFromTheArchive(t *testing.T) {
+	w := &wayback{current: []string{"20230101000000"}, pages: map[string]string{"20230101000000": pageCurrent(storyParas(8))}}
+	w.serve(t)
+	futuresListServer(t, "d41586-025-03600-9")
+	target, _, err := natureFuturesPick(context.Background(), Env{Fetcher: testFetcher()})
+	if want := "w5f:discover/futures?id=d41586-025-03600-9&t=Story+d41586-025-03600-9"; err != nil || target != want {
+		t.Fatalf("pick: %q %v, want %q", target, err, want)
 	}
 }
 
@@ -72,13 +90,15 @@ func TestNatureFuturesPicksAnOldStoryFromTheArchive(t *testing.T) {
 	}
 }
 
-// An old story the Archive does not hold gives way to another one.
-func TestNatureFuturesPassesOverAnOldStoryWithoutACopy(t *testing.T) {
-	(&wayback{}).serve(t)
-	srv, _ := futuresListServer(t, "516444a", "d41586-025-03600-9")
+// A story the Archive does not hold gives way to another one: the mock
+// holds no old captures, only one of the present address.
+func TestNatureFuturesPassesOverAStoryWithoutACopy(t *testing.T) {
+	w := &wayback{current: []string{"20230101000000"}, pages: map[string]string{"20230101000000": pageCurrent(storyParas(8))}}
+	w.serve(t)
+	futuresListServer(t, "516444a", "d41586-025-03600-9")
 	for range 6 {
 		target, _, err := natureFuturesPick(context.Background(), Env{Fetcher: testFetcher()})
-		if err != nil || target != srv.URL+"/articles/d41586-025-03600-9" {
+		if err != nil || !strings.HasPrefix(target, "w5f:discover/futures?") {
 			t.Fatalf("pick: %q %v", target, err)
 		}
 	}

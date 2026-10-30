@@ -1,11 +1,6 @@
 package discover
 
 import (
-	"context"
-	"errors"
-	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -48,32 +43,6 @@ func TestAdvertisementIsTold(t *testing.T) {
 	}
 }
 
-func TestStrayMarksTellADirtyScan(t *testing.T) {
-	clean := strings.Repeat(goodText+" Mr. J. Smith of St. Louis said it was so. ", 4)
-	if s, o := strayMarks(clean); s > 0.001 || o > 0.001 {
-		t.Errorf("clean prose has stray %.3f odd %.3f", s, o)
-	}
-	dirty := strings.Repeat("The county commissioners ft u appoint the trustees df the asylums and ithe law libraries j in the «county"+
-		" ^ of Lorain, and a 3d term. ", 4)
-	if s, o := strayMarks(dirty); s < 0.03 || o < 0.03 {
-		t.Errorf("a dirty scan has stray %.3f odd %.3f", s, o)
-	}
-	if proseOK(dirty) || !proseOK(clean) {
-		t.Error("only clean prose is prose to read")
-	}
-	if s, o := strayMarks("the 20th and the 1st, 4th of 1920s, a 5-cent fare"); s != 0 || o != 0 {
-		t.Errorf("ordinals and years are not marks: %.3f %.3f", s, o)
-	}
-}
-
-func TestProseOKRefusesAPageOfAdvertisements(t *testing.T) {
-	ads := strings.Repeat("Our special bargain prices are guaranteed by the dealer to every customer who will send for the free catalog. "+
-		"Buy at the store of the manufacturer and save on every order. ", 6)
-	if proseOK(ads) {
-		t.Error("a page of advertisements is not prose to read")
-	}
-}
-
 func TestParagraphsKeepAFragmentThatJoinsASentenceAcrossAPage(t *testing.T) {
 	text := "Jane’s feet were blistered, because she hadn’t moved around so much since we were\n\ncourting.\n\n" +
 		"“Stay put,” I said. “Your shining\n\nIMAGINATION\n\n90\n\n" +
@@ -91,26 +60,5 @@ func TestParagraphsKeepAFragmentThatJoinsASentenceAcrossAPage(t *testing.T) {
 	}
 	if !continues("lunch, and so") || !continues("to,") || continues("Lunch") || continues("“and") || continues("12 men") {
 		t.Error("a paragraph goes on with a plain lower-case word")
-	}
-}
-
-func TestADirtyScanIsToldFromAnEmptyPlace(t *testing.T) {
-	junk := strings.Repeat("xq vz kt jj qq zz bk wq lx jh rr tt\n", 600)
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasSuffix(r.URL.Path, "dirty.txt") {
-			fmt.Fprint(w, junk)
-			return
-		}
-		fmt.Fprint(w, goodText+"\n\n"+goodText) // clean, but too little for a window
-	}))
-	defer srv.Close()
-	f := testFetcher()
-	_, err := buildWindow(context.Background(), f, windowTarget(srv.URL+"/x/dirty.txt", "Junk"))
-	if !errors.Is(err, errDirtyScan) {
-		t.Errorf("a text of junk is a dirty scan: %v", err)
-	}
-	_, err = buildWindow(context.Background(), f, windowTarget(srv.URL+"/x/short.txt", "Short"))
-	if err == nil || errors.Is(err, errDirtyScan) {
-		t.Errorf("a clean text with too little in it is not dirty: %v", err)
 	}
 }
