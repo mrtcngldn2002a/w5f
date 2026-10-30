@@ -14,7 +14,7 @@ type weighted interface{ weight() int }
 func (textfiles) weight() int      { return 2 }
 func (knowledge) weight() int      { return 2 }
 func (smallwebFamily) weight() int { return 2 }
-func (fiction) weight() int        { return 2 }
+func (fiction) weight() int        { return 3 } // three magazines more (2026-10-30)
 func (printFamily) weight() int    { return 2 }
 func (literature) weight() int     { return 1 }
 

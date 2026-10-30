@@ -9,12 +9,13 @@ import (
 	"unicode/utf8"
 )
 
-// The text the Internet Archive keeps for a scan is OCR, and OCR leaves
-// marks of its own: words broken at the end of a line, letters from the wrong
-// alphabet, quotes turned to asterisks, columns cut off in the middle of a
-// sentence, whole paragraphs of noise where the print was faint. This file
-// mends what can be mended, and measures what cannot, so that a window is
-// cut from the cleanest part of an issue and starts and ends on a sentence.
+// The text of a scan is OCR (the Biodiversity Heritage Library's leaves, the
+// Internet Archive's copies of old pages), and OCR leaves marks of its own:
+// words broken at the end of a line, letters from the wrong alphabet, quotes
+// turned to asterisks, columns cut off in the middle of a sentence, whole
+// paragraphs of noise where the print was faint. This file mends what can be
+// mended, and measures what cannot (scantext.go splits such text into
+// paragraphs of whole sentences; the reading-matter judge weighs it).
 
 // english_words.txt is the ordinary vocabulary of English (inflections
 // included), made by scripts/english_words.py from public domain books.

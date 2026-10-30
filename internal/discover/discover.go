@@ -290,9 +290,13 @@ func Route(ctx context.Context, target string, env Env) (*doc.Document, error) {
 	case target == "w5f:discover/sites" || strings.HasPrefix(target, "w5f:discover/sites/") || strings.HasPrefix(target, "w5f:discover/sites?"):
 		return sitesRoute(ctx, env, target)
 	case strings.HasPrefix(target, "w5f:discover/window?"):
-		return windowRoute(ctx, env, target)
+		// Windows onto the Internet Archive's scans, which Deep random no
+		// longer draws (the owner, 2026-10-30).
+		return nil, errors.New("this window onto an Internet Archive scan is retired: Deep random no longer draws from the Archive")
 	case strings.HasPrefix(target, "w5f:discover/bhl?"):
 		return bhlRoute(ctx, env, target)
+	case strings.HasPrefix(target, "w5f:discover/gutenberg?"):
+		return gutenbergRoute(ctx, env, target)
 	case strings.HasPrefix(target, "w5f:discover/futures?"):
 		return futuresRoute(ctx, env, target)
 	case target == "w5f:discover/random":

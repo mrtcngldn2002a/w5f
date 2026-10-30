@@ -6,13 +6,15 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
 )
 
 // fictionWeb are the web places the fiction family draws from besides Reddit
-// and the SCP tales (chosen with the owner, 2026-10-12).
+// and the SCP tales (chosen with the owner, 2026-10-12; the professional
+// magazines added 2026-10-30, their stories whole on their sites).
 type fictionPlace struct {
 	name   string
 	weight int
@@ -22,6 +24,31 @@ type fictionPlace struct {
 var fictionWeb = []fictionPlace{
 	{"Nature Futures", 2, natureFuturesPick},
 	{"Creepypasta.com", 2, wpPick("https://www.creepypasta.com", "")},
+	// Category 58 "text": the stories (1,279), not their podcasts.
+	{"Clarkesworld", 2, wpPick("https://clarkesworldmagazine.com", "categories=58")},
+	// Category 5 "Fiction" (1,521): the posts with a podcast hold the text too.
+	{"Lightspeed", 2, wpPick("https://www.lightspeedmagazine.com", "categories=5")},
+	// Category 1 "Fiction" (1,312), but a story in parts is cut in its posts.
+	{"Strange Horizons", 2, wholeTitled(wpPick("https://strangehorizons.com", "categories=1"))},
+}
+
+// reInParts: a post that holds one part of a story ("Klokwerk's Heart (part 2
+// of 2)").
+var reInParts = regexp.MustCompile(`(?i)\bpart \d+ of \d+\b|\(part \d+\)`)
+
+// wholeTitled draws again (up to three times) when the post drawn is a part of
+// a story.
+func wholeTitled(pick func(context.Context, Env) (string, string, error)) func(context.Context, Env) (string, string, error) {
+	return func(ctx context.Context, env Env) (string, string, error) {
+		var target, title string
+		var err error
+		for range 3 {
+			if target, title, err = pick(ctx, env); err != nil || !reInParts.MatchString(title) {
+				return target, title, err
+			}
+		}
+		return "", "", errors.New("only parts of stories drawn: " + title)
+	}
 }
 
 var natureFuturesList = "https://www.nature.com/nature/articles?type=futures&page="

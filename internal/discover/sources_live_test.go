@@ -15,8 +15,8 @@ import (
 
 // TestNewSourcesLive draws a few times from every source of the print,
 // nature, literature, fiction and sufism families against the real sites, and
-// opens what was drawn the way the reader does (a window onto a scan is built
-// by Route). It needs the network, so it runs only with W5F_LIVE=1
+// opens what was drawn the way the reader does (a piece of a Gutenberg book is
+// cut out by Route). It needs the network, so it runs only with W5F_LIVE=1
 // (W5F_SOLVER=<url> names a bot-check helper, which Poetry Foundation needs;
 // W5F_LIVE_ONLY=<family> keeps to one family).
 func TestNewSourcesLive(t *testing.T) {
@@ -44,10 +44,7 @@ func TestNewSourcesLive(t *testing.T) {
 	}
 	var picks []pick
 	for _, s := range printSources {
-		picks = append(picks, pick{"print/" + s.name, func(ctx context.Context) (string, string, error) {
-			d, err := printDraw(ctx, env, s)
-			return d.Target, d.Why, err
-		}})
+		picks = append(picks, pick{"print/" + s.name, func(ctx context.Context) (string, string, error) { return s.pick(ctx, env) }})
 	}
 	for _, s := range natureSources {
 		picks = append(picks, pick{"nature/" + s.name, func(ctx context.Context) (string, string, error) { return s.pick(ctx, env) }})

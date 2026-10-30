@@ -63,28 +63,6 @@ func TestPerseusPicksAnEnglishReadingText(t *testing.T) {
 	}
 }
 
-func TestBHLOpensTheFullTextOfACuriousBook(t *testing.T) {
-	var queries []string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		queries = append(queries, r.URL.Query().Get("q"))
-		if r.URL.Path == "/services/search/v1/scrape" {
-			fmt.Fprint(w, `{"items":[{"identifier":"traditionsofcadd41dors","title":"Traditions of the  Caddo","year":1905}],"count":1,"total":73}`)
-			return
-		}
-		fmt.Fprint(w, `{"response":{"numFound":73,"start":0,"docs":[{"identifier":"traditionsofcadd41dors","title":"Traditions of the  Caddo","year":1905}]}}`)
-	}))
-	defer srv.Close()
-	swap(t, &archiveAPI, srv.URL)
-	d, err := bhlPick(context.Background(), Env{Fetcher: testFetcher()})
-	if err != nil || d.Target != srv.URL+"/stream/traditionsofcadd41dors/traditionsofcadd41dors_djvu.txt" ||
-		d.Why != "public domain/Biodiversity Heritage Library · Traditions of the Caddo (1905)" {
-		t.Fatalf("bhl: %+v %v", d, err)
-	}
-	if len(queries) != 1 || !strings.Contains(queries[0], "collection:biodiversity") {
-		t.Errorf("queries: %q", queries)
-	}
-}
-
 func TestSmallWebDirectories(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
