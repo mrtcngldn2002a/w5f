@@ -63,6 +63,9 @@ func TestPlatePictureDrawnAndShownLarge(t *testing.T) {
 	if !strings.Contains(view, "The Bedroom, 1889") || !strings.Contains(view, "Van Gogh") {
 		t.Fatal("caption or text missing")
 	}
+	if bar := m.bottomBar(); !strings.Contains(bar, "z") || !strings.Contains(bar, "picture") {
+		t.Fatalf("the bar does not say z: %q", bar)
+	}
 	m = press(m, "z")
 	if m.mode != modePicture || !strings.Contains(m.View().Content, "1/1 · The Bedroom, 1889") {
 		t.Fatalf("mode %v:\n%s", m.mode, m.View().Content)
